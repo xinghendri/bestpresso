@@ -11,12 +11,14 @@ export interface DecaidWorkflow {
 }
 export interface MachineSnapshot {
   state?: string | { state?: string; substate?: string }
+  groupTemperature?: number
+  targetGroupTemperature?: number
   steamTemperature?: number
 }
 export interface ScaleSnapshot { status?: 'connected' | 'disconnected'; weight?: number; weightFlow?: number }
 export interface DecaidDevice { id?: string; name?: string; state?: 'connected' | 'disconnected'; type?: 'machine' | 'scale' | 'sensor'; available?: boolean }
 export interface WaterLevels { currentLevel?: number; refillLevel?: number }
-export interface TimeToReadyFrame { status?: string; remainingTimeMs?: number }
+export interface TimeToReadyFrame { status?: string; remainingTimeMs?: number; currentTemp?: number; targetTemp?: number }
 export interface ShotMeasurement { machine?: { timestamp?: string; state?: { substate?: string } }; scale?: { weight?: number } }
 export interface ShotRecord { id?: string; workflow?: DecaidWorkflow; measurements?: ShotMeasurement[]; annotations?: { actualYield?: number } }
 export interface PaginatedShots { items?: ShotRecord[] }

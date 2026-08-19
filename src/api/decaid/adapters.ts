@@ -48,8 +48,9 @@ export function readinessFromSnapshot(snapshot: MachineSnapshot): MachineReadine
   const state = machineState?.state
   const substate = machineState?.substate
   if (state === 'sleeping') return 'sleeping'
-  if (state === 'booting' || state === 'heating' || state === 'preheating' || (state === 'idle' && substate === 'preparingForShot')) return 'heating'
   if (state === 'error' || state === 'needsWater') return 'disconnected'
+  if (state === 'booting' || state === 'heating' || state === 'preheating' || (state === 'idle' && substate === 'preparingForShot')) return 'heating'
+  if (snapshot.groupTemperature !== undefined && snapshot.targetGroupTemperature !== undefined && snapshot.groupTemperature < snapshot.targetGroupTemperature) return 'heating'
   return 'ready'
 }
 
