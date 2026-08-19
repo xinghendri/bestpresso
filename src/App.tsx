@@ -3,13 +3,14 @@ import { getDecaidSettingsUrl } from './api/decaid/config'
 import { AppShell } from './app/AppShell'
 import { useBrewingData } from './features/brew/useBrewingData'
 import { ProfilesPanel } from './features/profiles/ProfilesPanel'
+import { PreviousShotScreen } from './features/history/PreviousShotScreen'
 import './styles/index.css'
 
-type AppPage = 'home' | 'profiles'
+type AppPage = 'home' | 'profiles' | 'previous-pull'
 
 const currentPage = (): AppPage => {
   const page = new URLSearchParams(window.location.search).get('page')
-  return page === 'profiles' ? page : 'home'
+  return page === 'profiles' || page === 'previous-pull' ? page : 'home'
 }
 
 export default function App() {
@@ -28,8 +29,10 @@ export default function App() {
     else url.searchParams.set('page', nextPage)
     window.history.pushState({ page: nextPage }, '', url)
     setPage(nextPage)
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
   }
 
   if (page === 'profiles' && !data.liveBrew.visible) return <ProfilesPanel profiles={data.allProfiles} favoriteProfileIds={data.favoriteProfileIds} onClose={() => navigate('home')} />
-  return <AppShell {...data} onSleep={data.toggleSleep} onWake={data.wakeMachine} onDismissLiveBrew={data.dismissLiveBrew} onSearchScale={data.searchForScale} onUpdateMachineSetting={data.updateMachineSetting} onUpdateProfileSetting={data.updateProfileSetting} onOpenSettings={() => window.location.assign(getDecaidSettingsUrl())} onManageProfiles={() => navigate('profiles')} />
+  if (page === 'previous-pull' && !data.liveBrew.visible && data.model.previousShot) return <PreviousShotScreen shot={data.model.previousShot} onDismiss={() => navigate('home')} />
+  return <AppShell {...data} onSleep={data.toggleSleep} onWake={data.wakeMachine} onDismissLiveBrew={data.dismissLiveBrew} onSearchScale={data.searchForScale} onUpdateMachineSetting={data.updateMachineSetting} onUpdateProfileSetting={data.updateProfileSetting} onOpenSettings={() => window.location.assign(getDecaidSettingsUrl())} onManageProfiles={() => navigate('profiles')} onOpenPreviousShot={() => navigate('previous-pull')} />
 }
