@@ -7,7 +7,7 @@ import type { DecaidProfileRecord, FavoriteAssignments, MachineSnapshot, ScaleSn
 import type { BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, MachineReadiness, ScaleConnection, SettingFeedback } from '../../domain/brewing'
 import { brewingFixture } from '../../fixtures/brewingFixture'
 
-const POWER_CHECK_DELAY_MS = 20_000
+const POWER_CHECK_DELAY_MS = 10_000
 const POWER_CHECK_MIN_TARGET_GAP_C = 1
 const POWER_CHECK_MIN_RISE_C = 0.3
 const MAX_LIVE_SHOT_POINTS = 900
