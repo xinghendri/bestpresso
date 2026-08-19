@@ -7,5 +7,6 @@ export function StatusPill({ status, connection, heatingSeconds }: { status: Mac
     return <div className="status-pill status-pill--heating" title="Machine is heating" role="status" aria-live="polite"><img src={heatingIcon} alt="" /><strong>Heating</strong>{heatingSeconds !== null && heatingSeconds !== undefined && heatingSeconds > 0 && <span>{heatingSeconds}s</span>}</div>
   }
   const label = connection === 'connected' ? status : connection === 'fixture' ? 'Demo' : connection
-  return <div className={`status-pill status-pill--${label.toLowerCase()}`} title={`Data source: ${connection}`} role="status"><img src={readyIcon} alt="" /><strong>{label}</strong></div>
+  const visualState = connection === 'fixture' ? status : label.toLowerCase()
+  return <div className={`status-pill status-pill--${visualState}`} title={`Data source: ${connection}`} role="status"><img src={readyIcon} alt="" /><strong>{label}</strong></div>
 }
