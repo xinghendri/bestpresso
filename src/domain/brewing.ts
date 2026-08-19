@@ -36,6 +36,8 @@ export interface PreviousShot {
   profileName: string
   totalYield: string
   totalTime: string
+  targetYield?: number
+  points?: LiveShotPoint[]
 }
 
 export interface BrewingScreenModel {
@@ -64,6 +66,7 @@ export interface LiveShotPoint {
 
 export interface LiveBrewState {
   active: boolean
+  visible: boolean
   elapsedMs: number
   points: LiveShotPoint[]
 }

@@ -29,6 +29,18 @@ export interface DecaidDevice { id?: string; name?: string; state?: 'connected' 
 export interface DisplayState { brightness?: number; requestedBrightness?: number; platformSupported?: { brightness?: boolean; wakeLock?: boolean } }
 export interface WaterLevels { currentLevel?: number; refillLevel?: number }
 export interface TimeToReadyFrame { status?: string; remainingTimeMs?: number; currentTemp?: number; targetTemp?: number }
-export interface ShotMeasurement { machine?: { timestamp?: string; state?: { substate?: string } }; scale?: { weight?: number } }
+export interface ShotMeasurement {
+  machine?: {
+    timestamp?: string
+    state?: { substate?: string }
+    pressure?: number
+    flow?: number
+    targetPressure?: number
+    targetFlow?: number
+    mixTemperature?: number
+    groupTemperature?: number
+  }
+  scale?: { weight?: number; weightFlow?: number }
+}
 export interface ShotRecord { id?: string; workflow?: DecaidWorkflow; measurements?: ShotMeasurement[]; annotations?: { actualYield?: number } }
 export interface PaginatedShots { items?: ShotRecord[] }

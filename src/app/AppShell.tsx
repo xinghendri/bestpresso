@@ -22,6 +22,7 @@ interface AppShellProps {
   scale: ScaleConnection
   onSleep: () => void
   onWake: () => void
+  onDismissLiveBrew: () => void
   onSearchScale: () => void
   onUpdateMachineSetting: (setting: EditableMachineSetting, value: number) => void
   onUpdateProfileSetting: (profileId: string, setting: EditableProfileSetting, value: number) => void
@@ -29,10 +30,10 @@ interface AppShellProps {
   onManageProfiles: () => void
 }
 
-export function AppShell({ model, liveBrew, connection, gatewayHost, heatingSeconds, sleepPending, sleepScreenActive, machineActionError, settingFeedback, settingsDisabled, scale, onSleep, onWake, onSearchScale, onUpdateMachineSetting, onUpdateProfileSetting, onOpenSettings, onManageProfiles }: AppShellProps) {
+export function AppShell({ model, liveBrew, connection, gatewayHost, heatingSeconds, sleepPending, sleepScreenActive, machineActionError, settingFeedback, settingsDisabled, scale, onSleep, onWake, onDismissLiveBrew, onSearchScale, onUpdateMachineSetting, onUpdateProfileSetting, onOpenSettings, onManageProfiles }: AppShellProps) {
   const sleepLabel = model.readiness === 'sleeping' ? 'Wake' : 'Sleep'
   if (sleepScreenActive) return <button className="sleep-screen" type="button" aria-label="Wake machine" onClick={onWake}><span>Tap to wake</span></button>
-  if (liveBrew.active) return <LiveBrewingScreen model={model} liveBrew={liveBrew} />
+  if (liveBrew.visible) return <LiveBrewingScreen model={model} liveBrew={liveBrew} onDismiss={onDismissLiveBrew} />
   return <main className="app-shell">
     <header className="topbar"><img className="logo" src={logo} alt="decent" /><nav aria-label="Machine controls"><span className="gateway-label">{gatewayHost}</span><button className={sleepPending ? 'control-button control-button--pending' : 'control-button'} type="button" aria-label={sleepPending ? `${sleepLabel} request in progress` : sleepLabel} title={sleepLabel} disabled={sleepPending} onClick={onSleep}><img src={sleep} alt="" /></button><button className="control-button" type="button" aria-label="Settings" title="Settings" onClick={onOpenSettings}><img src={settings} alt="" /></button><StatusPill status={model.readiness} connection={connection} heatingSeconds={heatingSeconds} /></nav></header>
     {machineActionError && <div className="action-notice" role="alert">{machineActionError}</div>}

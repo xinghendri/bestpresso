@@ -7,9 +7,10 @@ import { LiveShotChart } from './LiveShotChart'
 interface LiveBrewingScreenProps {
   model: BrewingScreenModel
   liveBrew: LiveBrewState
+  onDismiss: () => void
 }
 
-export function LiveBrewingScreen({ model, liveBrew }: LiveBrewingScreenProps) {
+export function LiveBrewingScreen({ model, liveBrew, onDismiss }: LiveBrewingScreenProps) {
   const profile = model.profiles.find((candidate) => candidate.id === model.activeProfileId) ?? model.profiles[0]
   if (!profile) return null
 
@@ -23,7 +24,9 @@ export function LiveBrewingScreen({ model, liveBrew }: LiveBrewingScreenProps) {
   return <main className="live-brew-screen">
     <header className="live-brew-header">
       <img className="logo" src={logo} alt="decent" />
-      <div className="live-brew-status" role="status"><img src={brewingIcon} alt="" /><strong>Brewing</strong></div>
+      {liveBrew.active
+        ? <div className="live-brew-status" role="status"><img src={brewingIcon} alt="" /><strong>Brewing</strong></div>
+        : <button className="live-brew-status live-brew-status--done" type="button" onClick={onDismiss} aria-label="Dismiss completed pull"><img src={brewingIcon} alt="" /><strong>Done</strong></button>}
     </header>
     <section className="live-brew-panel" aria-label={`Brewing ${profile.name}`}>
       <article className="live-brew-card">

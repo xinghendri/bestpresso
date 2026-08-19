@@ -15,5 +15,20 @@ export const brewingFixture: BrewingScreenModel = {
     { id: 'turbo-bloom', name: 'Turbo bloom', temperature: '93', grindSetting: '11.8', dose: '18', targetYield: '48' },
     { id: 'gentle-sweet', name: 'Gentle and sweet', temperature: '90', grindSetting: '15.1', dose: '20', targetYield: '40' },
   ],
-  previousShot: { profileName: 'Adaptive V2', totalYield: '33.6', totalTime: '38' },
+  previousShot: {
+    profileName: 'Adaptive V2',
+    totalYield: '33.6',
+    totalTime: '38',
+    targetYield: 34,
+    points: [
+      { elapsedMs: 0, pressure: 0, flow: 0, weight: 0 },
+      { elapsedMs: 4000, pressure: 2, flow: 0.3, weight: 0.2 },
+      { elapsedMs: 8000, pressure: 8.5, flow: 1.2, weight: 1.5 },
+      { elapsedMs: 12000, pressure: 7.8, flow: 3.4, weight: 5.4 },
+      { elapsedMs: 18000, pressure: 6.8, flow: 2.9, weight: 12.8 },
+      { elapsedMs: 24000, pressure: 6.2, flow: 2.6, weight: 20.1 },
+      { elapsedMs: 30000, pressure: 5.7, flow: 2.4, weight: 27.4 },
+      { elapsedMs: 38000, pressure: 5.2, flow: 2.1, weight: 33.6 },
+    ],
+  },
 }

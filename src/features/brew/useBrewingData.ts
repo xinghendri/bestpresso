@@ -11,6 +11,14 @@ const POWER_CHECK_DELAY_MS = 20_000
 const POWER_CHECK_MIN_TARGET_GAP_C = 1
 const POWER_CHECK_MIN_RISE_C = 0.3
 const MAX_LIVE_SHOT_POINTS = 900
+const MIN_SUCCESSFUL_SHOT_MS = 5_000
+
+interface LiveShotSession {
+  startedAt: number
+  profileName: string
+  targetYield: number
+  points: LiveShotPoint[]
+}
 
 const snapshotTime = (timestamp?: string) => {
   const parsed = timestamp ? Date.parse(timestamp) : Number.NaN
@@ -28,7 +36,7 @@ export function useBrewingData() {
   const [sleepScreenActive, setSleepScreenActive] = useState(false)
   const [machineActionError, setMachineActionError] = useState<string | null>(null)
   const [settingFeedback, setSettingFeedback] = useState<SettingFeedback | null>(null)
-  const [liveBrew, setLiveBrew] = useState<LiveBrewState>({ active: false, elapsedMs: 0, points: [] })
+  const [liveBrew, setLiveBrew] = useState<LiveBrewState>({ active: false, visible: false, elapsedMs: 0, points: [] })
   const sleepRequestInFlight = useRef(false)
   const wakeScreenDismissed = useRef(false)
   const previousReadiness = useRef<MachineReadiness | null>(null)
@@ -40,8 +48,11 @@ export function useBrewingData() {
   const feedbackTimeout = useRef<number | null>(null)
   const scaleSearchTimeout = useRef<number | null>(null)
   const latestScaleSnapshot = useRef<Pick<LiveShotPoint, 'weight' | 'weightFlow'>>({})
-  const liveShotSession = useRef<{ startedAt: number; points: LiveShotPoint[] } | null>(null)
+  const liveShotSession = useRef<LiveShotSession | null>(null)
+  const latestModel = useRef(model)
   const gatewayHost = getDecaidEndpoints().gatewayHost
+
+  useEffect(() => { latestModel.current = model }, [model])
 
   const dimDisplay = async () => {
     if (displayDimmed.current) return
@@ -89,6 +100,29 @@ export function useBrewingData() {
     let disposed = false
     let timeToReadyEstimate: { deadline: number; receivedAt: number } | null = null
 
+    const completeLiveShot = () => {
+      const session = liveShotSession.current
+      if (!session) return
+      liveShotSession.current = null
+      const points = [...session.points]
+      const elapsedMs = points.at(-1)?.elapsedMs ?? 0
+      setLiveBrew({ active: false, visible: true, elapsedMs, points })
+
+      const hasExtraction = points.some((point) => (point.pressure ?? 0) > 0.5 || (point.flow ?? 0) > 0.1)
+      if (elapsedMs < MIN_SUCCESSFUL_SHOT_MS || !hasExtraction) return
+      const finalWeight = [...points].reverse().find((point) => point.weight !== undefined)?.weight
+      setModel((current) => ({
+        ...current,
+        previousShot: {
+          profileName: session.profileName,
+          totalYield: finalWeight === undefined ? '—' : finalWeight.toFixed(1),
+          totalTime: String(Math.max(1, Math.round(elapsedMs / 1000))),
+          targetYield: session.targetYield,
+          points,
+        },
+      }))
+    }
+
     const refreshConnectedScale = () => {
       setScale((current) => ({ ...current, status: 'connected' }))
       if (scaleSearchTimeout.current !== null) window.clearTimeout(scaleSearchTimeout.current)
@@ -124,7 +158,11 @@ export function useBrewingData() {
       const machineState = typeof snapshot.state === 'string' ? snapshot.state : snapshot.state?.state
       if (machineState === 'espresso') {
         const now = snapshotTime(snapshot.timestamp)
-        if (!liveShotSession.current) liveShotSession.current = { startedAt: now, points: [] }
+        if (!liveShotSession.current) {
+          const currentModel = latestModel.current
+          const profile = currentModel.profiles.find((candidate) => candidate.id === currentModel.activeProfileId) ?? currentModel.profiles[0]
+          liveShotSession.current = { startedAt: now, profileName: profile?.name ?? 'Espresso', targetYield: Number(profile?.targetYield) || 36, points: [] }
+        }
         const session = liveShotSession.current
         const elapsedMs = Math.max(0, now - session.startedAt)
         const lastPoint = session.points.at(-1)
@@ -141,10 +179,9 @@ export function useBrewingData() {
           })
           if (session.points.length > MAX_LIVE_SHOT_POINTS) session.points.shift()
         }
-        setLiveBrew({ active: true, elapsedMs, points: [...session.points] })
+        setLiveBrew({ active: true, visible: true, elapsedMs, points: [...session.points] })
       } else if (liveShotSession.current) {
-        liveShotSession.current = null
-        setLiveBrew((current) => ({ ...current, active: false }))
+        completeLiveShot()
       }
 
       const readiness = readinessWithPowerCheck(snapshot, readinessFromSnapshot(snapshot))
@@ -166,8 +203,7 @@ export function useBrewingData() {
     }, (connected) => {
       if (!connected) {
         heatingProgress.current = null
-        liveShotSession.current = null
-        setLiveBrew((current) => ({ ...current, active: false }))
+        completeLiveShot()
       }
       setConnection((current) => connected ? 'connected' : current === 'fixture' ? current : 'disconnected')
     })
@@ -395,6 +431,7 @@ export function useBrewingData() {
   }
 
   const settingsDisabled = connection !== 'connected' || settingFeedback?.status === 'saving'
+  const dismissLiveBrew = () => setLiveBrew((current) => current.active ? current : { ...current, visible: false })
 
-  return { model, allProfiles, favoriteProfileIds, liveBrew, heatingSeconds, connection, gatewayHost, scale, sleepPending, sleepScreenActive, machineActionError, settingFeedback, settingsDisabled, toggleSleep, wakeMachine, searchForScale, updateMachineSetting, updateProfileSetting }
+  return { model, allProfiles, favoriteProfileIds, liveBrew, heatingSeconds, connection, gatewayHost, scale, sleepPending, sleepScreenActive, machineActionError, settingFeedback, settingsDisabled, toggleSleep, wakeMachine, dismissLiveBrew, searchForScale, updateMachineSetting, updateProfileSetting }
 }

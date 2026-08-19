@@ -67,9 +67,26 @@ export function shotToDomain(shot: ShotRecord | null, fallback: PreviousShot): P
   const lastTimestamp = extraction.at(-1)?.machine?.timestamp
   const duration = firstTimestamp && lastTimestamp ? Math.max(0, Math.round((Date.parse(lastTimestamp) - Date.parse(firstTimestamp)) / 1000)) : Number(fallback.totalTime)
   const lastWeight = [...extraction].reverse().find((entry) => entry.scale?.weight !== undefined)?.scale?.weight
+  const startedAt = firstTimestamp ? Date.parse(firstTimestamp) : Number.NaN
+  const points = Number.isFinite(startedAt) ? extraction.flatMap((entry) => {
+    const timestamp = entry.machine?.timestamp ? Date.parse(entry.machine.timestamp) : Number.NaN
+    if (!Number.isFinite(timestamp)) return []
+    return [{
+      elapsedMs: Math.max(0, timestamp - startedAt),
+      pressure: entry.machine?.pressure,
+      flow: entry.machine?.flow,
+      targetPressure: entry.machine?.targetPressure,
+      targetFlow: entry.machine?.targetFlow,
+      temperature: entry.machine?.mixTemperature ?? entry.machine?.groupTemperature,
+      weight: entry.scale?.weight,
+      weightFlow: entry.scale?.weightFlow,
+    }]
+  }) : fallback.points
   return {
     profileName: shot.workflow?.profile?.title || fallback.profileName,
     totalYield: numberString(shot.annotations?.actualYield ?? lastWeight, fallback.totalYield),
     totalTime: numberString(duration, fallback.totalTime),
+    targetYield: shot.workflow?.context?.targetYield ?? shot.workflow?.profile?.target_weight ?? fallback.targetYield,
+    points: points?.length ? points : fallback.points,
   }
 }
