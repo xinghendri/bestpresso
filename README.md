@@ -35,4 +35,6 @@ The gateway query value is remembered as `localStorage.bestpressoGateway`. Decai
 
 The dashboard reads Streamline's five shared favorite-profile slots from Decaid and keeps their saved order; if no assignments exist it falls back to the first five visible profiles. `Manage profiles` opens Bestpresso's own profile page, which is reserved for the future profile-management workflow.
 
+The scale card resolves the connected device name from Decaid's device list and reads its live weight from the scale snapshot stream. When no scale is connected, the weight is replaced by a search control that starts Decaid's normal scan-and-auto-connect flow.
+
 The header Sleep control mirrors Streamline's confirmed-state behavior: it sends `sleeping` while the machine is awake and `idle` while it is asleep, then waits for the machine snapshot to confirm the change. Heating state comes from the confirmed machine snapshot, with an optional live countdown from the `time-to-ready.reaplugin` feed. The Settings control opens Decaid's bundled settings interface and supplies `backName=Bestpresso` so its Back control returns to the skin. Other machine commands and profile writes remain disabled.

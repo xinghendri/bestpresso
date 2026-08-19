@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { applyWorkflow, favoriteProfiles, profileRecordsToDomain, readinessFromSnapshot, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres } from '../../api/decaid/adapters'
-import { getFavoriteAssignments, getLatestShot, getProfiles, getWorkflow, setMachineState } from '../../api/decaid/client'
+import { getDevices, getFavoriteAssignments, getLatestShot, getProfiles, getWorkflow, scanForDevices, setMachineState } from '../../api/decaid/client'
 import { getDecaidEndpoints } from '../../api/decaid/config'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
-import type { BrewingScreenModel, DataConnection } from '../../domain/brewing'
+import type { BrewingScreenModel, DataConnection, ScaleConnection } from '../../domain/brewing'
 import { brewingFixture } from '../../fixtures/brewingFixture'
 
 export function useBrewingData() {
@@ -13,9 +13,11 @@ export function useBrewingData() {
   const [favoriteProfileIds, setFavoriteProfileIds] = useState(brewingFixture.profiles.slice(0, 5).map((profile) => profile.id))
   const [heatingSeconds, setHeatingSeconds] = useState<number | null>(null)
   const [connection, setConnection] = useState<DataConnection>('connecting')
+  const [scale, setScale] = useState<ScaleConnection>({ status: 'disconnected' })
   const [sleepPending, setSleepPending] = useState(false)
   const [machineActionError, setMachineActionError] = useState<string | null>(null)
   const sleepRequestInFlight = useRef(false)
+  const scaleSearchTimeout = useRef<number | null>(null)
   const gatewayHost = getDecaidEndpoints().gatewayHost
 
   useEffect(() => {
@@ -23,6 +25,23 @@ export function useBrewingData() {
     let profileRecords: DecaidProfileRecord[] = []
     let favoriteAssignments: FavoriteAssignments | null = null
     let timeToReadyEstimate: { deadline: number; receivedAt: number } | null = null
+
+    const refreshConnectedScale = () => {
+      setScale((current) => ({ ...current, status: 'connected' }))
+      if (scaleSearchTimeout.current !== null) window.clearTimeout(scaleSearchTimeout.current)
+      scaleSearchTimeout.current = null
+      getDevices().then((devices) => {
+        if (disposed) return
+        const connectedScale = devices.find((device) => device.type === 'scale' && device.state === 'connected')
+        setScale({ status: 'connected', name: connectedScale?.name || 'Scale' })
+      }).catch(() => undefined)
+    }
+
+    getDevices().then((devices) => {
+      if (disposed) return
+      const connectedScale = devices.find((device) => device.type === 'scale' && device.state === 'connected')
+      if (connectedScale) setScale({ status: 'connected', name: connectedScale.name || 'Scale' })
+    }).catch(() => undefined)
 
     Promise.all([getWorkflow(), getProfiles(), getFavoriteAssignments().catch(() => null), getLatestShot().catch(() => null)])
       .then(([workflow, records, assignments, shot]) => {
@@ -49,7 +68,14 @@ export function useBrewingData() {
     }, (connected) => setConnection((current) => connected ? 'connected' : current === 'fixture' ? current : 'disconnected'))
 
     const scale = subscribe<ScaleSnapshot>('/scale/snapshot', (snapshot) => {
-      if (snapshot.status) return
+      if (snapshot.status === 'connected') {
+        refreshConnectedScale()
+        return
+      }
+      if (snapshot.status === 'disconnected') {
+        setScale((current) => current.status === 'searching' ? current : { status: 'disconnected' })
+        return
+      }
       if (snapshot.weight === undefined) return
       setModel((current) => ({ ...current, utilities: current.utilities.map((utility) => utility.id === 'scale' ? { ...utility, metrics: utility.metrics.map((metric) => ({ ...metric, value: snapshot.weight!.toFixed(1) })) } : utility) }))
     }, () => undefined)
@@ -87,6 +113,7 @@ export function useBrewingData() {
       disposed = true
       window.clearInterval(refreshWorkflow)
       window.clearInterval(heatingCountdown)
+      if (scaleSearchTimeout.current !== null) window.clearTimeout(scaleSearchTimeout.current)
       machine.close(); scale.close(); water.close(); timeToReady.close()
     }
   }, [])
@@ -111,5 +138,23 @@ export function useBrewingData() {
     }
   }
 
-  return { model, allProfiles, favoriteProfileIds, heatingSeconds, connection, gatewayHost, sleepPending, machineActionError, toggleSleep }
+  const searchForScale = async () => {
+    setMachineActionError(null)
+    setScale((current) => ({ ...current, status: 'searching' }))
+    if (scaleSearchTimeout.current !== null) window.clearTimeout(scaleSearchTimeout.current)
+    scaleSearchTimeout.current = window.setTimeout(() => {
+      setScale((current) => current.status === 'searching' ? { status: 'disconnected' } : current)
+      scaleSearchTimeout.current = null
+    }, 20000)
+    try {
+      await scanForDevices()
+    } catch {
+      if (scaleSearchTimeout.current !== null) window.clearTimeout(scaleSearchTimeout.current)
+      scaleSearchTimeout.current = null
+      setScale({ status: 'disconnected' })
+      setMachineActionError('Decaid could not start a scale search.')
+    }
+  }
+
+  return { model, allProfiles, favoriteProfileIds, heatingSeconds, connection, gatewayHost, scale, sleepPending, machineActionError, toggleSleep, searchForScale }
 }
