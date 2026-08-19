@@ -115,13 +115,12 @@ export function tankMillilitres(level: number) {
   return MM_TO_ML[Math.min(index, MM_TO_ML.length - 1)]
 }
 
-export function shotToDomain(shot: ShotRecord | null, fallback: PreviousShot): PreviousShot {
-  if (!shot) return fallback
+export function shotToDomain(shot: ShotRecord): PreviousShot {
   const measurements = shot.measurements ?? []
   const extraction = measurements.filter((entry) => entry.machine?.state?.substate !== 'preparingForShot')
   const firstTimestamp = extraction[0]?.machine?.timestamp
   const lastTimestamp = extraction.at(-1)?.machine?.timestamp
-  const duration = firstTimestamp && lastTimestamp ? Math.max(0, Math.round((Date.parse(lastTimestamp) - Date.parse(firstTimestamp)) / 1000)) : Number(fallback.totalTime)
+  const duration = firstTimestamp && lastTimestamp ? Math.max(0, Math.round((Date.parse(lastTimestamp) - Date.parse(firstTimestamp)) / 1000)) : undefined
   const lastWeight = [...extraction].reverse().find((entry) => entry.scale?.weight !== undefined)?.scale?.weight
   const startedAt = firstTimestamp ? Date.parse(firstTimestamp) : Number.NaN
   const points = Number.isFinite(startedAt) ? extraction.flatMap((entry) => {
@@ -137,12 +136,12 @@ export function shotToDomain(shot: ShotRecord | null, fallback: PreviousShot): P
       weight: entry.scale?.weight,
       weightFlow: entry.scale?.weightFlow,
     }]
-  }) : fallback.points
+  }) : []
   return {
-    profileName: shot.workflow?.profile?.title || fallback.profileName,
-    totalYield: numberString(shot.annotations?.actualYield ?? lastWeight, fallback.totalYield),
-    totalTime: numberString(duration, fallback.totalTime),
-    targetYield: shot.workflow?.context?.targetYield ?? shot.workflow?.profile?.target_weight ?? fallback.targetYield,
-    points: points?.length ? points : fallback.points,
+    profileName: shot.workflow?.profile?.title || shot.workflow?.name || 'Previous pull',
+    totalYield: numberString(shot.annotations?.actualYield ?? lastWeight, '—'),
+    totalTime: numberString(duration, '—'),
+    targetYield: shot.workflow?.context?.targetYield ?? shot.workflow?.profile?.target_weight ?? undefined,
+    points,
   }
 }

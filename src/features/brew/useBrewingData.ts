@@ -4,7 +4,7 @@ import { getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, get
 import { getDecaidEndpoints } from '../../api/decaid/config'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
-import type { BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, MachineReadiness, ScaleConnection, SettingFeedback } from '../../domain/brewing'
+import type { BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, MachineReadiness, PreviousShotStatus, ScaleConnection, SettingFeedback } from '../../domain/brewing'
 import { brewingFixture } from '../../fixtures/brewingFixture'
 
 const POWER_CHECK_DELAY_MS = 10_000
@@ -26,7 +26,7 @@ const snapshotTime = (timestamp?: string) => {
 }
 
 export function useBrewingData() {
-  const [model, setModel] = useState<BrewingScreenModel>(brewingFixture)
+  const [model, setModel] = useState<BrewingScreenModel>({ ...brewingFixture, previousShot: null })
   const [allProfiles, setAllProfiles] = useState(brewingFixture.profiles)
   const [favoriteProfileIds, setFavoriteProfileIds] = useState(brewingFixture.profiles.slice(0, 5).map((profile) => profile.id))
   const [heatingSeconds, setHeatingSeconds] = useState<number | null>(null)
@@ -36,6 +36,7 @@ export function useBrewingData() {
   const [sleepScreenActive, setSleepScreenActive] = useState(false)
   const [machineActionError, setMachineActionError] = useState<string | null>(null)
   const [settingFeedback, setSettingFeedback] = useState<SettingFeedback | null>(null)
+  const [previousShotStatus, setPreviousShotStatus] = useState<PreviousShotStatus>('loading')
   const [liveBrew, setLiveBrew] = useState<LiveBrewState>({ active: false, visible: false, elapsedMs: 0, points: [] })
   const sleepRequestInFlight = useRef(false)
   const wakeScreenDismissed = useRef(false)
@@ -99,6 +100,22 @@ export function useBrewingData() {
   useEffect(() => {
     let disposed = false
     let timeToReadyEstimate: { deadline: number; receivedAt: number } | null = null
+    let latestShotRefreshTimeout: number | null = null
+
+    const schedulePersistedShotRefresh = (session: LiveShotSession, attempt = 0) => {
+      if (latestShotRefreshTimeout !== null) window.clearTimeout(latestShotRefreshTimeout)
+      latestShotRefreshTimeout = window.setTimeout(() => {
+        getLatestShot().then((shot) => {
+          if (disposed) return
+          const timestamp = shot?.timestamp ? Date.parse(shot.timestamp) : Number.NaN
+          const isCompletedSession = shot && (!Number.isFinite(timestamp) || timestamp >= session.startedAt - 2_000)
+          if (isCompletedSession) {
+            setModel((current) => ({ ...current, previousShot: shotToDomain(shot) }))
+            setPreviousShotStatus('loaded')
+          } else if (attempt < 2) schedulePersistedShotRefresh(session, attempt + 1)
+        }).catch(() => { if (!disposed && attempt < 2) schedulePersistedShotRefresh(session, attempt + 1) })
+      }, 800 * (attempt + 1))
+    }
 
     const completeLiveShot = () => {
       const session = liveShotSession.current
@@ -121,6 +138,8 @@ export function useBrewingData() {
           points,
         },
       }))
+      setPreviousShotStatus('loaded')
+      schedulePersistedShotRefresh(session)
     }
 
     const refreshConnectedScale = () => {
@@ -140,8 +159,12 @@ export function useBrewingData() {
       if (connectedScale) setScale({ status: 'connected', name: connectedScale.name || 'Scale' })
     }).catch(() => undefined)
 
-    Promise.all([getWorkflow(), getProfiles(), getFavoriteAssignments().catch(() => null), getLatestShot().catch(() => null)])
-      .then(([workflow, records, assignments, shot]) => {
+    const latestShotRequest = getLatestShot()
+      .then((shot) => ({ shot, failed: false }))
+      .catch(() => ({ shot: null, failed: true }))
+
+    Promise.all([getWorkflow(), getProfiles(), getFavoriteAssignments().catch(() => null), latestShotRequest])
+      .then(([workflow, records, assignments, latestShot]) => {
         if (disposed) return
         profileRecords.current = records
         favoriteAssignments.current = assignments
@@ -149,10 +172,16 @@ export function useBrewingData() {
         const favorites = favoriteProfiles(domainProfiles, assignments)
         setAllProfiles(domainProfiles)
         setFavoriteProfileIds(favorites.map((profile) => profile.id))
-        setModel((current) => ({ ...applyWorkflow(current, workflow, records, assignments), previousShot: shotToDomain(shot, current.previousShot) }))
+        setModel((current) => ({ ...applyWorkflow(current, workflow, records, assignments), previousShot: latestShot.shot ? shotToDomain(latestShot.shot) : null }))
+        setPreviousShotStatus(latestShot.failed ? 'error' : latestShot.shot ? 'loaded' : 'empty')
         setConnection('connected')
       })
-      .catch(() => { if (!disposed) setConnection('fixture') })
+      .catch(() => {
+        if (disposed) return
+        setConnection('fixture')
+        setPreviousShotStatus('fixture')
+        setModel((current) => ({ ...current, previousShot: brewingFixture.previousShot }))
+      })
 
     const machine = subscribe<MachineSnapshot>('/machine/snapshot', (snapshot) => {
       const machineState = typeof snapshot.state === 'string' ? snapshot.state : snapshot.state?.state
@@ -261,6 +290,7 @@ export function useBrewingData() {
       disposed = true
       window.clearInterval(refreshWorkflow)
       window.clearInterval(heatingCountdown)
+      if (latestShotRefreshTimeout !== null) window.clearTimeout(latestShotRefreshTimeout)
       if (feedbackTimeout.current !== null) window.clearTimeout(feedbackTimeout.current)
       if (scaleSearchTimeout.current !== null) window.clearTimeout(scaleSearchTimeout.current)
       machine.close(); scale.close(); water.close(); timeToReady.close()
@@ -433,5 +463,5 @@ export function useBrewingData() {
   const settingsDisabled = connection !== 'connected' || settingFeedback?.status === 'saving'
   const dismissLiveBrew = () => setLiveBrew((current) => current.active ? current : { ...current, visible: false })
 
-  return { model, allProfiles, favoriteProfileIds, liveBrew, heatingSeconds, connection, gatewayHost, scale, sleepPending, sleepScreenActive, machineActionError, settingFeedback, settingsDisabled, toggleSleep, wakeMachine, dismissLiveBrew, searchForScale, updateMachineSetting, updateProfileSetting }
+  return { model, allProfiles, favoriteProfileIds, liveBrew, previousShotStatus, heatingSeconds, connection, gatewayHost, scale, sleepPending, sleepScreenActive, machineActionError, settingFeedback, settingsDisabled, toggleSleep, wakeMachine, dismissLiveBrew, searchForScale, updateMachineSetting, updateProfileSetting }
 }

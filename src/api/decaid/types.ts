@@ -13,6 +13,7 @@ export interface DecaidProfileRecord { id?: string; profile?: DecaidProfile; vis
 export type FavoriteAssignments = Record<string, string | null>
 export interface DecaidWorkflowContext { targetDoseWeight?: number | null; targetYield?: number | null; grinderSetting?: string | null }
 export interface DecaidWorkflow {
+  name?: string
   profile?: DecaidProfile
   context?: DecaidWorkflowContext
   steamSettings?: { targetTemperature?: number; duration?: number; flow?: number }
@@ -51,5 +52,4 @@ export interface ShotMeasurement {
   }
   scale?: { weight?: number; weightFlow?: number }
 }
-export interface ShotRecord { id?: string; workflow?: DecaidWorkflow; measurements?: ShotMeasurement[]; annotations?: { actualYield?: number } }
-export interface PaginatedShots { items?: ShotRecord[] }
+export interface ShotRecord { id?: string; timestamp?: string; workflow?: DecaidWorkflow; measurements?: ShotMeasurement[]; annotations?: { actualYield?: number }; stopReason?: string | null }

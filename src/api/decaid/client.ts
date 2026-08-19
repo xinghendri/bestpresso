@@ -1,5 +1,5 @@
 import { getDecaidEndpoints } from './config'
-import type { DecaidDevice, DecaidProfileRecord, DecaidWorkflow, DecaidWorkflowPatch, DisplayState, FavoriteAssignments, PaginatedShots, ShotRecord } from './types'
+import type { DecaidDevice, DecaidProfileRecord, DecaidWorkflow, DecaidWorkflowPatch, DisplayState, FavoriteAssignments, ShotRecord } from './types'
 
 async function getJson<T>(path: string, timeoutMs = 4500): Promise<T> {
   const controller = new AbortController()
@@ -65,7 +65,6 @@ export async function setMachineState(state: 'idle' | 'sleeping') {
 }
 
 export async function getLatestShot() {
-  const page = await getJson<PaginatedShots>('/shots?limit=1&offset=0&order=desc')
-  const latest = page.items?.[0]
+  const latest = await getJson<ShotRecord | null>('/shots/latest')
   return latest?.id ? getJson<ShotRecord>(`/shots/${encodeURIComponent(latest.id)}`) : null
 }
