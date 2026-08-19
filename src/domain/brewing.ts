@@ -50,3 +50,20 @@ export interface SettingFeedback {
   status: 'saving' | 'saved' | 'error'
   message: string
 }
+
+export interface LiveShotPoint {
+  elapsedMs: number
+  pressure?: number
+  flow?: number
+  targetPressure?: number
+  targetFlow?: number
+  temperature?: number
+  weight?: number
+  weightFlow?: number
+}
+
+export interface LiveBrewState {
+  active: boolean
+  elapsedMs: number
+  points: LiveShotPoint[]
+}

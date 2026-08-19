@@ -4,12 +4,18 @@ import { getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, get
 import { getDecaidEndpoints } from '../../api/decaid/config'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
-import type { BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, MachineReadiness, ScaleConnection, SettingFeedback } from '../../domain/brewing'
+import type { BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, MachineReadiness, ScaleConnection, SettingFeedback } from '../../domain/brewing'
 import { brewingFixture } from '../../fixtures/brewingFixture'
 
 const POWER_CHECK_DELAY_MS = 20_000
 const POWER_CHECK_MIN_TARGET_GAP_C = 1
 const POWER_CHECK_MIN_RISE_C = 0.3
+const MAX_LIVE_SHOT_POINTS = 900
+
+const snapshotTime = (timestamp?: string) => {
+  const parsed = timestamp ? Date.parse(timestamp) : Number.NaN
+  return Number.isFinite(parsed) ? parsed : Date.now()
+}
 
 export function useBrewingData() {
   const [model, setModel] = useState<BrewingScreenModel>(brewingFixture)
@@ -22,6 +28,7 @@ export function useBrewingData() {
   const [sleepScreenActive, setSleepScreenActive] = useState(false)
   const [machineActionError, setMachineActionError] = useState<string | null>(null)
   const [settingFeedback, setSettingFeedback] = useState<SettingFeedback | null>(null)
+  const [liveBrew, setLiveBrew] = useState<LiveBrewState>({ active: false, elapsedMs: 0, points: [] })
   const sleepRequestInFlight = useRef(false)
   const wakeScreenDismissed = useRef(false)
   const previousReadiness = useRef<MachineReadiness | null>(null)
@@ -32,6 +39,8 @@ export function useBrewingData() {
   const favoriteAssignments = useRef<FavoriteAssignments | null>(null)
   const feedbackTimeout = useRef<number | null>(null)
   const scaleSearchTimeout = useRef<number | null>(null)
+  const latestScaleSnapshot = useRef<Pick<LiveShotPoint, 'weight' | 'weightFlow'>>({})
+  const liveShotSession = useRef<{ startedAt: number; points: LiveShotPoint[] } | null>(null)
   const gatewayHost = getDecaidEndpoints().gatewayHost
 
   const dimDisplay = async () => {
@@ -112,6 +121,32 @@ export function useBrewingData() {
       .catch(() => { if (!disposed) setConnection('fixture') })
 
     const machine = subscribe<MachineSnapshot>('/machine/snapshot', (snapshot) => {
+      const machineState = typeof snapshot.state === 'string' ? snapshot.state : snapshot.state?.state
+      if (machineState === 'espresso') {
+        const now = snapshotTime(snapshot.timestamp)
+        if (!liveShotSession.current) liveShotSession.current = { startedAt: now, points: [] }
+        const session = liveShotSession.current
+        const elapsedMs = Math.max(0, now - session.startedAt)
+        const lastPoint = session.points.at(-1)
+        if (!lastPoint || elapsedMs > lastPoint.elapsedMs) {
+          session.points.push({
+            elapsedMs,
+            pressure: snapshot.pressure,
+            flow: snapshot.flow,
+            targetPressure: snapshot.targetPressure,
+            targetFlow: snapshot.targetFlow,
+            temperature: snapshot.mixTemperature ?? snapshot.groupTemperature,
+            weight: latestScaleSnapshot.current.weight,
+            weightFlow: latestScaleSnapshot.current.weightFlow,
+          })
+          if (session.points.length > MAX_LIVE_SHOT_POINTS) session.points.shift()
+        }
+        setLiveBrew({ active: true, elapsedMs, points: [...session.points] })
+      } else if (liveShotSession.current) {
+        liveShotSession.current = null
+        setLiveBrew((current) => ({ ...current, active: false }))
+      }
+
       const readiness = readinessWithPowerCheck(snapshot, readinessFromSnapshot(snapshot))
       if (readiness === 'sleeping') {
         if (previousReadiness.current !== 'sleeping') void dimDisplay()
@@ -129,16 +164,27 @@ export function useBrewingData() {
         utilities: current.utilities.map((utility) => utility.id === 'steam' ? { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Current' && snapshot.steamTemperature !== undefined ? { ...metric, value: String(Math.round(snapshot.steamTemperature)), highlight: snapshot.steamTemperature < STEAM_HEATER_READY_C } : metric) } : utility),
       }))
     }, (connected) => {
-      if (!connected) heatingProgress.current = null
+      if (!connected) {
+        heatingProgress.current = null
+        liveShotSession.current = null
+        setLiveBrew((current) => ({ ...current, active: false }))
+      }
       setConnection((current) => connected ? 'connected' : current === 'fixture' ? current : 'disconnected')
     })
 
     const scale = subscribe<ScaleSnapshot>('/scale/snapshot', (snapshot) => {
+      if (snapshot.weight !== undefined || snapshot.weightFlow !== undefined) {
+        latestScaleSnapshot.current = {
+          weight: snapshot.weight ?? latestScaleSnapshot.current.weight,
+          weightFlow: snapshot.weightFlow ?? latestScaleSnapshot.current.weightFlow,
+        }
+      }
       if (snapshot.status === 'connected') {
         refreshConnectedScale()
         return
       }
       if (snapshot.status === 'disconnected') {
+        latestScaleSnapshot.current = {}
         setScale((current) => current.status === 'searching' ? current : { status: 'disconnected' })
         return
       }
@@ -350,5 +396,5 @@ export function useBrewingData() {
 
   const settingsDisabled = connection !== 'connected' || settingFeedback?.status === 'saving'
 
-  return { model, allProfiles, favoriteProfileIds, heatingSeconds, connection, gatewayHost, scale, sleepPending, sleepScreenActive, machineActionError, settingFeedback, settingsDisabled, toggleSleep, wakeMachine, searchForScale, updateMachineSetting, updateProfileSetting }
+  return { model, allProfiles, favoriteProfileIds, liveBrew, heatingSeconds, connection, gatewayHost, scale, sleepPending, sleepScreenActive, machineActionError, settingFeedback, settingsDisabled, toggleSleep, wakeMachine, searchForScale, updateMachineSetting, updateProfileSetting }
 }

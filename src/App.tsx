@@ -30,6 +30,6 @@ export default function App() {
     setPage(nextPage)
   }
 
-  if (page === 'profiles') return <ProfilesPanel profiles={data.allProfiles} favoriteProfileIds={data.favoriteProfileIds} onClose={() => navigate('home')} />
+  if (page === 'profiles' && !data.liveBrew.active) return <ProfilesPanel profiles={data.allProfiles} favoriteProfileIds={data.favoriteProfileIds} onClose={() => navigate('home')} />
   return <AppShell {...data} onSleep={data.toggleSleep} onWake={data.wakeMachine} onSearchScale={data.searchForScale} onUpdateMachineSetting={data.updateMachineSetting} onUpdateProfileSetting={data.updateProfileSetting} onOpenSettings={() => window.location.assign(getDecaidSettingsUrl())} onManageProfiles={() => navigate('profiles')} />
 }

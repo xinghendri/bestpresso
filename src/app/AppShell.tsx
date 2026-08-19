@@ -2,13 +2,15 @@ import logo from '../assets/figma/decent-logo.png'
 import settings from '../assets/figma/settings.svg'
 import sleep from '../assets/figma/sleep.svg'
 import { StatusPill } from '../components/StatusPill/StatusPill'
-import type { BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, ScaleConnection, SettingFeedback } from '../domain/brewing'
+import type { BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, ScaleConnection, SettingFeedback } from '../domain/brewing'
 import { BrewingPanel } from '../features/brew/BrewingPanel'
+import { LiveBrewingScreen } from '../features/brew/LiveBrewingScreen'
 import { HistoryPanel } from '../features/history/HistoryPanel'
 import { MachineUtilityCard } from '../features/machine/MachineUtilityCard'
 
 interface AppShellProps {
   model: BrewingScreenModel
+  liveBrew: LiveBrewState
   connection: DataConnection
   gatewayHost: string
   heatingSeconds: number | null
@@ -27,9 +29,10 @@ interface AppShellProps {
   onManageProfiles: () => void
 }
 
-export function AppShell({ model, connection, gatewayHost, heatingSeconds, sleepPending, sleepScreenActive, machineActionError, settingFeedback, settingsDisabled, scale, onSleep, onWake, onSearchScale, onUpdateMachineSetting, onUpdateProfileSetting, onOpenSettings, onManageProfiles }: AppShellProps) {
+export function AppShell({ model, liveBrew, connection, gatewayHost, heatingSeconds, sleepPending, sleepScreenActive, machineActionError, settingFeedback, settingsDisabled, scale, onSleep, onWake, onSearchScale, onUpdateMachineSetting, onUpdateProfileSetting, onOpenSettings, onManageProfiles }: AppShellProps) {
   const sleepLabel = model.readiness === 'sleeping' ? 'Wake' : 'Sleep'
   if (sleepScreenActive) return <button className="sleep-screen" type="button" aria-label="Wake machine" onClick={onWake}><span>Tap to wake</span></button>
+  if (liveBrew.active) return <LiveBrewingScreen model={model} liveBrew={liveBrew} />
   return <main className="app-shell">
     <header className="topbar"><img className="logo" src={logo} alt="decent" /><nav aria-label="Machine controls"><span className="gateway-label">{gatewayHost}</span><button className={sleepPending ? 'control-button control-button--pending' : 'control-button'} type="button" aria-label={sleepPending ? `${sleepLabel} request in progress` : sleepLabel} title={sleepLabel} disabled={sleepPending} onClick={onSleep}><img src={sleep} alt="" /></button><button className="control-button" type="button" aria-label="Settings" title="Settings" onClick={onOpenSettings}><img src={settings} alt="" /></button><StatusPill status={model.readiness} connection={connection} heatingSeconds={heatingSeconds} /></nav></header>
     {machineActionError && <div className="action-notice" role="alert">{machineActionError}</div>}

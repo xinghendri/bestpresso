@@ -11,12 +11,20 @@ export interface DecaidWorkflow {
 }
 export type DecaidWorkflowPatch = Partial<Pick<DecaidWorkflow, 'profile' | 'context' | 'steamSettings' | 'hotWaterData'>>
 export interface MachineSnapshot {
+  timestamp?: string
   state?: string | { state?: string; substate?: string }
+  flow?: number
+  pressure?: number
+  targetFlow?: number
+  targetPressure?: number
+  mixTemperature?: number
   groupTemperature?: number
+  targetMixTemperature?: number
   targetGroupTemperature?: number
+  profileFrame?: number
   steamTemperature?: number
 }
-export interface ScaleSnapshot { status?: 'connected' | 'disconnected'; weight?: number; weightFlow?: number }
+export interface ScaleSnapshot { status?: 'connected' | 'disconnected'; timestamp?: string; weight?: number; weightFlow?: number; timerValue?: number | null }
 export interface DecaidDevice { id?: string; name?: string; state?: 'connected' | 'disconnected'; type?: 'machine' | 'scale' | 'sensor'; available?: boolean }
 export interface DisplayState { brightness?: number; requestedBrightness?: number; platformSupported?: { brightness?: boolean; wakeLock?: boolean } }
 export interface WaterLevels { currentLevel?: number; refillLevel?: number }
