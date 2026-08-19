@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
-import { applyWorkflow, readinessFromSnapshot, shotToDomain, tankMillilitres } from '../../api/decaid/adapters'
-import { getLatestShot, getProfiles, getWorkflow, setMachineState } from '../../api/decaid/client'
+import { applyWorkflow, favoriteProfiles, profileRecordsToDomain, readinessFromSnapshot, shotToDomain, tankMillilitres } from '../../api/decaid/adapters'
+import { getFavoriteAssignments, getLatestShot, getProfiles, getWorkflow, setMachineState } from '../../api/decaid/client'
 import { getDecaidEndpoints } from '../../api/decaid/config'
 import { subscribe } from '../../api/decaid/socket'
-import type { DecaidProfileRecord, MachineSnapshot, ScaleSnapshot, WaterLevels } from '../../api/decaid/types'
+import type { DecaidProfileRecord, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
 import type { BrewingScreenModel, DataConnection } from '../../domain/brewing'
 import { brewingFixture } from '../../fixtures/brewingFixture'
 
 export function useBrewingData() {
   const [model, setModel] = useState<BrewingScreenModel>(brewingFixture)
+  const [allProfiles, setAllProfiles] = useState(brewingFixture.profiles)
+  const [favoriteProfileIds, setFavoriteProfileIds] = useState(brewingFixture.profiles.slice(0, 5).map((profile) => profile.id))
+  const [heatingSeconds, setHeatingSeconds] = useState<number | null>(null)
   const [connection, setConnection] = useState<DataConnection>('connecting')
   const [sleepPending, setSleepPending] = useState(false)
   const [machineActionError, setMachineActionError] = useState<string | null>(null)
@@ -18,20 +21,29 @@ export function useBrewingData() {
   useEffect(() => {
     let disposed = false
     let profileRecords: DecaidProfileRecord[] = []
+    let favoriteAssignments: FavoriteAssignments | null = null
+    let timeToReadyEstimate: { deadline: number; receivedAt: number } | null = null
 
-    Promise.all([getWorkflow(), getProfiles(), getLatestShot().catch(() => null)])
-      .then(([workflow, records, shot]) => {
+    Promise.all([getWorkflow(), getProfiles(), getFavoriteAssignments().catch(() => null), getLatestShot().catch(() => null)])
+      .then(([workflow, records, assignments, shot]) => {
         if (disposed) return
         profileRecords = records
-        setModel((current) => ({ ...applyWorkflow(current, workflow, records), previousShot: shotToDomain(shot, current.previousShot) }))
+        favoriteAssignments = assignments
+        const domainProfiles = profileRecordsToDomain(records, workflow, brewingFixture.profiles)
+        const favorites = favoriteProfiles(domainProfiles, assignments)
+        setAllProfiles(domainProfiles)
+        setFavoriteProfileIds(favorites.map((profile) => profile.id))
+        setModel((current) => ({ ...applyWorkflow(current, workflow, records, assignments), previousShot: shotToDomain(shot, current.previousShot) }))
         setConnection('connected')
       })
       .catch(() => { if (!disposed) setConnection('fixture') })
 
     const machine = subscribe<MachineSnapshot>('/machine/snapshot', (snapshot) => {
+      const readiness = readinessFromSnapshot(snapshot)
+      if (readiness !== 'heating') setHeatingSeconds(null)
       setModel((current) => ({
         ...current,
-        readiness: readinessFromSnapshot(snapshot),
+        readiness,
         utilities: current.utilities.map((utility) => utility.id === 'steam' ? { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Current' && snapshot.steamTemperature !== undefined ? { ...metric, value: String(Math.round(snapshot.steamTemperature)) } : metric) } : utility),
       }))
     }, (connected) => setConnection((current) => connected ? 'connected' : current === 'fixture' ? current : 'disconnected'))
@@ -47,14 +59,35 @@ export function useBrewingData() {
       setModel((current) => ({ ...current, utilities: current.utilities.map((utility) => utility.id === 'tank' ? { ...utility, metrics: utility.metrics.map((metric) => ({ ...metric, value: tankMillilitres(levels.currentLevel!).toLocaleString('en-US') })) } : utility) }))
     }, () => undefined)
 
+    const timeToReady = subscribe<TimeToReadyFrame>('/plugins/time-to-ready.reaplugin/timeToReady', (frame) => {
+      if (frame.status !== 'heating' || !frame.remainingTimeMs || frame.remainingTimeMs <= 0) {
+        timeToReadyEstimate = null
+        setHeatingSeconds(null)
+        return
+      }
+      const now = Date.now()
+      timeToReadyEstimate = { deadline: now + frame.remainingTimeMs, receivedAt: now }
+      setHeatingSeconds(Math.min(300, Math.round(frame.remainingTimeMs / 1000)))
+    }, () => undefined)
+
+    const heatingCountdown = window.setInterval(() => {
+      if (!timeToReadyEstimate || Date.now() - timeToReadyEstimate.receivedAt > 6000) {
+        timeToReadyEstimate = null
+        setHeatingSeconds(null)
+        return
+      }
+      setHeatingSeconds(Math.min(300, Math.max(0, Math.round((timeToReadyEstimate.deadline - Date.now()) / 1000))))
+    }, 1000)
+
     const refreshWorkflow = window.setInterval(() => {
-      getWorkflow().then((workflow) => { if (!disposed) setModel((current) => applyWorkflow(current, workflow, profileRecords)) }).catch(() => undefined)
+      getWorkflow().then((workflow) => { if (!disposed) setModel((current) => applyWorkflow(current, workflow, profileRecords, favoriteAssignments)) }).catch(() => undefined)
     }, 15000)
 
     return () => {
       disposed = true
       window.clearInterval(refreshWorkflow)
-      machine.close(); scale.close(); water.close()
+      window.clearInterval(heatingCountdown)
+      machine.close(); scale.close(); water.close(); timeToReady.close()
     }
   }, [])
 
@@ -78,5 +111,5 @@ export function useBrewingData() {
     }
   }
 
-  return { model, connection, gatewayHost, sleepPending, machineActionError, toggleSleep }
+  return { model, allProfiles, favoriteProfileIds, heatingSeconds, connection, gatewayHost, sleepPending, machineActionError, toggleSleep }
 }

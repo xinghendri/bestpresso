@@ -1,5 +1,5 @@
 import { getDecaidEndpoints } from './config'
-import type { DecaidProfileRecord, DecaidWorkflow, PaginatedShots, ShotRecord } from './types'
+import type { DecaidProfileRecord, DecaidWorkflow, FavoriteAssignments, PaginatedShots, ShotRecord } from './types'
 
 async function getJson<T>(path: string, timeoutMs = 4500): Promise<T> {
   const controller = new AbortController()
@@ -15,6 +15,7 @@ async function getJson<T>(path: string, timeoutMs = 4500): Promise<T> {
 
 export const getWorkflow = () => getJson<DecaidWorkflow>('/workflow')
 export const getProfiles = () => getJson<DecaidProfileRecord[]>('/profiles')
+export const getFavoriteAssignments = () => getJson<FavoriteAssignments>('/store/streamline-app/favorite-profiles')
 
 export async function setMachineState(state: 'idle' | 'sleeping') {
   const response = await fetch(`${getDecaidEndpoints().apiBase}/machine/state/${state}`, { method: 'PUT' })

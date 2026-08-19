@@ -12,7 +12,7 @@ function wrappedOffset(index: number, activeIndex: number, length: number) {
   return direct
 }
 
-export function BrewingPanel({ profiles, activeProfileId }: { profiles: BrewProfile[]; activeProfileId?: string }) {
+export function BrewingPanel({ profiles, activeProfileId, onManageProfiles }: { profiles: BrewProfile[]; activeProfileId?: string; onManageProfiles: () => void }) {
   const initialIndex = Math.max(0, profiles.findIndex((profile) => profile.id === activeProfileId || profile.id === 'adaptive-v2'))
   const [activeIndex, setActiveIndex] = useState(initialIndex)
   const pointerStart = useRef<number | null>(null)
@@ -54,7 +54,7 @@ export function BrewingPanel({ profiles, activeProfileId }: { profiles: BrewProf
         </button>
       })}
     </div>
-    <button className="manage-profiles" type="button">Manage profiles →</button>
+    <button className="manage-profiles" type="button" onClick={onManageProfiles}>Manage profiles →</button>
     <div className="brew-metrics" key={activeProfile.id} aria-live="polite">
       <Metric metric={{ label: 'Temp.', value: activeProfile.temperature, unit: '°' }} />
       <Metric metric={{ label: 'Grind size', value: activeProfile.grindSetting }} />

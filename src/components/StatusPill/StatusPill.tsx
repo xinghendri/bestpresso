@@ -1,7 +1,11 @@
+import heatingIcon from '../../assets/figma/heating.svg'
 import readyIcon from '../../assets/figma/ready.svg'
 import type { DataConnection, MachineReadiness } from '../../domain/brewing'
 
-export function StatusPill({ status, connection }: { status: MachineReadiness; connection: DataConnection }) {
+export function StatusPill({ status, connection, heatingSeconds }: { status: MachineReadiness; connection: DataConnection; heatingSeconds?: number | null }) {
+  if (connection === 'connected' && status === 'heating') {
+    return <div className="status-pill status-pill--heating" title="Machine is heating" role="status" aria-live="polite"><img src={heatingIcon} alt="" /><strong>Heating</strong>{heatingSeconds !== null && heatingSeconds !== undefined && heatingSeconds > 0 && <span>{heatingSeconds}s</span>}</div>
+  }
   const label = connection === 'connected' ? status : connection === 'fixture' ? 'Demo' : connection
-  return <div className={`status-pill status-pill--${label.toLowerCase()}`} title={`Data source: ${connection}`}><img src={readyIcon} alt="" /><strong>{label}</strong></div>
+  return <div className={`status-pill status-pill--${label.toLowerCase()}`} title={`Data source: ${connection}`} role="status"><img src={readyIcon} alt="" /><strong>{label}</strong></div>
 }

@@ -12,6 +12,8 @@ export const brewingFixture: BrewingScreenModel = {
     { id: 'trendy-six-bar', name: 'Trendy 6 bar low pressure shot', temperature: '91', grindSetting: '13.2', dose: '20', targetYield: '42' },
     { id: 'adaptive-v2', name: 'Adaptive V2', temperature: '92', grindSetting: '14.5', dose: '21', targetYield: '34' },
     { id: 'best-practice-light', name: 'Best practice (light roast)', temperature: '94', grindSetting: '12.8', dose: '18', targetYield: '45' },
+    { id: 'turbo-bloom', name: 'Turbo bloom', temperature: '93', grindSetting: '11.8', dose: '18', targetYield: '48' },
+    { id: 'gentle-sweet', name: 'Gentle and sweet', temperature: '90', grindSetting: '15.1', dose: '20', targetYield: '40' },
   ],
   previousShot: { profileName: 'Adaptive V2', totalYield: '33.6', totalTime: '38' },
 }

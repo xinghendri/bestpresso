@@ -1,5 +1,5 @@
 import type { BrewProfile, BrewingScreenModel, MachineReadiness, PreviousShot } from '../../domain/brewing'
-import type { DecaidProfileRecord, DecaidWorkflow, MachineSnapshot, ShotRecord } from './types'
+import type { DecaidProfileRecord, DecaidWorkflow, FavoriteAssignments, MachineSnapshot, ShotRecord } from './types'
 
 const MM_TO_ML = [0,16,43,70,97,124,151,179,206,233,261,288,316,343,371,398,426,453,481,509,537,564,592,620,648,676,704,732,760,788,816,844,872,900,929,957,985,1013,1042,1070,1104,1138,1172,1207,1242,1277,1312,1347,1382,1417,1453,1488,1523,1559,1594,1630,1665,1701,1736,1772,1808,1843,1879,1915,1951,1986,2022,2058]
 
@@ -23,15 +23,23 @@ export function profileRecordsToDomain(records: DecaidProfileRecord[], workflow:
   })
 }
 
-export function applyWorkflow(model: BrewingScreenModel, workflow: DecaidWorkflow, records: DecaidProfileRecord[]) {
-  const profiles = profileRecordsToDomain(records, workflow, model.profiles)
+export function favoriteProfiles(profiles: BrewProfile[], assignments: FavoriteAssignments | null) {
+  const assigned = Array.from({ length: 5 }, (_, slot) => assignments?.[slot])
+    .map((id) => profiles.find((profile) => profile.id === id))
+    .filter((profile): profile is BrewProfile => Boolean(profile))
+  return assigned.length ? assigned : profiles.slice(0, 5)
+}
+
+export function applyWorkflow(model: BrewingScreenModel, workflow: DecaidWorkflow, records: DecaidProfileRecord[], assignments: FavoriteAssignments | null = null) {
+  const allProfiles = profileRecordsToDomain(records, workflow, model.profiles)
+  const profiles = favoriteProfiles(allProfiles, assignments)
   const active = profiles.find((profile) => profile.name === workflow.profile?.title)
   const utilities = model.utilities.map((utility) => {
     if (utility.id === 'water') return { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Target yield' ? { ...metric, value: numberString(workflow.hotWaterData?.volume, metric.value) } : { ...metric, value: numberString(workflow.hotWaterData?.targetTemperature, metric.value) }) }
     if (utility.id === 'steam') return { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Target' ? { ...metric, value: numberString(workflow.steamSettings?.targetTemperature, metric.value) } : metric.label === 'Max time' ? { ...metric, value: numberString(workflow.steamSettings?.duration, metric.value) } : metric.label === 'Flow' ? { ...metric, value: numberString(workflow.steamSettings?.flow, metric.value) } : metric) }
     return utility
   })
-  return { ...model, profiles, activeProfileId: active?.id, utilities }
+  return { ...model, profiles, activeProfileId: active?.id ?? profiles[0]?.id, utilities }
 }
 
 export function readinessFromSnapshot(snapshot: MachineSnapshot): MachineReadiness {
