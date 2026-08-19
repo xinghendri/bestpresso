@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { applyWorkflow, favoriteProfiles, profileRecordsToDomain, readinessFromSnapshot, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres } from '../../api/decaid/adapters'
-import { getDevices, getFavoriteAssignments, getLatestShot, getProfiles, getWorkflow, scanForDevices, setMachineState } from '../../api/decaid/client'
+import { getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getWorkflow, scanForDevices, setDisplayBrightness, setMachineState } from '../../api/decaid/client'
 import { getDecaidEndpoints } from '../../api/decaid/config'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
-import type { BrewingScreenModel, DataConnection, ScaleConnection } from '../../domain/brewing'
+import type { BrewingScreenModel, DataConnection, MachineReadiness, ScaleConnection } from '../../domain/brewing'
 import { brewingFixture } from '../../fixtures/brewingFixture'
 
 export function useBrewingData() {
@@ -15,10 +15,35 @@ export function useBrewingData() {
   const [connection, setConnection] = useState<DataConnection>('connecting')
   const [scale, setScale] = useState<ScaleConnection>({ status: 'disconnected' })
   const [sleepPending, setSleepPending] = useState(false)
+  const [sleepScreenActive, setSleepScreenActive] = useState(false)
   const [machineActionError, setMachineActionError] = useState<string | null>(null)
   const sleepRequestInFlight = useRef(false)
+  const wakeScreenDismissed = useRef(false)
+  const previousReadiness = useRef<MachineReadiness | null>(null)
+  const displayDimmed = useRef(false)
+  const brightnessBeforeSleep = useRef<number | null>(null)
   const scaleSearchTimeout = useRef<number | null>(null)
   const gatewayHost = getDecaidEndpoints().gatewayHost
+
+  const dimDisplay = async () => {
+    if (displayDimmed.current) return
+    displayDimmed.current = true
+    try {
+      const display = await getDisplayState()
+      if (typeof display.requestedBrightness === 'number' && display.requestedBrightness > 0) brightnessBeforeSleep.current = display.requestedBrightness
+    } catch { /* brightness capture is optional */ }
+    try { await setDisplayBrightness(0) }
+    catch { displayDimmed.current = false }
+  }
+
+  const restoreDisplay = async () => {
+    const brightness = brightnessBeforeSleep.current ?? 100
+    try {
+      await setDisplayBrightness(brightness)
+      brightnessBeforeSleep.current = null
+    } catch { /* waking the machine remains the priority */ }
+    displayDimmed.current = false
+  }
 
   useEffect(() => {
     let disposed = false
@@ -59,6 +84,15 @@ export function useBrewingData() {
 
     const machine = subscribe<MachineSnapshot>('/machine/snapshot', (snapshot) => {
       const readiness = readinessFromSnapshot(snapshot)
+      if (readiness === 'sleeping') {
+        if (previousReadiness.current !== 'sleeping') void dimDisplay()
+        if (!wakeScreenDismissed.current && !sleepRequestInFlight.current) setSleepScreenActive(true)
+      } else {
+        if (previousReadiness.current === 'sleeping') void restoreDisplay()
+        wakeScreenDismissed.current = false
+        setSleepScreenActive(false)
+      }
+      previousReadiness.current = readiness
       if (readiness !== 'heating') setHeatingSeconds(null)
       setModel((current) => ({
         ...current,
@@ -129,9 +163,49 @@ export function useBrewingData() {
     setSleepPending(true)
     setMachineActionError(null)
     try {
-      await setMachineState(model.readiness === 'sleeping' ? 'idle' : 'sleeping')
+      if (model.readiness === 'sleeping') {
+        wakeScreenDismissed.current = true
+        setSleepScreenActive(false)
+        void restoreDisplay()
+        await setMachineState('idle')
+      } else {
+        await setMachineState('sleeping')
+        setSleepScreenActive(true)
+        void dimDisplay()
+      }
     } catch {
+      if (model.readiness === 'sleeping') {
+        wakeScreenDismissed.current = false
+        setSleepScreenActive(true)
+        void dimDisplay()
+      } else {
+        setSleepScreenActive(false)
+        void restoreDisplay()
+      }
       setMachineActionError('The machine did not accept the sleep command.')
+    } finally {
+      sleepRequestInFlight.current = false
+      setSleepPending(false)
+    }
+  }
+
+  const wakeMachine = async () => {
+    if (sleepRequestInFlight.current) return
+    sleepRequestInFlight.current = true
+    wakeScreenDismissed.current = true
+    setSleepScreenActive(false)
+    setSleepPending(true)
+    setMachineActionError(null)
+    const restorePromise = restoreDisplay()
+    try {
+      await setMachineState('idle')
+      await restorePromise
+    } catch {
+      await restorePromise
+      wakeScreenDismissed.current = false
+      setSleepScreenActive(true)
+      await dimDisplay()
+      setMachineActionError('The machine did not accept the wake command.')
     } finally {
       sleepRequestInFlight.current = false
       setSleepPending(false)
@@ -156,5 +230,5 @@ export function useBrewingData() {
     }
   }
 
-  return { model, allProfiles, favoriteProfileIds, heatingSeconds, connection, gatewayHost, scale, sleepPending, machineActionError, toggleSleep, searchForScale }
+  return { model, allProfiles, favoriteProfileIds, heatingSeconds, connection, gatewayHost, scale, sleepPending, sleepScreenActive, machineActionError, toggleSleep, wakeMachine, searchForScale }
 }

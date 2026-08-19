@@ -17,6 +17,7 @@ export interface MachineSnapshot {
 }
 export interface ScaleSnapshot { status?: 'connected' | 'disconnected'; weight?: number; weightFlow?: number }
 export interface DecaidDevice { id?: string; name?: string; state?: 'connected' | 'disconnected'; type?: 'machine' | 'scale' | 'sensor'; available?: boolean }
+export interface DisplayState { brightness?: number; requestedBrightness?: number; platformSupported?: { brightness?: boolean; wakeLock?: boolean } }
 export interface WaterLevels { currentLevel?: number; refillLevel?: number }
 export interface TimeToReadyFrame { status?: string; remainingTimeMs?: number; currentTemp?: number; targetTemp?: number }
 export interface ShotMeasurement { machine?: { timestamp?: string; state?: { substate?: string } }; scale?: { weight?: number } }

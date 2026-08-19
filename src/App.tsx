@@ -31,5 +31,5 @@ export default function App() {
   }
 
   if (page === 'profiles') return <ProfilesPanel profiles={data.allProfiles} favoriteProfileIds={data.favoriteProfileIds} onClose={() => navigate('home')} />
-  return <AppShell {...data} onSleep={data.toggleSleep} onSearchScale={data.searchForScale} onOpenSettings={() => window.location.assign(getDecaidSettingsUrl())} onManageProfiles={() => navigate('profiles')} />
+  return <AppShell {...data} onSleep={data.toggleSleep} onWake={data.wakeMachine} onSearchScale={data.searchForScale} onOpenSettings={() => window.location.assign(getDecaidSettingsUrl())} onManageProfiles={() => navigate('profiles')} />
 }

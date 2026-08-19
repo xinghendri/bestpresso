@@ -1,5 +1,5 @@
 import { getDecaidEndpoints } from './config'
-import type { DecaidDevice, DecaidProfileRecord, DecaidWorkflow, FavoriteAssignments, PaginatedShots, ShotRecord } from './types'
+import type { DecaidDevice, DecaidProfileRecord, DecaidWorkflow, DisplayState, FavoriteAssignments, PaginatedShots, ShotRecord } from './types'
 
 async function getJson<T>(path: string, timeoutMs = 4500): Promise<T> {
   const controller = new AbortController()
@@ -18,6 +18,17 @@ export const getProfiles = () => getJson<DecaidProfileRecord[]>('/profiles')
 export const getFavoriteAssignments = () => getJson<FavoriteAssignments>('/store/streamline-app/favorite-profiles')
 export const getDevices = () => getJson<DecaidDevice[]>('/devices')
 export const scanForDevices = () => getJson<unknown[]>('/devices/scan?quick=true')
+export const getDisplayState = () => getJson<DisplayState>('/display')
+
+export async function setDisplayBrightness(brightness: number) {
+  const response = await fetch(`${getDecaidEndpoints().apiBase}/display/brightness`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ brightness }),
+  })
+  if (!response.ok) throw new Error(`Decaid display brightness returned ${response.status}`)
+  return await response.json() as DisplayState
+}
 
 export async function setMachineState(state: 'idle' | 'sleeping') {
   const response = await fetch(`${getDecaidEndpoints().apiBase}/machine/state/${state}`, { method: 'PUT' })

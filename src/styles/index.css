@@ -4,6 +4,7 @@
 * { box-sizing:border-box; }
 body { margin:0; min-width:320px; min-height:100vh; }
 button { border:0; color:inherit; font:inherit; cursor:pointer; }
+.sleep-screen { position:fixed; inset:0; z-index:9999; width:100vw; height:100vh; height:100dvh; padding:0; border:0; border-radius:0; outline:0; background:#000; color:transparent; cursor:pointer; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }.sleep-screen span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 .app-shell { width:min(1194px,100%); min-height:834px; margin:0 auto; padding:0 32px 33px 40px; background:radial-gradient(circle at 16% 16%,#060707 0,#141414 22%,transparent 50%),linear-gradient(124deg,#181818 36%,#4d4038 100%); }
 .topbar { height:127px; display:flex; align-items:center; justify-content:space-between; padding:0 9px 0 7px; }
 .logo { width:173px; height:44px; object-fit:fill; transform:translateY(-4px); }
