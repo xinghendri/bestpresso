@@ -33,7 +33,7 @@ http://127.0.0.1:5173/?gateway=YOUR_DECAID_IP
 
 The gateway query value is remembered as `localStorage.bestpressoGateway`. Decaid REST is read from port `8080`; machine, scale, and reservoir values update from the matching WebSocket feeds. If Decaid cannot be reached, the status pill displays `Demo` and the interface retains its fixture values.
 
-The dashboard reads Streamline's five shared favorite-profile slots from Decaid and keeps their saved order; if no assignments exist it falls back to the first five visible profiles. `Manage profiles` opens Bestpresso's own profile page, which is reserved for the future profile-management workflow.
+The dashboard reads Streamline's five shared favorite-profile slots from Decaid and keeps their saved order; if no assignments exist it falls back to the first five visible profiles. Each profile card builds its blue pressure and green flow curves from that profile's ordered pump steps, durations, and transitions, so swiping profiles changes the expected target graph as well as the settings. Fast transitions render as steps, while smooth and eased transitions render as ramps. `Manage profiles` opens Bestpresso's own profile page, which is reserved for the future profile-management workflow.
 
 The scale card resolves the connected device name from Decaid's device list and reads its live weight from the scale snapshot stream. When no scale is connected, the weight is replaced by a search control that starts Decaid's normal scan-and-auto-connect flow.
 

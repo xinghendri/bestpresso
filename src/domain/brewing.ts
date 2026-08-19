@@ -23,6 +23,12 @@ export interface MachineUtility {
   metrics: DisplayMetric[]
 }
 
+export interface ProfileTargetPoint {
+  elapsedMs: number
+  pressure?: number
+  flow?: number
+}
+
 export interface BrewProfile {
   id: string
   name: string
@@ -30,6 +36,7 @@ export interface BrewProfile {
   grindSetting: string
   dose: string
   targetYield: string
+  targetPoints?: ProfileTargetPoint[]
 }
 
 export interface PreviousShot {

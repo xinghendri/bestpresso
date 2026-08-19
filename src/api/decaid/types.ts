@@ -1,4 +1,13 @@
-export interface DecaidProfileStep { temperature?: number; [key: string]: unknown }
+export interface DecaidProfileStep {
+  temperature?: number
+  seconds?: number
+  duration?: number
+  pressure?: number
+  flow?: number
+  pump?: string | { target?: string; pressure?: number; flow?: number }
+  transition?: string | { type?: string; duration?: number; adaptive?: boolean }
+  [key: string]: unknown
+}
 export interface DecaidProfile { title?: string; steps?: DecaidProfileStep[]; target_weight?: number | null; dose_weight?: number | null }
 export interface DecaidProfileRecord { id?: string; profile?: DecaidProfile; visibility?: string; metadata?: Record<string, unknown> | null; isDefault?: boolean }
 export type FavoriteAssignments = Record<string, string | null>

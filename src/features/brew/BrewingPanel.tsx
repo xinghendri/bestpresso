@@ -1,9 +1,8 @@
 import { useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent } from 'react'
-import profileFlow from '../../assets/figma/profile-flow.svg'
-import profilePressure from '../../assets/figma/profile-pressure.svg'
 import { Metric } from '../../components/Metric/Metric'
 import type { BrewProfile, EditableProfileSetting } from '../../domain/brewing'
+import { ProfileTargetChart } from './ProfileTargetChart'
 
 function wrappedOffset(index: number, activeIndex: number, length: number) {
   const direct = index - activeIndex
@@ -50,7 +49,7 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
         const position = offset === 0 ? 'active' : Math.abs(offset) > 1 ? 'hidden' : offset < 0 ? 'left' : 'right'
         return <button key={profile.id} className={`profile-card profile-card--${position}`} type="button" onClick={() => { if (suppressClick.current) { suppressClick.current = false; return } setActiveIndex(index) }} aria-current={offset === 0 ? 'true' : undefined} aria-label={`${profile.name}${offset === 0 ? ', selected' : ''}`}>
           <h1>{profile.name}</h1>
-          {offset === 0 && <div className="profile-card__chart"><img src={profilePressure} alt="" /><img src={profileFlow} alt="" /></div>}
+          {offset === 0 && <ProfileTargetChart profileName={profile.name} points={profile.targetPoints} />}
         </button>
       })}
     </div>
