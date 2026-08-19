@@ -2,7 +2,7 @@
   "id": "bestpresso",
   "name": "Bestpresso",
   "description": "A brewing-first interface for Decaid",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "author": "Hendri",
   "repository": "https://github.com/xinghendri/bestpresso"
 }
