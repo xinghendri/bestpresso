@@ -1,3 +1,6 @@
 import type { PreviousShot } from '../../domain/brewing'
 import { MiniShotChart } from './MiniShotChart'
-export function HistoryPanel({ shot }: { shot: PreviousShot }) { return <section className="history-panel"><header><div><span className="eyebrow">PREVIOUS PULL</span><h2>{shot.profileName}</h2></div><time>{shot.pulledAt}</time></header><div className="history-panel__content"><MiniShotChart points={shot.points}/><div className="shot-stats"><span><small>In</small>{shot.dose}g</span><span><small>Out</small>{shot.yield}g</span><span><small>Time</small>{shot.duration}s</span></div></div></section> }
+
+export function HistoryPanel({ shot }: { shot: PreviousShot }) {
+  return <section className="history-section"><header><h2>Previous pulls</h2><button type="button">See all</button></header><article className="history-card"><div className="history-card__summary"><h3>{shot.profileName}</h3><div><span><small>Total yield</small>{shot.totalYield}<i>g</i></span><span><small>Total time</small>{shot.totalTime}<i>s</i></span></div></div><MiniShotChart /></article></section>
+}

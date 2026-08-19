@@ -1,4 +1,14 @@
-import { Icon } from '../../components/Icon/Icon'
+import hotWaterIcon from '../../assets/figma/hot-water.svg'
+import scaleIcon from '../../assets/figma/scale.svg'
+import steamIcon from '../../assets/figma/steam.svg'
+import { Metric } from '../../components/Metric/Metric'
 import type { MachineUtility } from '../../domain/brewing'
-const icons = { water: 'droplet', steam: 'steam', scale: 'scale', tank: 'tank' } as const
-export function MachineUtilityCard({ utility }: { utility: MachineUtility }) { return <button className="utility-card" type="button"><span className="utility-card__icon"><Icon name={icons[utility.id]} /></span><span className="utility-card__copy"><span>{utility.label}</span><small>{utility.detail}</small></span><strong>{utility.value}</strong></button> }
+
+const icons = { water: hotWaterIcon, steam: steamIcon, scale: scaleIcon, tank: scaleIcon }
+
+export function MachineUtilityCard({ utility }: { utility: MachineUtility }) {
+  return <section className={`utility-card utility-card--${utility.id}`}>
+    <header><img src={icons[utility.id]} alt="" /><span>{utility.label}</span></header>
+    <div className="utility-card__metrics">{utility.metrics.map((metric) => <Metric key={metric.label} metric={metric} compact />)}</div>
+  </section>
+}

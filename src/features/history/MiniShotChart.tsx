@@ -1,3 +1,7 @@
-import type { ShotPoint } from '../../domain/brewing'
-function line(points: ShotPoint[], key: keyof ShotPoint, max: number) { return points.map((point, index) => `${(index / (points.length - 1)) * 100},${40 - (point[key] / max) * 32}`).join(' ') }
-export function MiniShotChart({ points }: { points: ShotPoint[] }) { return <svg className="mini-chart" viewBox="0 0 100 42" preserveAspectRatio="none" aria-label="Previous shot pressure and flow graph"><path d="M0 40H100" className="mini-chart__axis" /><polyline points={line(points, 'pressure', 10)} className="mini-chart__pressure" /><polyline points={line(points, 'flow', 4)} className="mini-chart__flow" /></svg> }
+import blue from '../../assets/figma/history-blue.svg'
+import green from '../../assets/figma/history-green.svg'
+import purple from '../../assets/figma/history-purple.svg'
+
+export function MiniShotChart() {
+  return <div className="mini-chart" aria-label="Previous shot graph"><img src={blue} alt="" /><img src={green} alt="" /><img src={purple} alt="" /></div>
+}
