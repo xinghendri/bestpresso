@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { applyWorkflow, favoriteProfiles, profileRecordsToDomain, readinessFromSnapshot, shotToDomain, tankMillilitres } from '../../api/decaid/adapters'
+import { applyWorkflow, favoriteProfiles, profileRecordsToDomain, readinessFromSnapshot, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres } from '../../api/decaid/adapters'
 import { getFavoriteAssignments, getLatestShot, getProfiles, getWorkflow, setMachineState } from '../../api/decaid/client'
 import { getDecaidEndpoints } from '../../api/decaid/config'
 import { subscribe } from '../../api/decaid/socket'
@@ -44,7 +44,7 @@ export function useBrewingData() {
       setModel((current) => ({
         ...current,
         readiness,
-        utilities: current.utilities.map((utility) => utility.id === 'steam' ? { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Current' && snapshot.steamTemperature !== undefined ? { ...metric, value: String(Math.round(snapshot.steamTemperature)) } : metric) } : utility),
+        utilities: current.utilities.map((utility) => utility.id === 'steam' ? { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Current' && snapshot.steamTemperature !== undefined ? { ...metric, value: String(Math.round(snapshot.steamTemperature)), highlight: snapshot.steamTemperature < STEAM_HEATER_READY_C } : metric) } : utility),
       }))
     }, (connected) => setConnection((current) => connected ? 'connected' : current === 'fixture' ? current : 'disconnected'))
 
