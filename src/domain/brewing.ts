@@ -2,6 +2,8 @@ export type MachineReadiness = 'ready' | 'heating' | 'sleeping' | 'disconnected'
 export type DataConnection = 'connecting' | 'connected' | 'fixture' | 'disconnected'
 export type UtilityId = 'water' | 'steam' | 'scale' | 'tank'
 export type ScaleConnectionStatus = 'connected' | 'disconnected' | 'searching'
+export type EditableMachineSetting = 'hotWaterVolume' | 'hotWaterTemperature' | 'steamTemperature' | 'steamDuration' | 'steamFlow'
+export type EditableProfileSetting = 'temperature' | 'grindSetting' | 'dose' | 'targetYield'
 
 export interface ScaleConnection {
   status: ScaleConnectionStatus
@@ -42,4 +44,9 @@ export interface BrewingScreenModel {
   utilities: MachineUtility[]
   profiles: BrewProfile[]
   previousShot: PreviousShot
+}
+
+export interface SettingFeedback {
+  status: 'saving' | 'saved' | 'error'
+  message: string
 }

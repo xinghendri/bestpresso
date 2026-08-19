@@ -3,7 +3,7 @@ import type { KeyboardEvent, PointerEvent } from 'react'
 import profileFlow from '../../assets/figma/profile-flow.svg'
 import profilePressure from '../../assets/figma/profile-pressure.svg'
 import { Metric } from '../../components/Metric/Metric'
-import type { BrewProfile } from '../../domain/brewing'
+import type { BrewProfile, EditableProfileSetting } from '../../domain/brewing'
 
 function wrappedOffset(index: number, activeIndex: number, length: number) {
   const direct = index - activeIndex
@@ -12,7 +12,7 @@ function wrappedOffset(index: number, activeIndex: number, length: number) {
   return direct
 }
 
-export function BrewingPanel({ profiles, activeProfileId, onManageProfiles }: { profiles: BrewProfile[]; activeProfileId?: string; onManageProfiles: () => void }) {
+export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUpdateProfile, onManageProfiles }: { profiles: BrewProfile[]; activeProfileId?: string; settingsDisabled?: boolean; onUpdateProfile: (profileId: string, setting: EditableProfileSetting, value: number) => void; onManageProfiles: () => void }) {
   const initialIndex = Math.max(0, profiles.findIndex((profile) => profile.id === activeProfileId || profile.id === 'adaptive-v2'))
   const [activeIndex, setActiveIndex] = useState(initialIndex)
   const pointerStart = useRef<number | null>(null)
@@ -56,10 +56,10 @@ export function BrewingPanel({ profiles, activeProfileId, onManageProfiles }: { 
     </div>
     <button className="manage-profiles" type="button" onClick={onManageProfiles}>Manage profiles →</button>
     <div className="brew-metrics" key={activeProfile.id} aria-live="polite">
-      <Metric metric={{ label: 'Temp.', value: activeProfile.temperature, unit: '°' }} />
-      <Metric metric={{ label: 'Grind size', value: activeProfile.grindSetting }} />
-      <Metric metric={{ label: 'Dose', value: activeProfile.dose, unit: 'g' }} />
-      <Metric metric={{ label: 'Target yield', value: activeProfile.targetYield, unit: 'g' }} />
+      <Metric metric={{ label: 'Temp.', value: activeProfile.temperature, unit: '°' }} edit={{ min: 70, max: 110, step: 0.5, disabled: settingsDisabled, onSave: (value) => onUpdateProfile(activeProfile.id, 'temperature', value) }} />
+      <Metric metric={{ label: 'Grind size', value: activeProfile.grindSetting }} edit={{ min: 0, max: 100, step: 0.1, disabled: settingsDisabled, onSave: (value) => onUpdateProfile(activeProfile.id, 'grindSetting', value) }} />
+      <Metric metric={{ label: 'Dose', value: activeProfile.dose, unit: 'g' }} edit={{ min: 1, max: 100, step: 0.1, disabled: settingsDisabled, onSave: (value) => onUpdateProfile(activeProfile.id, 'dose', value) }} />
+      <Metric metric={{ label: 'Target yield', value: activeProfile.targetYield, unit: 'g' }} edit={{ min: 1, max: 200, step: 0.1, disabled: settingsDisabled, onSave: (value) => onUpdateProfile(activeProfile.id, 'targetYield', value) }} />
     </div>
   </section>
 }

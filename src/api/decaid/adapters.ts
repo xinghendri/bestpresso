@@ -16,7 +16,7 @@ export function profileRecordsToDomain(records: DecaidProfileRecord[], workflow:
     return {
       id: record.id || profile.title || crypto.randomUUID(),
       name: profile.title || 'Untitled profile',
-      temperature: numberString(profile.steps?.[0]?.temperature, '—'),
+      temperature: numberString(isActive ? workflow.profile?.steps?.[0]?.temperature : metadata.temperature ?? profile.steps?.[0]?.temperature, '—'),
       grindSetting: numberString(isActive ? workflow.context?.grinderSetting : metadata.grinderSetting, '—'),
       dose: numberString(isActive ? workflow.context?.targetDoseWeight : metadata.targetDoseWeight ?? profile.dose_weight, '18'),
       targetYield: numberString(isActive ? workflow.context?.targetYield : metadata.targetYield ?? profile.target_weight, '—'),

@@ -1,5 +1,5 @@
 import { getDecaidEndpoints } from './config'
-import type { DecaidDevice, DecaidProfileRecord, DecaidWorkflow, DisplayState, FavoriteAssignments, PaginatedShots, ShotRecord } from './types'
+import type { DecaidDevice, DecaidProfileRecord, DecaidWorkflow, DecaidWorkflowPatch, DisplayState, FavoriteAssignments, PaginatedShots, ShotRecord } from './types'
 
 async function getJson<T>(path: string, timeoutMs = 4500): Promise<T> {
   const controller = new AbortController()
@@ -28,6 +28,35 @@ export async function setDisplayBrightness(brightness: number) {
   })
   if (!response.ok) throw new Error(`Decaid display brightness returned ${response.status}`)
   return await response.json() as DisplayState
+}
+
+export async function updateWorkflow(patch: DecaidWorkflowPatch) {
+  const response = await fetch(`${getDecaidEndpoints().apiBase}/workflow`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  })
+  if (!response.ok) throw new Error(`Decaid workflow update returned ${response.status}: ${await response.text()}`)
+  return await response.json() as DecaidWorkflow
+}
+
+export async function updateProfileMetadata(profileId: string, metadata: Record<string, unknown>) {
+  const response = await fetch(`${getDecaidEndpoints().apiBase}/profiles/${encodeURIComponent(profileId)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ metadata }),
+  })
+  if (!response.ok) throw new Error(`Decaid profile update returned ${response.status}: ${await response.text()}`)
+  return await response.json() as DecaidProfileRecord
+}
+
+export async function setSharedSetting(key: string, value: unknown) {
+  const response = await fetch(`${getDecaidEndpoints().apiBase}/store/streamline-app/${encodeURIComponent(key)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(value),
+  })
+  if (!response.ok) throw new Error(`Decaid shared setting returned ${response.status}`)
 }
 
 export async function setMachineState(state: 'idle' | 'sleeping') {

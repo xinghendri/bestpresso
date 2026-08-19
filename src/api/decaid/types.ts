@@ -1,6 +1,6 @@
-export interface DecaidProfileStep { temperature?: number }
+export interface DecaidProfileStep { temperature?: number; [key: string]: unknown }
 export interface DecaidProfile { title?: string; steps?: DecaidProfileStep[]; target_weight?: number | null; dose_weight?: number | null }
-export interface DecaidProfileRecord { id?: string; profile?: DecaidProfile; visibility?: string; metadata?: Record<string, unknown> | null }
+export interface DecaidProfileRecord { id?: string; profile?: DecaidProfile; visibility?: string; metadata?: Record<string, unknown> | null; isDefault?: boolean }
 export type FavoriteAssignments = Record<string, string | null>
 export interface DecaidWorkflowContext { targetDoseWeight?: number | null; targetYield?: number | null; grinderSetting?: string | null }
 export interface DecaidWorkflow {
@@ -9,6 +9,7 @@ export interface DecaidWorkflow {
   steamSettings?: { targetTemperature?: number; duration?: number; flow?: number }
   hotWaterData?: { targetTemperature?: number; volume?: number }
 }
+export type DecaidWorkflowPatch = Partial<Pick<DecaidWorkflow, 'profile' | 'context' | 'steamSettings' | 'hotWaterData'>>
 export interface MachineSnapshot {
   state?: string | { state?: string; substate?: string }
   groupTemperature?: number
