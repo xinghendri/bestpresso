@@ -1,0 +1,1 @@
+export function Metric({ label, value, unit }: { label: string; value: string | number; unit?: string }) { return <div className="metric"><span className="metric__label">{label}</span><span className="metric__value">{value}<small>{unit}</small></span></div> }
