@@ -1,4 +1,7 @@
 import { AppShell } from './app/AppShell'
-import { brewingFixture } from './fixtures/brewingFixture'
+import { useBrewingData } from './features/brew/useBrewingData'
 import './styles/index.css'
-export default function App() { return <AppShell model={brewingFixture} /> }
+export default function App() {
+  const data = useBrewingData()
+  return <AppShell {...data} />
+}

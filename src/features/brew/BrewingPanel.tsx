@@ -12,12 +12,12 @@ function wrappedOffset(index: number, activeIndex: number, length: number) {
   return direct
 }
 
-export function BrewingPanel({ profiles }: { profiles: BrewProfile[] }) {
-  const initialIndex = Math.max(0, profiles.findIndex((profile) => profile.id === 'adaptive-v2'))
+export function BrewingPanel({ profiles, activeProfileId }: { profiles: BrewProfile[]; activeProfileId?: string }) {
+  const initialIndex = Math.max(0, profiles.findIndex((profile) => profile.id === activeProfileId || profile.id === 'adaptive-v2'))
   const [activeIndex, setActiveIndex] = useState(initialIndex)
   const pointerStart = useRef<number | null>(null)
   const suppressClick = useRef(false)
-  const activeProfile = profiles[activeIndex]
+  const activeProfile = profiles[activeIndex] ?? profiles[0]
 
   const selectRelative = (direction: number) => {
     setActiveIndex((current) => (current + direction + profiles.length) % profiles.length)
@@ -47,7 +47,7 @@ export function BrewingPanel({ profiles }: { profiles: BrewProfile[] }) {
     <div className="profile-carousel" aria-label="Profiles" aria-roledescription="carousel" tabIndex={0} onKeyDown={handleKeyDown} onPointerDown={handlePointerDown} onPointerUp={handlePointerUp} onPointerCancel={() => { pointerStart.current = null }}>
       {profiles.map((profile, index) => {
         const offset = wrappedOffset(index, activeIndex, profiles.length)
-        const position = offset === 0 ? 'active' : offset < 0 ? 'left' : 'right'
+        const position = offset === 0 ? 'active' : Math.abs(offset) > 1 ? 'hidden' : offset < 0 ? 'left' : 'right'
         return <button key={profile.id} className={`profile-card profile-card--${position}`} type="button" onClick={() => { if (suppressClick.current) { suppressClick.current = false; return } setActiveIndex(index) }} aria-current={offset === 0 ? 'true' : undefined} aria-label={`${profile.name}${offset === 0 ? ', selected' : ''}`}>
           <h1>{profile.name}</h1>
           {offset === 0 && <div className="profile-card__chart"><img src={profilePressure} alt="" /><img src={profileFlow} alt="" /></div>}
