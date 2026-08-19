@@ -32,6 +32,6 @@ export interface PreviousShot {
 export interface BrewingScreenModel {
   readiness: MachineReadiness
   utilities: MachineUtility[]
-  profile: BrewProfile
+  profiles: BrewProfile[]
   previousShot: PreviousShot
 }
