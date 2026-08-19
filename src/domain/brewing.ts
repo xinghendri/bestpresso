@@ -1,4 +1,4 @@
-export type MachineReadiness = 'ready' | 'heating' | 'sleeping' | 'disconnected'
+export type MachineReadiness = 'ready' | 'heating' | 'notHeating' | 'sleeping' | 'disconnected'
 export type DataConnection = 'connecting' | 'connected' | 'fixture' | 'disconnected'
 export type UtilityId = 'water' | 'steam' | 'scale' | 'tank'
 export type ScaleConnectionStatus = 'connected' | 'disconnected' | 'searching'

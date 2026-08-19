@@ -7,6 +7,10 @@ import type { DecaidProfileRecord, FavoriteAssignments, MachineSnapshot, ScaleSn
 import type { BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, MachineReadiness, ScaleConnection, SettingFeedback } from '../../domain/brewing'
 import { brewingFixture } from '../../fixtures/brewingFixture'
 
+const POWER_CHECK_DELAY_MS = 20_000
+const POWER_CHECK_MIN_TARGET_GAP_C = 1
+const POWER_CHECK_MIN_RISE_C = 0.3
+
 export function useBrewingData() {
   const [model, setModel] = useState<BrewingScreenModel>(brewingFixture)
   const [allProfiles, setAllProfiles] = useState(brewingFixture.profiles)
@@ -21,6 +25,7 @@ export function useBrewingData() {
   const sleepRequestInFlight = useRef(false)
   const wakeScreenDismissed = useRef(false)
   const previousReadiness = useRef<MachineReadiness | null>(null)
+  const heatingProgress = useRef<{ startedAt: number; baseline: number; lowest: number; target: number; flagged: boolean } | null>(null)
   const displayDimmed = useRef(false)
   const brightnessBeforeSleep = useRef<number | null>(null)
   const profileRecords = useRef<DecaidProfileRecord[]>([])
@@ -47,6 +52,28 @@ export function useBrewingData() {
       brightnessBeforeSleep.current = null
     } catch { /* waking the machine remains the priority */ }
     displayDimmed.current = false
+  }
+
+  const readinessWithPowerCheck = (snapshot: MachineSnapshot, readiness: MachineReadiness) => {
+    const current = snapshot.groupTemperature
+    const target = snapshot.targetGroupTemperature
+    if (readiness !== 'heating' || current === undefined || target === undefined || target - current < POWER_CHECK_MIN_TARGET_GAP_C) {
+      heatingProgress.current = null
+      return readiness
+    }
+    const now = Date.now()
+    const progress = heatingProgress.current
+    if (!progress || Math.abs(progress.target - target) >= 0.1) {
+      heatingProgress.current = { startedAt: now, baseline: current, lowest: current, target, flagged: false }
+      return readiness
+    }
+    progress.lowest = Math.min(progress.lowest, current)
+    if ((!progress.flagged && current >= progress.baseline + POWER_CHECK_MIN_RISE_C) || (progress.flagged && current >= progress.lowest + POWER_CHECK_MIN_RISE_C)) {
+      heatingProgress.current = { startedAt: now, baseline: current, lowest: current, target, flagged: false }
+      return readiness
+    }
+    if (now - progress.startedAt >= POWER_CHECK_DELAY_MS) progress.flagged = true
+    return progress.flagged ? 'notHeating' : readiness
   }
 
   useEffect(() => {
@@ -85,7 +112,7 @@ export function useBrewingData() {
       .catch(() => { if (!disposed) setConnection('fixture') })
 
     const machine = subscribe<MachineSnapshot>('/machine/snapshot', (snapshot) => {
-      const readiness = readinessFromSnapshot(snapshot)
+      const readiness = readinessWithPowerCheck(snapshot, readinessFromSnapshot(snapshot))
       if (readiness === 'sleeping') {
         if (previousReadiness.current !== 'sleeping') void dimDisplay()
         if (!wakeScreenDismissed.current && !sleepRequestInFlight.current) setSleepScreenActive(true)
@@ -101,7 +128,10 @@ export function useBrewingData() {
         readiness,
         utilities: current.utilities.map((utility) => utility.id === 'steam' ? { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Current' && snapshot.steamTemperature !== undefined ? { ...metric, value: String(Math.round(snapshot.steamTemperature)), highlight: snapshot.steamTemperature < STEAM_HEATER_READY_C } : metric) } : utility),
       }))
-    }, (connected) => setConnection((current) => connected ? 'connected' : current === 'fixture' ? current : 'disconnected'))
+    }, (connected) => {
+      if (!connected) heatingProgress.current = null
+      setConnection((current) => connected ? 'connected' : current === 'fixture' ? current : 'disconnected')
+    })
 
     const scale = subscribe<ScaleSnapshot>('/scale/snapshot', (snapshot) => {
       if (snapshot.status === 'connected') {
