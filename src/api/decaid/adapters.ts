@@ -44,9 +44,11 @@ export function applyWorkflow(model: BrewingScreenModel, workflow: DecaidWorkflo
 }
 
 export function readinessFromSnapshot(snapshot: MachineSnapshot): MachineReadiness {
-  const state = typeof snapshot.state === 'string' ? snapshot.state : snapshot.state?.state
+  const machineState = typeof snapshot.state === 'string' ? { state: snapshot.state } : snapshot.state
+  const state = machineState?.state
+  const substate = machineState?.substate
   if (state === 'sleeping') return 'sleeping'
-  if (state === 'booting' || state === 'heating' || state === 'preheating') return 'heating'
+  if (state === 'booting' || state === 'heating' || state === 'preheating' || (state === 'idle' && substate === 'preparingForShot')) return 'heating'
   if (state === 'error' || state === 'needsWater') return 'disconnected'
   return 'ready'
 }
