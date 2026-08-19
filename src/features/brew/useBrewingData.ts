@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { applyWorkflow, readinessFromSnapshot, shotToDomain, tankMillilitres } from '../../api/decaid/adapters'
-import { getLatestShot, getProfiles, getWorkflow } from '../../api/decaid/client'
+import { getLatestShot, getProfiles, getWorkflow, setMachineState } from '../../api/decaid/client'
 import { getDecaidEndpoints } from '../../api/decaid/config'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, MachineSnapshot, ScaleSnapshot, WaterLevels } from '../../api/decaid/types'
@@ -10,6 +10,9 @@ import { brewingFixture } from '../../fixtures/brewingFixture'
 export function useBrewingData() {
   const [model, setModel] = useState<BrewingScreenModel>(brewingFixture)
   const [connection, setConnection] = useState<DataConnection>('connecting')
+  const [sleepPending, setSleepPending] = useState(false)
+  const [machineActionError, setMachineActionError] = useState<string | null>(null)
+  const sleepRequestInFlight = useRef(false)
   const gatewayHost = getDecaidEndpoints().gatewayHost
 
   useEffect(() => {
@@ -55,5 +58,25 @@ export function useBrewingData() {
     }
   }, [])
 
-  return { model, connection, gatewayHost }
+  const toggleSleep = async () => {
+    if (sleepRequestInFlight.current) return
+    if (connection === 'fixture' || connection === 'connecting') {
+      setMachineActionError('Connect to a Decaid gateway before controlling the machine.')
+      return
+    }
+
+    sleepRequestInFlight.current = true
+    setSleepPending(true)
+    setMachineActionError(null)
+    try {
+      await setMachineState(model.readiness === 'sleeping' ? 'idle' : 'sleeping')
+    } catch {
+      setMachineActionError('The machine did not accept the sleep command.')
+    } finally {
+      sleepRequestInFlight.current = false
+      setSleepPending(false)
+    }
+  }
+
+  return { model, connection, gatewayHost, sleepPending, machineActionError, toggleSleep }
 }

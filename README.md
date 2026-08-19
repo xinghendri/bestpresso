@@ -33,4 +33,4 @@ http://127.0.0.1:5173/?gateway=YOUR_DECAID_IP
 
 The gateway query value is remembered as `localStorage.bestpressoGateway`. Decaid REST is read from port `8080`; machine, scale, and reservoir values update from the matching WebSocket feeds. If Decaid cannot be reached, the status pill displays `Demo` and the interface retains its fixture values.
 
-This milestone reads values only. Machine commands and workflow/profile writes remain disabled.
+The header Sleep control mirrors Streamline's confirmed-state behavior: it sends `sleeping` while the machine is awake and `idle` while it is asleep, then waits for the machine snapshot to confirm the change. The Settings control opens Bestpresso's settings route and supports browser Back navigation. Other machine commands and workflow/profile writes remain disabled.

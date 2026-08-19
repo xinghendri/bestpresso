@@ -16,6 +16,11 @@ async function getJson<T>(path: string, timeoutMs = 4500): Promise<T> {
 export const getWorkflow = () => getJson<DecaidWorkflow>('/workflow')
 export const getProfiles = () => getJson<DecaidProfileRecord[]>('/profiles')
 
+export async function setMachineState(state: 'idle' | 'sleeping') {
+  const response = await fetch(`${getDecaidEndpoints().apiBase}/machine/state/${state}`, { method: 'PUT' })
+  if (!response.ok) throw new Error(`Decaid machine state returned ${response.status}`)
+}
+
 export async function getLatestShot() {
   const page = await getJson<PaginatedShots>('/shots?limit=1&offset=0&order=desc')
   const latest = page.items?.[0]
