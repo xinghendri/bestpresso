@@ -27,3 +27,9 @@ export function getDecaidEndpoints() {
     socketBase: `${secure ? 'wss' : 'ws'}://${host}/ws/v1`,
   }
 }
+
+export function getDecaidSettingsUrl() {
+  const url = new URL(`${getDecaidEndpoints().apiBase}/plugins/settings.reaplugin/ui`)
+  url.searchParams.set('backName', 'Bestpresso')
+  return url.toString()
+}
