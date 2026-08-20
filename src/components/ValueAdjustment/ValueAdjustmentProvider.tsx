@@ -132,14 +132,16 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     <section className="value-adjuster__body">
       <p>{request.label}</p>
       <output aria-live="polite">{formatValue(visualValue, request.mode)}{request.unit && <small>{request.unit}</small>}</output>
-      <div className="value-adjuster__labels" aria-hidden="true">{labels.map((label, index) => {
-        const inRange = label >= request.min && label <= request.max
-        const isCenter = label === centerLabel
-        return <button key={`${label}-${index}`} type="button" tabIndex={-1} disabled={!inRange || isCenter} onClick={() => animateToValue(label)} data-distance={Math.abs(index - 4)}>{inRange && !isCenter ? label : ''}</button>
-      })}</div>
-      <div ref={ruler} className="value-adjuster__ruler" role="slider" tabIndex={0} aria-label={request.label} aria-valuemin={request.min} aria-valuemax={request.max} aria-valuenow={value} aria-valuetext={`${formatValue(value, request.mode)}${request.unit ?? ''}`} onKeyDown={handleKeyDown} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={endDrag} onPointerCancel={endDrag}>
-        <div className="value-adjuster__ticks" aria-hidden="true">{ticks.map((tick, index) => <i key={index} style={{ left: `${tick.left}%` }} className={tick.major ? 'value-adjuster__tick--major' : ''} />)}</div>
-        <span className="value-adjuster__pointer" aria-hidden="true" />
+      <div ref={ruler} className="value-adjuster__scrubber" role="slider" tabIndex={0} aria-label={request.label} aria-valuemin={request.min} aria-valuemax={request.max} aria-valuenow={value} aria-valuetext={`${formatValue(value, request.mode)}${request.unit ?? ''}`} onKeyDown={handleKeyDown} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={endDrag} onPointerCancel={endDrag}>
+        <div className="value-adjuster__labels" aria-hidden="true">{labels.map((label, index) => {
+          const inRange = label >= request.min && label <= request.max
+          const isCenter = label === centerLabel
+          return <span key={`${label}-${index}`} data-distance={Math.abs(index - 4)}>{inRange && !isCenter ? label : ''}</span>
+        })}</div>
+        <div className="value-adjuster__ruler">
+          <div className="value-adjuster__ticks" aria-hidden="true">{ticks.map((tick, index) => <i key={index} style={{ left: `${tick.left}%` }} className={tick.major ? 'value-adjuster__tick--major' : ''} />)}</div>
+          <span className="value-adjuster__pointer" aria-hidden="true" />
+        </div>
       </div>
     </section>
     <footer className="value-adjuster__presets" aria-label={`${request.label} presets`}>{presets.map((preset) => <button key={preset} type="button" className={preset === value ? 'value-adjuster__preset value-adjuster__preset--active' : 'value-adjuster__preset'} onClick={() => animateToValue(preset)}>{formatValue(preset, request.mode)}{request.unit && <small>{request.unit}</small>}</button>)}</footer>
