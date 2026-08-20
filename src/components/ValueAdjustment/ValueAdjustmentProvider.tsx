@@ -12,6 +12,8 @@ const normalizedValue = (value: number, request: ValueAdjustmentRequest) => {
   return Number(stepped.toFixed(request.mode === 'decimal' ? 1 : 0))
 }
 
+const clampedValue = (value: number, request: ValueAdjustmentRequest) => Math.min(request.max, Math.max(request.min, value))
+
 const fallbackPresets = (request: ValueAdjustmentRequest) => {
   const offsets = request.mode === 'decimal' ? [-5, -2, -1, 1, 2, 5] : [-10, -5, -2, 2, 5, 10]
   return offsets.map((offset) => normalizedValue(request.value + offset, request))
@@ -24,6 +26,9 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const drag = useRef<{ pointerId: number; startX: number; startValue: number } | null>(null)
   const visualValueRef = useRef(value)
   const animationFrame = useRef<number | null>(null)
+  const audioContext = useRef<AudioContext | null>(null)
+  const lastFeedbackValue = useRef(value)
+  const lastFeedbackAt = useRef(0)
   const presets = useMemo(() => Array.from(new Set((request.presets ?? fallbackPresets(request)).map((preset) => normalizedValue(preset, request)))).filter((preset) => preset >= request.min && preset <= request.max), [request])
   const centerLabel = Math.round(visualValue)
   const labels = Array.from({ length: 9 }, (_, index) => centerLabel + index - 4)
@@ -40,15 +45,62 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     animationFrame.current = null
   }, [])
 
+  const prepareAudioFeedback = useCallback(() => {
+    if (!audioContext.current && typeof window.AudioContext !== 'undefined') {
+      try {
+        audioContext.current = new window.AudioContext()
+      } catch {
+        return
+      }
+    }
+
+    if (audioContext.current?.state === 'suspended') void audioContext.current.resume().catch(() => undefined)
+  }, [])
+
+  const playStepFeedback = useCallback((nextValue: number) => {
+    const selectedValue = normalizedValue(nextValue, request)
+    if (selectedValue === lastFeedbackValue.current) return
+    lastFeedbackValue.current = selectedValue
+
+    const now = performance.now()
+    if (now - lastFeedbackAt.current < 32) return
+    lastFeedbackAt.current = now
+
+    const context = audioContext.current
+    if (!context || context.state !== 'running') return
+
+    try {
+      const oscillator = context.createOscillator()
+      const gain = context.createGain()
+      const startedAt = context.currentTime
+      oscillator.type = 'sine'
+      oscillator.frequency.setValueAtTime(request.mode === 'integer' ? 460 : 560, startedAt)
+      gain.gain.setValueAtTime(0.0001, startedAt)
+      gain.gain.exponentialRampToValueAtTime(0.014, startedAt + 0.003)
+      gain.gain.exponentialRampToValueAtTime(0.0001, startedAt + 0.026)
+      oscillator.connect(gain)
+      gain.connect(context.destination)
+      oscillator.addEventListener('ended', () => {
+        oscillator.disconnect()
+        gain.disconnect()
+      }, { once: true })
+      oscillator.start(startedAt)
+      oscillator.stop(startedAt + 0.03)
+    } catch {
+      // Audio feedback is an enhancement; keep the ruler usable if audio is unavailable.
+    }
+  }, [request])
+
   const setImmediateValue = useCallback((nextValue: number) => {
     stopAnimation()
     const next = normalizedValue(nextValue, request)
     visualValueRef.current = next
     setVisualValue(next)
     setValue(next)
-  }, [request, stopAnimation])
+    playStepFeedback(next)
+  }, [playStepFeedback, request, stopAnimation])
 
-  const animateToValue = useCallback((nextValue: number) => {
+  const animateToValue = useCallback((nextValue: number, requestedDuration?: number) => {
     const target = normalizedValue(nextValue, request)
     const start = visualValueRef.current
     stopAnimation()
@@ -61,7 +113,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     }
 
     const distanceInSteps = Math.abs(target - start) / request.step
-    const duration = Math.min(720, Math.max(320, 240 + distanceInSteps * 18))
+    const duration = requestedDuration ?? Math.min(720, Math.max(320, 240 + distanceInSteps * 18))
     const startedAt = performance.now()
     const animate = (now: number) => {
       const progress = Math.min(1, (now - startedAt) / duration)
@@ -69,11 +121,12 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
       const next = start + (target - start) * easedProgress
       visualValueRef.current = next
       setVisualValue(next)
+      playStepFeedback(next)
       if (progress < 1) animationFrame.current = requestAnimationFrame(animate)
       else animationFrame.current = null
     }
     animationFrame.current = requestAnimationFrame(animate)
-  }, [request, stopAnimation])
+  }, [playStepFeedback, request, stopAnimation])
 
   useEffect(() => {
     ruler.current?.focus()
@@ -82,28 +135,34 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     return () => {
       window.removeEventListener('keydown', handleEscape)
       stopAnimation()
+      if (audioContext.current?.state !== 'closed') void audioContext.current?.close().catch(() => undefined)
+      audioContext.current = null
     }
   }, [onClose, stopAnimation])
 
   const changeBySteps = (steps: number) => setImmediateValue(visualValueRef.current + steps * request.step)
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowDown', 'ArrowRight', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End'].includes(event.key)) return
+    prepareAudioFeedback()
     if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') changeBySteps(-1)
     else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') changeBySteps(1)
     else if (event.key === 'PageDown') changeBySteps(-10)
     else if (event.key === 'PageUp') changeBySteps(10)
     else if (event.key === 'Home') setImmediateValue(request.min)
     else if (event.key === 'End') setImmediateValue(request.max)
-    else return
     event.preventDefault()
   }
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    prepareAudioFeedback()
     stopAnimation()
-    const startValue = normalizedValue(visualValueRef.current, request)
+    const startValue = clampedValue(visualValueRef.current, request)
+    const selectedValue = normalizedValue(startValue, request)
     visualValueRef.current = startValue
     setVisualValue(startValue)
-    setValue(startValue)
+    setValue(selectedValue)
+    lastFeedbackValue.current = selectedValue
     drag.current = { pointerId: event.pointerId, startX: event.clientX, startValue }
     event.currentTarget.setPointerCapture(event.pointerId)
   }
@@ -114,14 +173,21 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     const width = Math.max(1, event.currentTarget.getBoundingClientRect().width)
     const visibleSteps = request.mode === 'decimal' ? 80 : 10
     const stepDelta = (activeDrag.startX - event.clientX) / (width / visibleSteps)
-    const next = normalizedValue(activeDrag.startValue + stepDelta * request.step, request)
-    visualValueRef.current = next
-    setVisualValue(next)
-    setValue(next)
+    const rawValue = activeDrag.startValue + stepDelta * request.step
+    const nextVisualValue = request.mode === 'integer' ? clampedValue(rawValue, request) : normalizedValue(rawValue, request)
+    const selectedValue = normalizedValue(nextVisualValue, request)
+    visualValueRef.current = nextVisualValue
+    setVisualValue(nextVisualValue)
+    setValue(selectedValue)
+    playStepFeedback(selectedValue)
   }
 
   const endDrag = (event: PointerEvent<HTMLDivElement>) => {
-    if (drag.current?.pointerId === event.pointerId) drag.current = null
+    if (drag.current?.pointerId !== event.pointerId) return
+    drag.current = null
+    const selectedValue = normalizedValue(visualValueRef.current, request)
+    if (request.mode === 'integer') animateToValue(selectedValue, 160)
+    else setImmediateValue(selectedValue)
   }
 
   return <main className={`value-adjuster value-adjuster--${request.mode}`} aria-label={`Adjust ${request.label}`}>
@@ -144,7 +210,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
         </div>
       </div>
     </section>
-    <footer className="value-adjuster__presets" aria-label={`${request.label} presets`}>{presets.map((preset) => <button key={preset} type="button" className={preset === value ? 'value-adjuster__preset value-adjuster__preset--active' : 'value-adjuster__preset'} onClick={() => animateToValue(preset)}>{formatValue(preset, request.mode)}{request.unit && <small>{request.unit}</small>}</button>)}</footer>
+    <footer className="value-adjuster__presets" aria-label={`${request.label} presets`}>{presets.map((preset) => <button key={preset} type="button" className={preset === value ? 'value-adjuster__preset value-adjuster__preset--active' : 'value-adjuster__preset'} onClick={() => { prepareAudioFeedback(); animateToValue(preset) }}>{formatValue(preset, request.mode)}{request.unit && <small>{request.unit}</small>}</button>)}</footer>
   </main>
 }
 
