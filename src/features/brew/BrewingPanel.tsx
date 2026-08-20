@@ -11,12 +11,20 @@ function wrappedOffset(index: number, activeIndex: number, length: number) {
   return direct
 }
 
+function doseToYieldRatio(dose: string, targetYield: string) {
+  const doseValue = Number(dose)
+  const yieldValue = Number(targetYield)
+  if (!Number.isFinite(doseValue) || doseValue <= 0 || !Number.isFinite(yieldValue)) return undefined
+  return `1:${(yieldValue / doseValue).toFixed(1)} ratio`
+}
+
 export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUpdateProfile, onManageProfiles }: { profiles: BrewProfile[]; activeProfileId?: string; settingsDisabled?: boolean; onUpdateProfile: (profileId: string, setting: EditableProfileSetting, value: number) => void; onManageProfiles: () => void }) {
   const initialIndex = Math.max(0, profiles.findIndex((profile) => profile.id === activeProfileId || profile.id === 'adaptive-v2'))
   const [activeIndex, setActiveIndex] = useState(initialIndex)
   const pointerStart = useRef<number | null>(null)
   const suppressClick = useRef(false)
   const activeProfile = profiles[activeIndex] ?? profiles[0]
+  const ratio = doseToYieldRatio(activeProfile.dose, activeProfile.targetYield)
 
   const selectRelative = (direction: number) => {
     setActiveIndex((current) => (current + direction + profiles.length) % profiles.length)
@@ -58,7 +66,7 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
       <Metric metric={{ label: 'Temp.', value: activeProfile.temperature, unit: '°' }} edit={{ title: 'Brew temperature', min: 70, max: 110, step: 1, mode: 'integer', presets: [88, 89, 91, 92, 94, 96], disabled: settingsDisabled, onSave: (value) => onUpdateProfile(activeProfile.id, 'temperature', value) }} />
       <Metric metric={{ label: 'Grind size', value: activeProfile.grindSetting }} edit={{ min: 0, max: 100, step: 0.1, mode: 'decimal', presets: [10, 12, 14.5, 16, 18, 20], disabled: settingsDisabled, onSave: (value) => onUpdateProfile(activeProfile.id, 'grindSetting', value) }} />
       <Metric metric={{ label: 'Dose', value: activeProfile.dose, unit: 'g' }} edit={{ min: 1, max: 100, step: 0.1, mode: 'decimal', presets: [15, 16, 18, 20, 21, 22], disabled: settingsDisabled, onSave: (value) => onUpdateProfile(activeProfile.id, 'dose', value) }} />
-      <Metric metric={{ label: 'Target yield', value: activeProfile.targetYield, unit: 'g' }} edit={{ min: 1, max: 200, step: 0.1, mode: 'decimal', presets: [20, 30, 34, 36, 40, 45], disabled: settingsDisabled, onSave: (value) => onUpdateProfile(activeProfile.id, 'targetYield', value) }} />
+      <Metric metric={{ label: 'Target yield', value: activeProfile.targetYield, unit: 'g', subtext: ratio }} edit={{ min: 1, max: 200, step: 0.1, mode: 'decimal', presets: [20, 30, 34, 36, 40, 45], disabled: settingsDisabled, onSave: (value) => onUpdateProfile(activeProfile.id, 'targetYield', value) }} />
     </div>
   </section>
 }

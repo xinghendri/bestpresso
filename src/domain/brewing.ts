@@ -15,6 +15,7 @@ export interface DisplayMetric {
   label: string
   value: string
   unit?: string
+  subtext?: string
   highlight?: boolean
 }
 

@@ -10,7 +10,8 @@ import { brewingFixture } from '../../fixtures/brewingFixture'
 const POWER_CHECK_DELAY_MS = 10_000
 const POWER_CHECK_MIN_TARGET_GAP_C = 1
 const POWER_CHECK_MIN_RISE_C = 0.3
-const READINESS_TRANSITION_DELAY_MS = 1_500
+const READY_CONFIRMATION_MS = 500
+const HEATING_CONFIRMATION_MS = 2_000
 const MAX_LIVE_SHOT_POINTS = 900
 const MIN_SUCCESSFUL_SHOT_MS = 5_000
 
@@ -92,7 +93,8 @@ export function useBrewingData() {
       readinessTransition.current = { candidate, startedAt: now }
       return previous
     }
-    if (now - transition.startedAt < READINESS_TRANSITION_DELAY_MS) return previous
+    const confirmationDelay = candidate === 'ready' ? READY_CONFIRMATION_MS : HEATING_CONFIRMATION_MS
+    if (now - transition.startedAt < confirmationDelay) return previous
     readinessTransition.current = null
     return candidate
   }

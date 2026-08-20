@@ -34,7 +34,7 @@ export function MachineUtilityCard({ utility, scale, onSearchScale, settingsDisa
   return <section className={`utility-card utility-card--${utility.id}`}>
     <header>{utility.id === 'tank' ? <span className="reservoir-icon"><img src={reservoirTop} alt="" /><img src={reservoirBottom} alt="" /></span> : <img src={icons[utility.id]} alt="" />}<span>{title}</span></header>
     {isScale && !scaleConnected
-      ? <button className="scale-search" type="button" onClick={onSearchScale} disabled={scale?.status === 'searching'}>{scale?.status === 'searching' ? 'Searching…' : 'Search for scale'}</button>
+      ? <button className="scale-search" type="button" onClick={onSearchScale} disabled={scale?.status === 'searching'}>{scale?.status === 'searching' ? 'Searching…' : 'Search'}</button>
       : <div className="utility-card__metrics">{utility.metrics.map((metric) => <Metric key={metric.label} metric={metric} compact edit={editForMetric(utility, metric.label, onUpdateSetting, settingsDisabled)} />)}</div>}
   </section>
 }

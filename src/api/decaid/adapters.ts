@@ -5,6 +5,7 @@ const MM_TO_ML = [0,16,43,70,97,124,151,179,206,233,261,288,316,343,371,398,426,
 export const STEAM_HEATER_READY_C = 130
 const GROUP_HEATING_ENTER_GAP_C = 1
 const GROUP_HEATING_EXIT_GAP_C = 0.2
+const READY_MACHINE_STATES = new Set(['idle', 'schedIdle', 'espresso', 'hotWater', 'flush', 'steam', 'steamRinse', 'cleaning', 'descaling', 'calibration', 'selfTest', 'airPurge'])
 
 const numberString = (value: unknown, fallback: string) => value === null || value === undefined || value === '' || Number.isNaN(Number(value)) ? fallback : String(value)
 const finiteNumber = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : undefined
@@ -107,12 +108,14 @@ export function readinessFromSnapshot(snapshot: MachineSnapshot, previousReadine
   const substate = machineState?.substate
   if (state === 'sleeping') return 'sleeping'
   if (state === 'error' || state === 'needsWater') return 'disconnected'
-  if (state === 'booting' || state === 'heating' || state === 'preheating' || (state === 'idle' && substate === 'preparingForShot')) return 'heating'
+  if (state === 'booting' || state === 'heating' || state === 'preheating') return 'heating'
+  if (state && READY_MACHINE_STATES.has(state)) return 'ready'
   if (snapshot.groupTemperature !== undefined && snapshot.targetGroupTemperature !== undefined) {
     const targetGap = snapshot.targetGroupTemperature - snapshot.groupTemperature
     const wasHeating = previousReadiness === 'heating' || previousReadiness === 'notHeating'
     if (wasHeating ? targetGap > GROUP_HEATING_EXIT_GAP_C : targetGap >= GROUP_HEATING_ENTER_GAP_C) return 'heating'
   }
+  if (substate === 'preparingForShot') return 'heating'
   return 'ready'
 }
 
