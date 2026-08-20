@@ -94,7 +94,7 @@ export function applyWorkflow(model: BrewingScreenModel, workflow: DecaidWorkflo
   const profiles = favoriteProfiles(allProfiles, assignments)
   const active = profiles.find((profile) => profile.name === workflow.profile?.title)
   const utilities = model.utilities.map((utility) => {
-    if (utility.id === 'water') return { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Target yield' ? { ...metric, value: numberString(workflow.hotWaterData?.volume, metric.value) } : { ...metric, value: numberString(workflow.hotWaterData?.targetTemperature, metric.value) }) }
+    if (utility.id === 'water') return { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Volume' ? { ...metric, value: numberString(workflow.hotWaterData?.volume, metric.value) } : { ...metric, value: numberString(workflow.hotWaterData?.targetTemperature, metric.value) }) }
     if (utility.id === 'steam') return { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Target' ? { ...metric, value: numberString(workflow.steamSettings?.targetTemperature, metric.value) } : metric.label === 'Max time' ? { ...metric, value: numberString(workflow.steamSettings?.duration, metric.value) } : metric.label === 'Flow' ? { ...metric, value: numberString(workflow.steamSettings?.flow, metric.value) } : metric) }
     return utility
   })
@@ -145,6 +145,7 @@ export function shotToDomain(shot: ShotRecord): PreviousShot {
   }) : []
   return {
     profileName: shot.workflow?.profile?.title || shot.workflow?.name || 'Previous pull',
+    timestamp: shot.timestamp ?? firstTimestamp ?? lastTimestamp,
     totalYield: numberString(shot.annotations?.actualYield ?? lastWeight, '—'),
     totalTime: numberString(duration, '—'),
     targetYield: shot.workflow?.context?.targetYield ?? shot.workflow?.profile?.target_weight ?? undefined,

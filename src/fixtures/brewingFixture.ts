@@ -3,7 +3,7 @@ import type { BrewingScreenModel } from '../domain/brewing'
 export const brewingFixture: BrewingScreenModel = {
   readiness: 'ready',
   utilities: [
-    { id: 'water', label: 'Hot water', metrics: [{ label: 'Target yield', value: '50', unit: 'ml' }, { label: 'Temp.', value: '92', unit: '°' }] },
+    { id: 'water', label: 'Hot water', metrics: [{ label: 'Volume', value: '50', unit: 'ml' }, { label: 'Temp.', value: '92', unit: '°' }] },
     { id: 'steam', label: 'Steam', metrics: [{ label: 'Current', value: '121', unit: '°', highlight: true }, { label: 'Target', value: '160', unit: '°' }, { label: 'Max time', value: '50', unit: 's' }, { label: 'Flow', value: '0.6', unit: 'ml/s' }] },
     { id: 'scale', label: 'Scale', metrics: [{ label: 'Weight', value: '0.0', unit: 'g' }] },
     { id: 'tank', label: 'Reservoir', metrics: [{ label: 'Current', value: '1,234', unit: 'ml' }] },
@@ -17,6 +17,7 @@ export const brewingFixture: BrewingScreenModel = {
   ],
   previousShot: {
     profileName: 'Adaptive V2',
+    timestamp: new Date().toISOString(),
     totalYield: '33.6',
     totalTime: '38',
     targetYield: 34,

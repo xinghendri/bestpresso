@@ -154,6 +154,7 @@ export function useBrewingData() {
         ...current,
         previousShot: {
           profileName: session.profileName,
+          timestamp: new Date(session.startedAt).toISOString(),
           totalYield: finalWeight === undefined ? '—' : finalWeight.toFixed(1),
           totalTime: String(Math.max(1, Math.round(elapsedMs / 1000))),
           targetYield: session.targetYield,
