@@ -10,6 +10,7 @@ import { brewingFixture } from '../../fixtures/brewingFixture'
 const POWER_CHECK_DELAY_MS = 10_000
 const POWER_CHECK_MIN_TARGET_GAP_C = 1
 const POWER_CHECK_MIN_RISE_C = 0.3
+const READINESS_TRANSITION_DELAY_MS = 1_500
 const MAX_LIVE_SHOT_POINTS = 900
 const MIN_SUCCESSFUL_SHOT_MS = 5_000
 
@@ -41,6 +42,7 @@ export function useBrewingData() {
   const sleepRequestInFlight = useRef(false)
   const wakeScreenDismissed = useRef(false)
   const previousReadiness = useRef<MachineReadiness | null>(null)
+  const readinessTransition = useRef<{ candidate: 'ready' | 'heating'; startedAt: number } | null>(null)
   const heatingProgress = useRef<{ startedAt: number; baseline: number; lowest: number; target: number; flagged: boolean } | null>(null)
   const displayDimmed = useRef(false)
   const brightnessBeforeSleep = useRef<number | null>(null)
@@ -73,6 +75,26 @@ export function useBrewingData() {
       brightnessBeforeSleep.current = null
     } catch { /* waking the machine remains the priority */ }
     displayDimmed.current = false
+  }
+
+  const stabilizedReadiness = (candidate: MachineReadiness) => {
+    const previous = previousReadiness.current
+    const previousThermalState = previous === 'notHeating' ? 'heating' : previous
+    const isThermalTransition = (candidate === 'ready' || candidate === 'heating') && (previousThermalState === 'ready' || previousThermalState === 'heating')
+    if (!previous || !isThermalTransition || candidate === previousThermalState) {
+      readinessTransition.current = null
+      return candidate
+    }
+
+    const now = Date.now()
+    const transition = readinessTransition.current
+    if (!transition || transition.candidate !== candidate) {
+      readinessTransition.current = { candidate, startedAt: now }
+      return previous
+    }
+    if (now - transition.startedAt < READINESS_TRANSITION_DELAY_MS) return previous
+    readinessTransition.current = null
+    return candidate
   }
 
   const readinessWithPowerCheck = (snapshot: MachineSnapshot, readiness: MachineReadiness) => {
@@ -213,7 +235,8 @@ export function useBrewingData() {
         completeLiveShot()
       }
 
-      const readiness = readinessWithPowerCheck(snapshot, readinessFromSnapshot(snapshot))
+      const candidateReadiness = readinessFromSnapshot(snapshot, previousReadiness.current)
+      const readiness = readinessWithPowerCheck(snapshot, stabilizedReadiness(candidateReadiness))
       if (readiness === 'sleeping') {
         if (previousReadiness.current !== 'sleeping') void dimDisplay()
         if (!wakeScreenDismissed.current && !sleepRequestInFlight.current) setSleepScreenActive(true)
@@ -232,6 +255,7 @@ export function useBrewingData() {
     }, (connected) => {
       if (!connected) {
         heatingProgress.current = null
+        readinessTransition.current = null
         completeLiveShot()
       }
       setConnection((current) => connected ? 'connected' : current === 'fixture' ? current : 'disconnected')
