@@ -26,7 +26,7 @@ export function LiveBrewingScreen({ model, liveBrew, onDismiss }: LiveBrewingScr
       <img className="logo" src={logo} alt="decent" />
       {liveBrew.active
         ? <div className="live-brew-status" role="status"><img src={brewingIcon} alt="" /><strong>Brewing</strong></div>
-        : <button className="live-brew-status live-brew-status--done" type="button" onClick={onDismiss} aria-label="Dismiss completed pull"><img src={brewingIcon} alt="" /><strong>Done</strong></button>}
+        : <button className="live-brew-status live-brew-status--close" type="button" onClick={onDismiss} aria-label="Close completed pull"><span aria-hidden="true">×</span><strong>Close</strong></button>}
     </header>
     <section className="live-brew-panel" aria-label={`Brewing ${profile.name}`}>
       <article className="live-brew-card">

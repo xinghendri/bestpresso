@@ -1,5 +1,4 @@
 import logo from '../../assets/figma/decent-logo.png'
-import brewingIcon from '../../assets/figma/ready.svg'
 import { Metric } from '../../components/Metric/Metric'
 import type { LiveShotPoint, PreviousShot } from '../../domain/brewing'
 import { LiveShotChart } from '../brew/LiveShotChart'
@@ -22,7 +21,7 @@ export function PreviousShotScreen({ shot, onDismiss }: { shot: PreviousShot; on
   return <main className="live-brew-screen previous-shot-screen">
     <header className="live-brew-header">
       <img className="logo" src={logo} alt="decent" />
-      <button className="live-brew-status live-brew-status--done" type="button" onClick={onDismiss} aria-label="Close previous pull"><img src={brewingIcon} alt="" /><strong>Done</strong></button>
+      <button className="live-brew-status live-brew-status--close" type="button" onClick={onDismiss} aria-label="Close previous pull"><span aria-hidden="true">×</span><strong>Close</strong></button>
     </header>
     <section className="live-brew-panel" aria-label={`Previous pull: ${shot.profileName}`}>
       <article className="live-brew-card">
