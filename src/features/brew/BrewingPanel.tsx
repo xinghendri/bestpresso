@@ -55,10 +55,10 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
     </div>
     <button className="manage-profiles" type="button" onClick={onManageProfiles}>Manage profiles →</button>
     <div className="brew-metrics" key={activeProfile.id} aria-live="polite">
-      <Metric metric={{ label: 'Temp.', value: activeProfile.temperature, unit: '°' }} edit={{ min: 70, max: 110, step: 0.5, disabled: settingsDisabled, onSave: (value) => onUpdateProfile(activeProfile.id, 'temperature', value) }} />
-      <Metric metric={{ label: 'Grind size', value: activeProfile.grindSetting }} edit={{ min: 0, max: 100, step: 0.1, disabled: settingsDisabled, onSave: (value) => onUpdateProfile(activeProfile.id, 'grindSetting', value) }} />
-      <Metric metric={{ label: 'Dose', value: activeProfile.dose, unit: 'g' }} edit={{ min: 1, max: 100, step: 0.1, disabled: settingsDisabled, onSave: (value) => onUpdateProfile(activeProfile.id, 'dose', value) }} />
-      <Metric metric={{ label: 'Target yield', value: activeProfile.targetYield, unit: 'g' }} edit={{ min: 1, max: 200, step: 0.1, disabled: settingsDisabled, onSave: (value) => onUpdateProfile(activeProfile.id, 'targetYield', value) }} />
+      <Metric metric={{ label: 'Temp.', value: activeProfile.temperature, unit: '°' }} edit={{ title: 'Brew temperature', min: 70, max: 110, step: 1, mode: 'integer', presets: [88, 89, 91, 92, 94, 96], disabled: settingsDisabled, onSave: (value) => onUpdateProfile(activeProfile.id, 'temperature', value) }} />
+      <Metric metric={{ label: 'Grind size', value: activeProfile.grindSetting }} edit={{ min: 0, max: 100, step: 0.1, mode: 'decimal', presets: [10, 12, 14.5, 16, 18, 20], disabled: settingsDisabled, onSave: (value) => onUpdateProfile(activeProfile.id, 'grindSetting', value) }} />
+      <Metric metric={{ label: 'Dose', value: activeProfile.dose, unit: 'g' }} edit={{ min: 1, max: 100, step: 0.1, mode: 'decimal', presets: [15, 16, 18, 20, 21, 22], disabled: settingsDisabled, onSave: (value) => onUpdateProfile(activeProfile.id, 'dose', value) }} />
+      <Metric metric={{ label: 'Target yield', value: activeProfile.targetYield, unit: 'g' }} edit={{ min: 1, max: 200, step: 0.1, mode: 'decimal', presets: [20, 30, 34, 36, 40, 45], disabled: settingsDisabled, onSave: (value) => onUpdateProfile(activeProfile.id, 'targetYield', value) }} />
     </div>
   </section>
 }
