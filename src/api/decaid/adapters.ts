@@ -107,7 +107,8 @@ export function readinessFromSnapshot(snapshot: MachineSnapshot, previousReadine
   const state = machineState?.state
   const substate = machineState?.substate
   if (state === 'sleeping') return 'sleeping'
-  if (state === 'error' || state === 'needsWater') return 'disconnected'
+  if (state === 'needsWater' && previousReadiness) return previousReadiness
+  if (state === 'error') return 'disconnected'
   if (state === 'booting' || state === 'heating' || state === 'preheating') return 'heating'
   if (state && READY_MACHINE_STATES.has(state)) return 'ready'
   if (snapshot.groupTemperature !== undefined && snapshot.targetGroupTemperature !== undefined) {

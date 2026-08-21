@@ -249,7 +249,7 @@ export function useBrewingData() {
         if (!wakeScreenDismissed.current && !sleepRequestInFlight.current) setSleepScreenActive(true)
       } else {
         if (previousReadiness.current === 'sleeping') void restoreDisplay()
-        wakeScreenDismissed.current = false
+        if (readiness !== 'disconnected') wakeScreenDismissed.current = false
         setSleepScreenActive(false)
       }
       previousReadiness.current = readiness
@@ -346,8 +346,15 @@ export function useBrewingData() {
 
   const toggleSleep = async () => {
     if (sleepRequestInFlight.current) return
-    if (connection === 'fixture' || connection === 'connecting') {
-      setMachineActionError('Connect to a Decaid gateway before controlling the machine.')
+    if (connection !== 'connected') {
+      if (model.readiness === 'sleeping') {
+        wakeScreenDismissed.current = true
+        setSleepScreenActive(false)
+        void restoreDisplay()
+        setMachineActionError('The sleep screen was dismissed, but the disconnected machine could not be woken.')
+      } else {
+        setMachineActionError('Connect to a Decaid gateway before controlling the machine.')
+      }
       return
     }
 
@@ -367,9 +374,9 @@ export function useBrewingData() {
       }
     } catch {
       if (model.readiness === 'sleeping') {
-        wakeScreenDismissed.current = false
-        setSleepScreenActive(true)
-        void dimDisplay()
+        wakeScreenDismissed.current = true
+        setSleepScreenActive(false)
+        void restoreDisplay()
       } else {
         setSleepScreenActive(false)
         void restoreDisplay()
@@ -389,14 +396,18 @@ export function useBrewingData() {
     setSleepPending(true)
     setMachineActionError(null)
     const restorePromise = restoreDisplay()
+    if (connection !== 'connected') {
+      await restorePromise
+      sleepRequestInFlight.current = false
+      setSleepPending(false)
+      setMachineActionError('The sleep screen was dismissed, but the disconnected machine could not be woken.')
+      return
+    }
     try {
       await setMachineState('idle')
       await restorePromise
     } catch {
       await restorePromise
-      wakeScreenDismissed.current = false
-      setSleepScreenActive(true)
-      await dimDisplay()
       setMachineActionError('The machine did not accept the wake command.')
     } finally {
       sleepRequestInFlight.current = false
