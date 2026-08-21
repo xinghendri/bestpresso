@@ -40,6 +40,7 @@ export function useBrewingData() {
   const [sleepScreenActive, setSleepScreenActive] = useState(false)
   const [machineActionError, setMachineActionError] = useState<string | null>(null)
   const [settingFeedback, setSettingFeedback] = useState<SettingFeedback | null>(null)
+  const [settingFeedbackVisible, setSettingFeedbackVisible] = useState(false)
   const [previousShotStatus, setPreviousShotStatus] = useState<PreviousShotStatus>('loading')
   const [liveBrew, setLiveBrew] = useState<LiveBrewState>({ active: false, visible: false, elapsedMs: 0, points: [] })
   const sleepRequestInFlight = useRef(false)
@@ -52,6 +53,7 @@ export function useBrewingData() {
   const profileRecords = useRef<DecaidProfileRecord[]>([])
   const favoriteAssignments = useRef<FavoriteAssignments | null>(null)
   const feedbackTimeout = useRef<number | null>(null)
+  const actionErrorTimeout = useRef<number | null>(null)
   const scaleSearchTimeout = useRef<number | null>(null)
   const latestScaleSnapshot = useRef<Pick<LiveShotPoint, 'weight' | 'weightFlow'>>({})
   const latestTankVolume = useRef<number | null>(null)
@@ -80,6 +82,16 @@ export function useBrewingData() {
       brightnessBeforeSleep.current = null
     } catch { /* waking the machine remains the priority */ }
     displayDimmed.current = false
+  }
+
+  const showMachineActionError = (message: string | null) => {
+    if (actionErrorTimeout.current !== null) window.clearTimeout(actionErrorTimeout.current)
+    actionErrorTimeout.current = null
+    setMachineActionError(message)
+    if (message) actionErrorTimeout.current = window.setTimeout(() => {
+      setMachineActionError(null)
+      actionErrorTimeout.current = null
+    }, 5000)
   }
 
   const stabilizedReadiness = (candidate: MachineReadiness) => {
@@ -378,6 +390,7 @@ export function useBrewingData() {
       window.clearInterval(heatingCountdown)
       if (latestShotRefreshTimeout !== null) window.clearTimeout(latestShotRefreshTimeout)
       if (feedbackTimeout.current !== null) window.clearTimeout(feedbackTimeout.current)
+      if (actionErrorTimeout.current !== null) window.clearTimeout(actionErrorTimeout.current)
       if (scaleSearchTimeout.current !== null) window.clearTimeout(scaleSearchTimeout.current)
       machine.close(); scale.close(); water.close(); timeToReady.close()
     }
@@ -390,16 +403,16 @@ export function useBrewingData() {
         wakeScreenDismissed.current = true
         setSleepScreenActive(false)
         void restoreDisplay()
-        setMachineActionError('The sleep screen was dismissed, but the disconnected machine could not be woken.')
+        showMachineActionError('The sleep screen was dismissed, but the disconnected machine could not be woken.')
       } else {
-        setMachineActionError('Connect to a Decaid gateway before controlling the machine.')
+        showMachineActionError('Connect to a Decaid gateway before controlling the machine.')
       }
       return
     }
 
     sleepRequestInFlight.current = true
     setSleepPending(true)
-    setMachineActionError(null)
+    showMachineActionError(null)
     try {
       if (model.readiness === 'sleeping') {
         wakeScreenDismissed.current = true
@@ -420,7 +433,7 @@ export function useBrewingData() {
         setSleepScreenActive(false)
         void restoreDisplay()
       }
-      setMachineActionError('The machine did not accept the sleep command.')
+      showMachineActionError('The machine did not accept the sleep command.')
     } finally {
       sleepRequestInFlight.current = false
       setSleepPending(false)
@@ -433,13 +446,13 @@ export function useBrewingData() {
     wakeScreenDismissed.current = true
     setSleepScreenActive(false)
     setSleepPending(true)
-    setMachineActionError(null)
+    showMachineActionError(null)
     const restorePromise = restoreDisplay()
     if (connection !== 'connected' || machineConnection !== 'connected') {
       await restorePromise
       sleepRequestInFlight.current = false
       setSleepPending(false)
-      setMachineActionError('The sleep screen was dismissed, but the disconnected machine could not be woken.')
+      showMachineActionError('The sleep screen was dismissed, but the disconnected machine could not be woken.')
       return
     }
     try {
@@ -447,7 +460,7 @@ export function useBrewingData() {
       await restorePromise
     } catch {
       await restorePromise
-      setMachineActionError('The machine did not accept the wake command.')
+      showMachineActionError('The machine did not accept the wake command.')
     } finally {
       sleepRequestInFlight.current = false
       setSleepPending(false)
@@ -455,7 +468,7 @@ export function useBrewingData() {
   }
 
   const searchForScale = async () => {
-    setMachineActionError(null)
+    showMachineActionError(null)
     setScale((current) => ({ ...current, status: 'searching' }))
     if (scaleSearchTimeout.current !== null) window.clearTimeout(scaleSearchTimeout.current)
     scaleSearchTimeout.current = window.setTimeout(() => {
@@ -468,15 +481,18 @@ export function useBrewingData() {
       if (scaleSearchTimeout.current !== null) window.clearTimeout(scaleSearchTimeout.current)
       scaleSearchTimeout.current = null
       setScale({ status: 'disconnected' })
-      setMachineActionError('Decaid could not start a scale search.')
+      showMachineActionError('Decaid could not start a scale search.')
     }
   }
 
-  const showSettingFeedback = (feedback: SettingFeedback, dismiss = false) => {
+  const showSettingFeedback = (feedback: SettingFeedback) => {
     if (feedbackTimeout.current !== null) window.clearTimeout(feedbackTimeout.current)
-    feedbackTimeout.current = null
     setSettingFeedback(feedback)
-    if (dismiss) feedbackTimeout.current = window.setTimeout(() => { setSettingFeedback(null); feedbackTimeout.current = null }, 3000)
+    setSettingFeedbackVisible(true)
+    feedbackTimeout.current = window.setTimeout(() => {
+      setSettingFeedbackVisible(false)
+      feedbackTimeout.current = null
+    }, 5000)
   }
 
   const updateMachineSetting = async (setting: EditableMachineSetting, value: number) => {
@@ -497,7 +513,7 @@ export function useBrewingData() {
       const workflow = await updateWorkflow(update.patch)
       setModel((current) => applyWorkflow(current, workflow, profileRecords.current, favoriteAssignments.current))
       if ('sharedKey' in update) await setSharedSetting(update.sharedKey, value)
-      showSettingFeedback({ status: 'saved', message: `${update.label} saved to Decaid.` }, true)
+      showSettingFeedback({ status: 'saved', message: `${update.label} saved to Decaid.` })
     } catch {
       showSettingFeedback({ status: 'error', message: `${update.label} could not be saved.` })
     }
@@ -551,7 +567,7 @@ export function useBrewingData() {
       setAllProfiles(domainProfiles)
       setFavoriteProfileIds(favorites.map((profile) => profile.id))
       setModel((current) => applyWorkflow(current, workflow, profileRecords.current, favoriteAssignments.current))
-      showSettingFeedback({ status: 'saved', message: `${currentProfile.name} saved and applied.` }, true)
+      showSettingFeedback({ status: 'saved', message: `${currentProfile.name} saved and applied.` })
     } catch {
       showSettingFeedback({ status: 'error', message: `${currentProfile.name} was applied, but its saved defaults could not be recorded.` })
     }
@@ -560,5 +576,5 @@ export function useBrewingData() {
   const settingsDisabled = connection !== 'connected' || settingFeedback?.status === 'saving'
   const dismissLiveBrew = () => setLiveBrew((current) => current.active ? current : { ...current, visible: false })
 
-  return { model, allProfiles, favoriteProfileIds, liveBrew, previousShotStatus, heatingSeconds, connection, machineConnection, scale, sleepPending, sleepScreenActive, machineActionError, settingFeedback, settingsDisabled, toggleSleep, wakeMachine, dismissLiveBrew, searchForScale, updateMachineSetting, updateProfileSetting }
+  return { model, allProfiles, favoriteProfileIds, liveBrew, previousShotStatus, heatingSeconds, connection, machineConnection, scale, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, dismissLiveBrew, searchForScale, updateMachineSetting, updateProfileSetting }
 }
