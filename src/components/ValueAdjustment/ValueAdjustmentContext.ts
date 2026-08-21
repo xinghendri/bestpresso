@@ -11,6 +11,7 @@ export interface ValueAdjustmentRequest {
   step: number
   mode: ValueAdjustmentMode
   presets?: number[]
+  valueHint?: (value: number) => string | undefined
   onSave: (value: number) => void
 }
 

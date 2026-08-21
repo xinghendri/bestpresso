@@ -9,6 +9,7 @@ interface MetricEdit {
   mode: ValueAdjustmentMode
   title?: string
   presets?: number[]
+  valueHint?: (value: number) => string | undefined
   disabled?: boolean
   onSave: (value: number) => void
 }
@@ -22,7 +23,7 @@ export function Metric({ metric, compact = false, edit }: { metric: DisplayMetri
   const subtextClassName = `metric__subtext${metric.subtextVariant === 'pill' ? ' metric__subtext--pill' : ''}`
   const unitClassName = `metric__unit${metric.unit === '°' ? ' metric__unit--degree' : ''}`
 
-  if (edit) return <button className={`${className} metric__edit-button`} type="button" disabled={editDisabled} onClick={() => openAdjustment({ label: edit.title ?? metric.label, value: currentValue, unit: metric.unit, min: edit.min, max: edit.max, step: edit.step, mode: edit.mode, presets: edit.presets, onSave: edit.onSave })} aria-label={`Edit ${metric.label}, current value ${metric.value}${metric.unit ?? ''}`}>
+  if (edit) return <button className={`${className} metric__edit-button`} type="button" disabled={editDisabled} onClick={() => openAdjustment({ label: edit.title ?? metric.label, value: currentValue, unit: metric.unit, min: edit.min, max: edit.max, step: edit.step, mode: edit.mode, presets: edit.presets, valueHint: edit.valueHint, onSave: edit.onSave })} aria-label={`Edit ${metric.label}, current value ${metric.value}${metric.unit ?? ''}`}>
     <span className="metric__label">{metric.label}{!editDisabled && <span className="metric__edit-indicator" aria-hidden="true">›</span>}</span>
     <span className={readingClassName}>{metric.value}{metric.unit && <small className={unitClassName}>{metric.unit}</small>}</span>
     {metric.subtext && <span className={subtextClassName}>{metric.subtext}</span>}

@@ -30,6 +30,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const lastFeedbackValue = useRef(value)
   const lastFeedbackAt = useRef(0)
   const presets = useMemo(() => Array.from(new Set((request.presets ?? fallbackPresets(request)).map((preset) => normalizedValue(preset, request)))).filter((preset) => preset >= request.min && preset <= request.max), [request])
+  const valueHint = request.valueHint?.(normalizedValue(visualValue, request))
   const centerLabel = Math.round(visualValue)
   const labels = Array.from({ length: 9 }, (_, index) => centerLabel + index - 4)
   const minorTickStep = request.mode === 'decimal' ? 0.1 : 0.25
@@ -198,7 +199,8 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     <section className="value-adjuster__body">
       <p>{request.label}</p>
       <output aria-live="polite">{formatValue(visualValue, request.mode)}{request.unit && <small>{request.unit}</small>}</output>
-      <div ref={ruler} className="value-adjuster__scrubber" role="slider" tabIndex={0} aria-label={request.label} aria-valuemin={request.min} aria-valuemax={request.max} aria-valuenow={value} aria-valuetext={`${formatValue(value, request.mode)}${request.unit ?? ''}`} onKeyDown={handleKeyDown} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={endDrag} onPointerCancel={endDrag}>
+      {valueHint && <div className="value-adjuster__value-hint"><span>{valueHint}</span></div>}
+      <div ref={ruler} className="value-adjuster__scrubber" role="slider" tabIndex={0} aria-label={request.label} aria-valuemin={request.min} aria-valuemax={request.max} aria-valuenow={value} aria-valuetext={`${formatValue(value, request.mode)}${request.unit ?? ''}${valueHint ? `, ${valueHint}` : ''}`} onKeyDown={handleKeyDown} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={endDrag} onPointerCancel={endDrag}>
         <div className="value-adjuster__labels" aria-hidden="true">{labels.map((label, index) => {
           const inRange = label >= request.min && label <= request.max
           const isCenter = label === centerLabel
