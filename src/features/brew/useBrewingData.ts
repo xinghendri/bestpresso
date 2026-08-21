@@ -253,7 +253,11 @@ export function useBrewingData() {
       setModel((current) => ({
         ...current,
         readiness,
-        utilities: current.utilities.map((utility) => utility.id === 'steam' ? { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Current' && snapshot.steamTemperature !== undefined ? { ...metric, value: String(Math.round(snapshot.steamTemperature)), highlight: snapshot.steamTemperature < STEAM_HEATER_READY_C } : metric) } : utility),
+        utilities: current.utilities.map((utility) => {
+          if (utility.id === 'steam') return { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Current' && snapshot.steamTemperature !== undefined ? { ...metric, value: String(Math.round(snapshot.steamTemperature)), highlight: snapshot.steamTemperature < STEAM_HEATER_READY_C } : metric) }
+          if (utility.id === 'tank') return { ...utility, alert: machineState === 'needsWater' }
+          return utility
+        }),
       }))
     }, (connected) => {
       if (!connected) {

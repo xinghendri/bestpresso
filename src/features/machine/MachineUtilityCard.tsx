@@ -1,9 +1,11 @@
+import type { CSSProperties } from 'react'
 import hotWaterIcon from '../../assets/figma/hot-water.svg'
 import reservoirBottom from '../../assets/figma/reservoir-bottom.svg'
 import reservoirTop from '../../assets/figma/reservoir-top.svg'
 import scaleIcon from '../../assets/figma/scale.svg'
 import steamIcon from '../../assets/figma/steam.svg'
 import { Metric } from '../../components/Metric/Metric'
+import { WATER_TANK_CAPACITY_ML, WATER_TANK_LOW_LEVEL_ML } from '../../domain/brewing'
 import type { EditableMachineSetting, MachineUtility, ScaleConnection } from '../../domain/brewing'
 
 const icons = { water: hotWaterIcon, steam: steamIcon, scale: scaleIcon }
@@ -27,12 +29,31 @@ const editForMetric = (utility: MachineUtility, label: string, onSave?: (setting
 }
 
 export function MachineUtilityCard({ utility, scale, onSearchScale, settingsDisabled, onUpdateSetting }: MachineUtilityCardProps) {
+  if (utility.id === 'tank') {
+    const metric = utility.metrics[0]
+    const volume = Number(metric?.value.replaceAll(',', ''))
+    const safeVolume = Number.isFinite(volume) ? Math.max(0, Math.min(WATER_TANK_CAPACITY_ML, volume)) : 0
+    const level = safeVolume / WATER_TANK_CAPACITY_ML * 100
+    const valueLabel = Number.isFinite(volume) ? `${metric.value} ${metric.unit ?? 'ml'}` : 'unknown level'
+    const statusLabel = utility.alert
+      ? `Water reservoir needs water, ${valueLabel}`
+      : safeVolume <= WATER_TANK_LOW_LEVEL_ML
+        ? `Water reservoir low, ${valueLabel}`
+        : `Water reservoir, ${valueLabel}`
+    const style = { '--reservoir-level': `${level}%` } as CSSProperties
+
+    return <section className={utility.alert ? 'reservoir-meter reservoir-meter--needs-water' : 'reservoir-meter'} role="meter" aria-label={statusLabel} aria-valuemin={0} aria-valuemax={WATER_TANK_CAPACITY_ML} aria-valuenow={safeVolume} aria-valuetext={statusLabel} title={statusLabel} style={style}>
+      <span className="reservoir-meter__icon" aria-hidden="true"><img src={reservoirTop} alt="" /><img src={reservoirBottom} alt="" /></span>
+      <span className="reservoir-meter__track" aria-hidden="true"><span className="reservoir-meter__level" /></span>
+    </section>
+  }
+
   const isScale = utility.id === 'scale'
   const scaleConnected = isScale && scale?.status === 'connected'
   const title = scaleConnected ? scale.name || 'Scale' : utility.label
 
   return <section className={`utility-card utility-card--${utility.id}`}>
-    <header>{utility.id === 'tank' ? <span className="reservoir-icon"><img src={reservoirTop} alt="" /><img src={reservoirBottom} alt="" /></span> : <img src={icons[utility.id]} alt="" />}<span>{title}</span></header>
+    <header><img src={icons[utility.id]} alt="" /><span>{title}</span></header>
     {isScale && !scaleConnected
       ? <button className="scale-search" type="button" onClick={onSearchScale} disabled={scale?.status === 'searching'}>{scale?.status === 'searching' ? 'Searching…' : 'Search'}</button>
       : <div className="utility-card__metrics">{utility.metrics.map((metric) => <Metric key={metric.label} metric={metric} compact edit={editForMetric(utility, metric.label, onUpdateSetting, settingsDisabled)} />)}</div>}
