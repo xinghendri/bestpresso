@@ -51,7 +51,7 @@ export function MachineUtilityCard({ utility, scale, onSearchScale, settingsDisa
   const isScale = utility.id === 'scale'
   const scaleConnected = isScale && scale?.status === 'connected'
   const title = scaleConnected ? scale.name || 'Scale' : utility.label
-  const showThemisMini = scaleConnected && /themis[\s_-]*mini/i.test(title)
+  const showThemisMini = scaleConnected && /(?:themis[\s_-]*mini|bookoo(?:[\s_-]*themis)?[\s_-]*mini)/i.test(title)
   const cardClassName = `utility-card utility-card--${utility.id}${showThemisMini ? ' utility-card--scale-themis-mini' : ''}`
 
   return <section className={cardClassName}>
