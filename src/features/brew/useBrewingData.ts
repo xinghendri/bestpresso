@@ -4,6 +4,7 @@ import { getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, get
 import { getDecaidEndpoints } from '../../api/decaid/config'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
+import { WATER_TANK_LOW_LEVEL_ML, WATER_TANK_SENSOR_FULL_MM } from '../../domain/brewing'
 import type { BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, MachineReadiness, PreviousShotStatus, ScaleConnection, SettingFeedback } from '../../domain/brewing'
 import { brewingFixture } from '../../fixtures/brewingFixture'
 
@@ -52,6 +53,8 @@ export function useBrewingData() {
   const feedbackTimeout = useRef<number | null>(null)
   const scaleSearchTimeout = useRef<number | null>(null)
   const latestScaleSnapshot = useRef<Pick<LiveShotPoint, 'weight' | 'weightFlow'>>({})
+  const latestTankVolume = useRef<number | null>(null)
+  const machineNeedsWater = useRef(false)
   const liveShotSession = useRef<LiveShotSession | null>(null)
   const latestModel = useRef(model)
   const gatewayHost = getDecaidEndpoints().gatewayHost
@@ -210,6 +213,7 @@ export function useBrewingData() {
 
     const machine = subscribe<MachineSnapshot>('/machine/snapshot', (snapshot) => {
       const machineState = typeof snapshot.state === 'string' ? snapshot.state : snapshot.state?.state
+      machineNeedsWater.current = machineState === 'needsWater'
       if (machineState === 'espresso') {
         const now = snapshotTime(snapshot.timestamp)
         if (!liveShotSession.current) {
@@ -255,7 +259,7 @@ export function useBrewingData() {
         readiness,
         utilities: current.utilities.map((utility) => {
           if (utility.id === 'steam') return { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Current' && snapshot.steamTemperature !== undefined ? { ...metric, value: String(Math.round(snapshot.steamTemperature)), highlight: snapshot.steamTemperature < STEAM_HEATER_READY_C } : metric) }
-          if (utility.id === 'tank') return { ...utility, alert: machineState === 'needsWater' }
+          if (utility.id === 'tank') return { ...utility, alert: machineNeedsWater.current || (latestTankVolume.current !== null && latestTankVolume.current <= WATER_TANK_LOW_LEVEL_ML) }
           return utility
         }),
       }))
@@ -290,7 +294,19 @@ export function useBrewingData() {
 
     const water = subscribe<WaterLevels>('/machine/waterLevels', (levels) => {
       if (levels.currentLevel === undefined) return
-      setModel((current) => ({ ...current, utilities: current.utilities.map((utility) => utility.id === 'tank' ? { ...utility, metrics: utility.metrics.map((metric) => ({ ...metric, value: tankMillilitres(levels.currentLevel!).toLocaleString('en-US') })) } : utility) }))
+      const sensorLevel = levels.currentLevel
+      const volume = tankMillilitres(sensorLevel)
+      const levelPercent = Math.max(0, Math.min(100, sensorLevel / WATER_TANK_SENSOR_FULL_MM * 100))
+      latestTankVolume.current = volume
+      setModel((current) => ({
+        ...current,
+        utilities: current.utilities.map((utility) => utility.id === 'tank' ? {
+          ...utility,
+          alert: machineNeedsWater.current || volume <= WATER_TANK_LOW_LEVEL_ML,
+          levelPercent,
+          metrics: utility.metrics.map((metric) => ({ ...metric, value: volume.toLocaleString('en-US') })),
+        } : utility),
+      }))
     }, () => undefined)
 
     const timeToReady = subscribe<TimeToReadyFrame>('/plugins/time-to-ready.reaplugin/timeToReady', (frame) => {

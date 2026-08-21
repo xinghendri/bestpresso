@@ -5,8 +5,9 @@ export type ScaleConnectionStatus = 'connected' | 'disconnected' | 'searching'
 export type EditableMachineSetting = 'hotWaterVolume' | 'hotWaterTemperature' | 'steamTemperature' | 'steamDuration' | 'steamFlow'
 export type EditableProfileSetting = 'temperature' | 'grindSetting' | 'dose' | 'targetYield'
 export type PreviousShotStatus = 'loading' | 'loaded' | 'empty' | 'error' | 'fixture'
-export const WATER_TANK_CAPACITY_ML = 2058
-export const WATER_TANK_LOW_LEVEL_ML = 400
+export const WATER_TANK_CAPACITY_ML = 1277
+export const WATER_TANK_SENSOR_FULL_MM = 45
+export const WATER_TANK_LOW_LEVEL_ML = 450
 
 export interface ScaleConnection {
   status: ScaleConnectionStatus
@@ -26,6 +27,7 @@ export interface MachineUtility {
   label: string
   metrics: DisplayMetric[]
   alert?: boolean
+  levelPercent?: number
 }
 
 export interface ProfileTargetPoint {
