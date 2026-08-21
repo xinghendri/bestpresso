@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import themisMiniImage from '../../assets/figma/bookoo-themis-mini.png'
 import hotWaterIcon from '../../assets/figma/hot-water.svg'
 import reservoirBottom from '../../assets/figma/reservoir-bottom.svg'
 import reservoirTop from '../../assets/figma/reservoir-top.svg'
@@ -51,11 +52,14 @@ export function MachineUtilityCard({ utility, scale, onSearchScale, settingsDisa
   const isScale = utility.id === 'scale'
   const scaleConnected = isScale && scale?.status === 'connected'
   const title = scaleConnected ? scale.name || 'Scale' : utility.label
+  const showThemisMini = scaleConnected && /themis[\s_-]*mini/i.test(title)
+  const cardClassName = `utility-card utility-card--${utility.id}${showThemisMini ? ' utility-card--scale-themis-mini' : ''}`
 
-  return <section className={`utility-card utility-card--${utility.id}`}>
+  return <section className={cardClassName}>
     <header><img src={icons[utility.id]} alt="" /><span>{title}</span></header>
     {isScale && !scaleConnected
       ? <button className="scale-search" type="button" onClick={onSearchScale} disabled={scale?.status === 'searching'}>{scale?.status === 'searching' ? 'Searching…' : 'Search'}</button>
       : <div className="utility-card__metrics">{utility.metrics.map((metric) => <Metric key={metric.label} metric={metric} compact edit={editForMetric(utility, metric.label, onUpdateSetting, settingsDisabled)} />)}</div>}
+    {showThemisMini && <span className="scale-device-art" aria-hidden="true"><img src={themisMiniImage} alt="" /></span>}
   </section>
 }
