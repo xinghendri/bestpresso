@@ -19,6 +19,7 @@ export interface DisplayMetric {
   value: string
   unit?: string
   subtext?: string
+  subtextVariant?: 'plain' | 'pill'
   highlight?: boolean
 }
 
