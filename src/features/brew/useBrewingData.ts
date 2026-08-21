@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { applyWorkflow, favoriteProfiles, profileRecordsToDomain, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres } from '../../api/decaid/adapters'
 import { getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getWorkflow, scanForDevices, setDisplayBrightness, setMachineState, setSharedSetting, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
-import { getDecaidEndpoints } from '../../api/decaid/config'
 import { readinessFromSnapshot, readinessTemperatureSample } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
@@ -60,7 +59,6 @@ export function useBrewingData() {
   const machineConnectionRef = useRef<DataConnection>('connecting')
   const liveShotSession = useRef<LiveShotSession | null>(null)
   const latestModel = useRef(model)
-  const gatewayHost = getDecaidEndpoints().gatewayHost
 
   useEffect(() => { latestModel.current = model }, [model])
 
@@ -562,5 +560,5 @@ export function useBrewingData() {
   const settingsDisabled = connection !== 'connected' || settingFeedback?.status === 'saving'
   const dismissLiveBrew = () => setLiveBrew((current) => current.active ? current : { ...current, visible: false })
 
-  return { model, allProfiles, favoriteProfileIds, liveBrew, previousShotStatus, heatingSeconds, connection, machineConnection, gatewayHost, scale, sleepPending, sleepScreenActive, machineActionError, settingFeedback, settingsDisabled, toggleSleep, wakeMachine, dismissLiveBrew, searchForScale, updateMachineSetting, updateProfileSetting }
+  return { model, allProfiles, favoriteProfileIds, liveBrew, previousShotStatus, heatingSeconds, connection, machineConnection, scale, sleepPending, sleepScreenActive, machineActionError, settingFeedback, settingsDisabled, toggleSleep, wakeMachine, dismissLiveBrew, searchForScale, updateMachineSetting, updateProfileSetting }
 }
