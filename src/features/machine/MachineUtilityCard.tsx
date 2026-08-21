@@ -1,8 +1,7 @@
 import type { CSSProperties } from 'react'
 import themisMiniImage from '../../assets/figma/bookoo-themis-mini.png'
 import hotWaterIcon from '../../assets/figma/hot-water.svg'
-import reservoirBottom from '../../assets/figma/reservoir-bottom.svg'
-import reservoirTop from '../../assets/figma/reservoir-top.svg'
+import reservoirIcon from '../../assets/figma/reservoir.svg'
 import scaleIcon from '../../assets/figma/scale.svg'
 import steamIcon from '../../assets/figma/steam.svg'
 import { Metric } from '../../components/Metric/Metric'
@@ -44,7 +43,7 @@ export function MachineUtilityCard({ utility, scale, onSearchScale, settingsDisa
     const style = { '--reservoir-level': `${level}%` } as CSSProperties
 
     return <section className={needsWater ? 'reservoir-meter reservoir-meter--needs-water' : 'reservoir-meter'} role="meter" aria-label={statusLabel} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(level)} aria-valuetext={statusLabel} title={statusLabel} style={style}>
-      <span className="reservoir-meter__icon" aria-hidden="true"><img src={reservoirTop} alt="" /><img src={reservoirBottom} alt="" /></span>
+      <span className="reservoir-meter__icon" aria-hidden="true"><img src={reservoirIcon} alt="" /></span>
       <span className="reservoir-meter__track" aria-hidden="true"><span className="reservoir-meter__level" /></span>
     </section>
   }
