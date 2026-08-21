@@ -27,10 +27,7 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
   const ratio = doseToYieldRatio(activeProfile.dose, activeProfile.targetYield)
   const doseValue = Number(activeProfile.dose)
   const yieldValueHint = Number.isFinite(doseValue) && doseValue > 0
-    ? (targetYield: number) => {
-        const liveRatio = doseToYieldRatio(doseValue, targetYield)
-        return liveRatio ? `${liveRatio} · ${doseValue.toFixed(1)}g dose` : undefined
-      }
+    ? (targetYield: number) => doseToYieldRatio(doseValue, targetYield)
     : undefined
 
   const selectRelative = (direction: number) => {
