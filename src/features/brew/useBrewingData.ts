@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { applyWorkflow, favoriteProfiles, profileRecordsToDomain, readinessFromSnapshot, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres } from '../../api/decaid/adapters'
+import { applyWorkflow, favoriteProfiles, profileRecordsToDomain, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres } from '../../api/decaid/adapters'
 import { getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getWorkflow, scanForDevices, setDisplayBrightness, setMachineState, setSharedSetting, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
 import { getDecaidEndpoints } from '../../api/decaid/config'
+import { readinessFromSnapshot, readinessTemperatureSample } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
 import { WATER_TANK_LOW_LEVEL_ML, WATER_TANK_SENSOR_FULL_MM } from '../../domain/brewing'
@@ -34,6 +35,7 @@ export function useBrewingData() {
   const [favoriteProfileIds, setFavoriteProfileIds] = useState(brewingFixture.profiles.slice(0, 5).map((profile) => profile.id))
   const [heatingSeconds, setHeatingSeconds] = useState<number | null>(null)
   const [connection, setConnection] = useState<DataConnection>('connecting')
+  const [machineConnection, setMachineConnection] = useState<DataConnection>('connecting')
   const [scale, setScale] = useState<ScaleConnection>({ status: 'disconnected' })
   const [sleepPending, setSleepPending] = useState(false)
   const [sleepScreenActive, setSleepScreenActive] = useState(false)
@@ -45,7 +47,7 @@ export function useBrewingData() {
   const wakeScreenDismissed = useRef(false)
   const previousReadiness = useRef<MachineReadiness | null>(null)
   const readinessTransition = useRef<{ candidate: 'ready' | 'heating'; startedAt: number } | null>(null)
-  const heatingProgress = useRef<{ startedAt: number; baseline: number; lowest: number; target: number; flagged: boolean } | null>(null)
+  const heatingProgress = useRef<{ startedAt: number; baseline: number; lowest: number; sensor: 'mix' | 'group'; target: number; flagged: boolean } | null>(null)
   const displayDimmed = useRef(false)
   const brightnessBeforeSleep = useRef<number | null>(null)
   const profileRecords = useRef<DecaidProfileRecord[]>([])
@@ -55,6 +57,7 @@ export function useBrewingData() {
   const latestScaleSnapshot = useRef<Pick<LiveShotPoint, 'weight' | 'weightFlow'>>({})
   const latestTankVolume = useRef<number | null>(null)
   const machineNeedsWater = useRef(false)
+  const machineConnectionRef = useRef<DataConnection>('connecting')
   const liveShotSession = useRef<LiveShotSession | null>(null)
   const latestModel = useRef(model)
   const gatewayHost = getDecaidEndpoints().gatewayHost
@@ -103,21 +106,21 @@ export function useBrewingData() {
   }
 
   const readinessWithPowerCheck = (snapshot: MachineSnapshot, readiness: MachineReadiness) => {
-    const current = snapshot.groupTemperature
-    const target = snapshot.targetGroupTemperature
-    if (readiness !== 'heating' || current === undefined || target === undefined || target - current < POWER_CHECK_MIN_TARGET_GAP_C) {
+    const sample = readinessTemperatureSample(snapshot)
+    if (readiness !== 'heating' || !sample || sample.gap < POWER_CHECK_MIN_TARGET_GAP_C) {
       heatingProgress.current = null
       return readiness
     }
+    const { current, sensor, target } = sample
     const now = Date.now()
     const progress = heatingProgress.current
-    if (!progress || Math.abs(progress.target - target) >= 0.1) {
-      heatingProgress.current = { startedAt: now, baseline: current, lowest: current, target, flagged: false }
+    if (!progress || progress.sensor !== sensor || Math.abs(progress.target - target) >= 0.1) {
+      heatingProgress.current = { startedAt: now, baseline: current, lowest: current, sensor, target, flagged: false }
       return readiness
     }
     progress.lowest = Math.min(progress.lowest, current)
     if ((!progress.flagged && current >= progress.baseline + POWER_CHECK_MIN_RISE_C) || (progress.flagged && current >= progress.lowest + POWER_CHECK_MIN_RISE_C)) {
-      heatingProgress.current = { startedAt: now, baseline: current, lowest: current, target, flagged: false }
+      heatingProgress.current = { startedAt: now, baseline: current, lowest: current, sensor, target, flagged: false }
       return readiness
     }
     if (now - progress.startedAt >= POWER_CHECK_DELAY_MS) progress.flagged = true
@@ -128,6 +131,39 @@ export function useBrewingData() {
     let disposed = false
     let timeToReadyEstimate: { deadline: number; receivedAt: number } | null = null
     let latestShotRefreshTimeout: number | null = null
+
+    const updateMachineConnection = (next: DataConnection) => {
+      const previous = machineConnectionRef.current
+      if (previous === next) return
+      machineConnectionRef.current = next
+      setMachineConnection(next)
+      if (next !== 'connected') {
+        previousReadiness.current = null
+        readinessTransition.current = null
+        heatingProgress.current = null
+        setHeatingSeconds(null)
+        if (previous === 'connected') {
+          setSleepScreenActive(false)
+          void restoreDisplay()
+        }
+      }
+    }
+
+    const applyConnectedDevices = (devices: Awaited<ReturnType<typeof getDevices>>) => {
+      const connectedMachine = devices.find((device) => device.type === 'machine' && device.state === 'connected')
+      const connectedScale = devices.find((device) => device.type === 'scale' && device.state === 'connected')
+      updateMachineConnection(connectedMachine ? 'connected' : 'disconnected')
+      setScale((current) => current.status === 'searching'
+        ? current
+        : connectedScale
+          ? { status: 'connected', name: connectedScale.name || 'Scale' }
+          : { status: 'disconnected' })
+    }
+
+    const refreshConnectedDevices = () => getDevices().then((devices) => {
+      if (!disposed) applyConnectedDevices(devices)
+      return devices
+    })
 
     const schedulePersistedShotRefresh = (session: LiveShotSession, attempt = 0) => {
       if (latestShotRefreshTimeout !== null) window.clearTimeout(latestShotRefreshTimeout)
@@ -174,18 +210,14 @@ export function useBrewingData() {
       setScale((current) => ({ ...current, status: 'connected' }))
       if (scaleSearchTimeout.current !== null) window.clearTimeout(scaleSearchTimeout.current)
       scaleSearchTimeout.current = null
-      getDevices().then((devices) => {
+      refreshConnectedDevices().then((devices) => {
         if (disposed) return
         const connectedScale = devices.find((device) => device.type === 'scale' && device.state === 'connected')
         setScale({ status: 'connected', name: connectedScale?.name || 'Scale' })
       }).catch(() => undefined)
     }
 
-    getDevices().then((devices) => {
-      if (disposed) return
-      const connectedScale = devices.find((device) => device.type === 'scale' && device.state === 'connected')
-      if (connectedScale) setScale({ status: 'connected', name: connectedScale.name || 'Scale' })
-    }).catch(() => undefined)
+    refreshConnectedDevices().catch(() => undefined)
 
     const latestShotRequest = getLatestShot()
       .then((shot) => ({ shot, failed: false }))
@@ -207,13 +239,15 @@ export function useBrewingData() {
       .catch(() => {
         if (disposed) return
         setConnection('fixture')
+        updateMachineConnection('fixture')
         setPreviousShotStatus('fixture')
         setModel((current) => ({ ...current, previousShot: brewingFixture.previousShot }))
       })
 
     const machine = subscribe<MachineSnapshot>('/machine/snapshot', (snapshot) => {
-      const machineState = typeof snapshot.state === 'string' ? snapshot.state : snapshot.state?.state
-      machineNeedsWater.current = machineState === 'needsWater'
+      if (machineConnectionRef.current !== 'connected') return
+      const machineState = (typeof snapshot.state === 'string' ? snapshot.state : snapshot.state?.state)?.toLowerCase()
+      machineNeedsWater.current = machineState === 'needswater'
       if (machineState === 'espresso') {
         const now = snapshotTime(snapshot.timestamp)
         if (!liveShotSession.current) {
@@ -268,6 +302,8 @@ export function useBrewingData() {
         heatingProgress.current = null
         readinessTransition.current = null
         completeLiveShot()
+      } else if (machineConnectionRef.current === 'fixture') {
+        updateMachineConnection('connecting')
       }
       setConnection((current) => connected ? 'connected' : current === 'fixture' ? current : 'disconnected')
     })
@@ -310,7 +346,7 @@ export function useBrewingData() {
     }, () => undefined)
 
     const timeToReady = subscribe<TimeToReadyFrame>('/plugins/time-to-ready.reaplugin/timeToReady', (frame) => {
-      if (frame.status !== 'heating' || !frame.remainingTimeMs || frame.remainingTimeMs <= 0) {
+      if (machineConnectionRef.current !== 'connected' || frame.status !== 'heating' || !frame.remainingTimeMs || frame.remainingTimeMs <= 0) {
         timeToReadyEstimate = null
         setHeatingSeconds(null)
         return
@@ -333,9 +369,14 @@ export function useBrewingData() {
       getWorkflow().then((workflow) => { if (!disposed) setModel((current) => applyWorkflow(current, workflow, profileRecords.current, favoriteAssignments.current)) }).catch(() => undefined)
     }, 15000)
 
+    const refreshDeviceConnections = window.setInterval(() => {
+      refreshConnectedDevices().catch(() => undefined)
+    }, 3000)
+
     return () => {
       disposed = true
       window.clearInterval(refreshWorkflow)
+      window.clearInterval(refreshDeviceConnections)
       window.clearInterval(heatingCountdown)
       if (latestShotRefreshTimeout !== null) window.clearTimeout(latestShotRefreshTimeout)
       if (feedbackTimeout.current !== null) window.clearTimeout(feedbackTimeout.current)
@@ -346,7 +387,7 @@ export function useBrewingData() {
 
   const toggleSleep = async () => {
     if (sleepRequestInFlight.current) return
-    if (connection !== 'connected') {
+    if (connection !== 'connected' || machineConnection !== 'connected') {
       if (model.readiness === 'sleeping') {
         wakeScreenDismissed.current = true
         setSleepScreenActive(false)
@@ -396,7 +437,7 @@ export function useBrewingData() {
     setSleepPending(true)
     setMachineActionError(null)
     const restorePromise = restoreDisplay()
-    if (connection !== 'connected') {
+    if (connection !== 'connected' || machineConnection !== 'connected') {
       await restorePromise
       sleepRequestInFlight.current = false
       setSleepPending(false)
@@ -521,5 +562,5 @@ export function useBrewingData() {
   const settingsDisabled = connection !== 'connected' || settingFeedback?.status === 'saving'
   const dismissLiveBrew = () => setLiveBrew((current) => current.active ? current : { ...current, visible: false })
 
-  return { model, allProfiles, favoriteProfileIds, liveBrew, previousShotStatus, heatingSeconds, connection, gatewayHost, scale, sleepPending, sleepScreenActive, machineActionError, settingFeedback, settingsDisabled, toggleSleep, wakeMachine, dismissLiveBrew, searchForScale, updateMachineSetting, updateProfileSetting }
+  return { model, allProfiles, favoriteProfileIds, liveBrew, previousShotStatus, heatingSeconds, connection, machineConnection, gatewayHost, scale, sleepPending, sleepScreenActive, machineActionError, settingFeedback, settingsDisabled, toggleSleep, wakeMachine, dismissLiveBrew, searchForScale, updateMachineSetting, updateProfileSetting }
 }

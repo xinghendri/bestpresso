@@ -1,11 +1,8 @@
-import type { BrewProfile, BrewingScreenModel, MachineReadiness, PreviousShot, ProfileTargetPoint } from '../../domain/brewing'
-import type { DecaidProfileRecord, DecaidProfileStep, DecaidWorkflow, FavoriteAssignments, MachineSnapshot, ShotRecord } from './types'
+import type { BrewProfile, BrewingScreenModel, PreviousShot, ProfileTargetPoint } from '../../domain/brewing'
+import type { DecaidProfileRecord, DecaidProfileStep, DecaidWorkflow, FavoriteAssignments, ShotRecord } from './types'
 
 const MM_TO_ML = [0,16,43,70,97,124,151,179,206,233,261,288,316,343,371,398,426,453,481,509,537,564,592,620,648,676,704,732,760,788,816,844,872,900,929,957,985,1013,1042,1070,1104,1138,1172,1207,1242,1277,1312,1347,1382,1417,1453,1488,1523,1559,1594,1630,1665,1701,1736,1772,1808,1843,1879,1915,1951,1986,2022,2058]
 export const STEAM_HEATER_READY_C = 130
-const GROUP_HEATING_ENTER_GAP_C = 1
-const GROUP_HEATING_EXIT_GAP_C = 0.2
-const READY_MACHINE_STATES = new Set(['idle', 'schedIdle', 'espresso', 'hotWater', 'flush', 'steam', 'steamRinse', 'cleaning', 'descaling', 'calibration', 'selfTest', 'airPurge'])
 
 const numberString = (value: unknown, fallback: string) => value === null || value === undefined || value === '' || Number.isNaN(Number(value)) ? fallback : String(value)
 const finiteNumber = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : undefined
@@ -100,24 +97,6 @@ export function applyWorkflow(model: BrewingScreenModel, workflow: DecaidWorkflo
     return utility
   })
   return { ...model, profiles, activeProfileId: active?.id ?? profiles[0]?.id, utilities }
-}
-
-export function readinessFromSnapshot(snapshot: MachineSnapshot, previousReadiness?: MachineReadiness | null): MachineReadiness {
-  const machineState = typeof snapshot.state === 'string' ? { state: snapshot.state } : snapshot.state
-  const state = machineState?.state
-  const substate = machineState?.substate
-  if (state === 'sleeping') return 'sleeping'
-  if (state === 'needsWater' && previousReadiness) return previousReadiness
-  if (state === 'error') return 'disconnected'
-  if (state === 'booting' || state === 'heating' || state === 'preheating') return 'heating'
-  if (state && READY_MACHINE_STATES.has(state)) return 'ready'
-  if (snapshot.groupTemperature !== undefined && snapshot.targetGroupTemperature !== undefined) {
-    const targetGap = snapshot.targetGroupTemperature - snapshot.groupTemperature
-    const wasHeating = previousReadiness === 'heating' || previousReadiness === 'notHeating'
-    if (wasHeating ? targetGap > GROUP_HEATING_EXIT_GAP_C : targetGap >= GROUP_HEATING_ENTER_GAP_C) return 'heating'
-  }
-  if (substate === 'preparingForShot') return 'heating'
-  return 'ready'
 }
 
 export function tankMillilitres(level: number) {
