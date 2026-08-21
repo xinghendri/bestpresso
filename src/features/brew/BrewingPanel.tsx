@@ -54,7 +54,17 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
     <div className="profile-carousel" aria-label="Profiles" aria-roledescription="carousel" tabIndex={0} onKeyDown={handleKeyDown} onPointerDown={handlePointerDown} onPointerUp={handlePointerUp} onPointerCancel={() => { pointerStart.current = null }}>
       {profiles.map((profile, index) => {
         const offset = wrappedOffset(index, activeIndex, profiles.length)
-        const position = offset === 0 ? 'active' : Math.abs(offset) > 1 ? 'hidden' : offset < 0 ? 'left' : 'right'
+        const position = offset === 0
+          ? 'active'
+          : offset === -1
+            ? 'left'
+            : offset === 1
+              ? 'right'
+              : offset === -2
+                ? 'far-left'
+                : offset === 2
+                  ? 'far-right'
+                  : 'hidden'
         return <button key={profile.id} className={`profile-card profile-card--${position}`} type="button" onClick={() => { if (suppressClick.current) { suppressClick.current = false; return } setActiveIndex(index) }} aria-current={offset === 0 ? 'true' : undefined} aria-label={`${profile.name}${offset === 0 ? ', selected' : ''}`}>
           <h1>{profile.name}</h1>
           {offset === 0 && <ProfileTargetChart profileName={profile.name} points={profile.targetPoints} />}
