@@ -1,5 +1,4 @@
 import type { CSSProperties } from 'react'
-import themisMiniImage from '../../assets/figma/bookoo-themis-mini.png'
 import hotWaterIcon from '../../assets/figma/hot-water.svg'
 import reservoirIcon from '../../assets/figma/reservoir.svg'
 import scaleIcon from '../../assets/figma/scale.svg'
@@ -7,6 +6,7 @@ import steamIcon from '../../assets/figma/steam.svg'
 import { Metric } from '../../components/Metric/Metric'
 import { WATER_TANK_CAPACITY_ML, WATER_TANK_LOW_LEVEL_ML } from '../../domain/brewing'
 import type { EditableMachineSetting, MachineUtility, ScaleConnection } from '../../domain/brewing'
+import { scalePresentationForName } from './scaleArtwork'
 
 const icons = { water: hotWaterIcon, steam: steamIcon, scale: scaleIcon }
 
@@ -51,14 +51,14 @@ export function MachineUtilityCard({ utility, scale, onSearchScale, settingsDisa
   const isScale = utility.id === 'scale'
   const scaleConnected = isScale && scale?.status === 'connected'
   const title = scaleConnected ? scale.name || 'Scale' : utility.label
-  const showThemisMini = scaleConnected && /(?:themis[\s_-]*mini|bookoo(?:[\s_-]*themis)?[\s_-]*mini)/i.test(title)
-  const cardClassName = `utility-card utility-card--${utility.id}${showThemisMini ? ' utility-card--scale-themis-mini' : ''}`
+  const scalePresentation = scaleConnected ? scalePresentationForName(title) : undefined
+  const cardClassName = `utility-card utility-card--${utility.id}${scalePresentation?.imageSrc ? ' utility-card--scale-with-art' : ''}`
 
-  return <section className={cardClassName}>
+  return <section className={cardClassName} data-scale-model={scalePresentation?.id} data-scale-image={scalePresentation?.imageName}>
     <header><img src={icons[utility.id]} alt="" /><span>{title}</span></header>
     {isScale && !scaleConnected
       ? <button className="scale-search" type="button" onClick={onSearchScale} disabled={scale?.status === 'searching'}>{scale?.status === 'searching' ? 'Searching…' : 'Search'}</button>
       : <div className="utility-card__metrics">{utility.metrics.map((metric) => <Metric key={metric.label} metric={metric} compact edit={editForMetric(utility, metric.label, onUpdateSetting, settingsDisabled)} />)}</div>}
-    {showThemisMini && <span className="scale-device-art" aria-hidden="true"><img src={themisMiniImage} alt="" /></span>}
+    {scalePresentation?.imageSrc && <span className="scale-device-art" aria-hidden="true"><img src={scalePresentation.imageSrc} alt="" /></span>}
   </section>
 }
