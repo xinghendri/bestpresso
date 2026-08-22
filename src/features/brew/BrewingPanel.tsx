@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent } from 'react'
 import { Metric } from '../../components/Metric/Metric'
 import type { BrewProfile, EditableProfileSetting } from '../../domain/brewing'
+import type { FixedValueSuggestion } from '../../domain/valueAdjustments'
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { ProfileTargetChart } from './ProfileTargetChart'
 
@@ -27,11 +28,18 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
   const activeProfile = profiles[activeIndex] ?? profiles[0]
   const ratio = doseToYieldRatio(activeProfile.dose, activeProfile.targetYield)
   const doseValue = Number(activeProfile.dose)
-  const yieldValueHint = Number.isFinite(doseValue) && doseValue > 0
-    ? (targetYield: number) => doseToYieldRatio(doseValue, targetYield)
+  const effectiveDose = Number.isFinite(doseValue) && doseValue >= 0 ? doseValue : VALUE_ADJUSTMENTS.dose.defaultValue
+  const yieldValueHint = effectiveDose > 0
+    ? (targetYield: number) => doseToYieldRatio(effectiveDose, targetYield)
     : undefined
+  const fixedYieldSuggestions: readonly FixedValueSuggestion[] = [
+    { label: 'Ristretto', detail: '1:1', value: effectiveDose },
+    { label: 'Espresso', detail: '1:2', value: effectiveDose * 2 },
+    { label: 'Lungo', detail: '1:3', value: effectiveDose * 3 },
+    { label: 'Lungo+', detail: '1:4', value: effectiveDose * 4 },
+  ]
 
-  const editProfileSetting = (setting: EditableProfileSetting, valueHint?: (value: number) => string | undefined) => {
+  const editProfileSetting = (setting: EditableProfileSetting, valueHint?: (value: number) => string | undefined, fixedSuggestions?: readonly FixedValueSuggestion[]) => {
     const definition = VALUE_ADJUSTMENTS[setting]
     return {
       title: definition.title,
@@ -42,6 +50,7 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
       initialValue: 'defaultValue' in definition ? definition.defaultValue : undefined,
       suggestionKey: setting,
       presets: definition.suggestions,
+      fixedSuggestions,
       valueHint,
       disabled: settingsDisabled,
       onSave: (value: number) => onUpdateProfile(activeProfile.id, setting, value),
@@ -98,7 +107,7 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
       <Metric metric={{ label: 'Temp.', value: activeProfile.temperature, unit: '°' }} edit={editProfileSetting('temperature')} />
       <Metric metric={{ label: 'Grind size', value: activeProfile.grindSetting }} edit={editProfileSetting('grindSetting')} />
       <Metric metric={{ label: 'Dose', value: activeProfile.dose, unit: 'g' }} edit={editProfileSetting('dose')} />
-      <Metric metric={{ label: 'Yield', value: activeProfile.targetYield, unit: 'g', subtext: ratio, subtextVariant: 'pill' }} edit={editProfileSetting('targetYield', yieldValueHint)} />
+      <Metric metric={{ label: 'Yield', value: activeProfile.targetYield, unit: 'g', subtext: ratio, subtextVariant: 'pill' }} edit={editProfileSetting('targetYield', yieldValueHint, fixedYieldSuggestions)} />
     </div>
   </section>
 }

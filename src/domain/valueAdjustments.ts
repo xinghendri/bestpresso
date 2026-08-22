@@ -3,6 +3,12 @@ import type { EditableMachineSetting, EditableProfileSetting } from './brewing'
 export type ValueAdjustmentKey = EditableMachineSetting | EditableProfileSetting
 export type ValueAdjustmentMode = 'integer' | 'decimal'
 
+export interface FixedValueSuggestion {
+  label: string
+  detail: string
+  value: number
+}
+
 export interface ValueAdjustmentDefinition {
   title: string
   min: number
