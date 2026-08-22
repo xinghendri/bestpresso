@@ -10,6 +10,11 @@ import { scalePresentationForName } from './scaleArtwork'
 
 const icons = { water: hotWaterIcon, steam: steamIcon, scale: scaleIcon }
 
+const withoutGenericScaleSuffix = (name: string | undefined) => {
+  const title = name?.replace(/\s+scale$/i, '').trim()
+  return title || name || 'Scale'
+}
+
 interface MachineUtilityCardProps {
   utility: MachineUtility
   scale?: ScaleConnection
@@ -54,8 +59,9 @@ export function MachineUtilityCard({ utility, scale, onSearchScale, settingsDisa
 
   const isScale = utility.id === 'scale'
   const scaleConnected = isScale && scale?.status === 'connected'
-  const title = scaleConnected ? scale.name || 'Scale' : utility.label
-  const scalePresentation = scaleConnected ? scalePresentationForName(title) : undefined
+  const connectedScaleName = scaleConnected ? scale.name || 'Scale' : undefined
+  const scalePresentation = scaleConnected ? scalePresentationForName(connectedScaleName) : undefined
+  const title = scaleConnected ? scalePresentation?.displayName ?? withoutGenericScaleSuffix(connectedScaleName) : utility.label
   const cardClassName = `utility-card utility-card--${utility.id}${scalePresentation?.imageSrc ? ' utility-card--scale-with-art' : ''}`
 
   return <section className={cardClassName} data-scale-model={scalePresentation?.id} data-scale-image={scalePresentation?.imageName}>
