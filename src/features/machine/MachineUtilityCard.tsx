@@ -18,6 +18,7 @@ const withoutGenericScaleSuffix = (name: string | undefined) => {
 
 interface MachineUtilityCardProps {
   utility: MachineUtility
+  compact?: boolean
   scale?: ScaleConnection
   onSearchScale?: () => void
   settingsDisabled?: boolean
@@ -53,7 +54,7 @@ const editForMetric = (utility: MachineUtility, label: string, onSave?: (setting
   }
 }
 
-export function MachineUtilityCard({ utility, scale, onSearchScale, settingsDisabled, onUpdateSetting }: MachineUtilityCardProps) {
+export function MachineUtilityCard({ utility, compact = false, scale, onSearchScale, settingsDisabled, onUpdateSetting }: MachineUtilityCardProps) {
   if (utility.id === 'tank') {
     const metric = utility.metrics[0]
     const volume = Number(metric?.value.replaceAll(',', ''))
@@ -82,9 +83,9 @@ export function MachineUtilityCard({ utility, scale, onSearchScale, settingsDisa
   const connectedScaleName = scaleConnected ? scale.name || 'Scale' : undefined
   const scalePresentation = scaleConnected ? scalePresentationForName(connectedScaleName) : undefined
   const title = scaleConnected ? scalePresentation?.displayName ?? withoutGenericScaleSuffix(connectedScaleName) : utility.label
-  const cardClassName = `utility-card utility-card--${utility.id}${scalePresentation?.imageSrc ? ' utility-card--scale-with-art' : ''}`
+  const cardClassName = `utility-card utility-card--${utility.id}${compact ? ' utility-card--compact' : ''}${scalePresentation?.imageSrc ? ' utility-card--scale-with-art' : ''}`
 
-  return <section className={cardClassName} data-scale-model={scalePresentation?.id} data-scale-image={scalePresentation?.imageName}>
+  return <section className={cardClassName} data-layout={compact ? 'compact' : 'expanded'} data-scale-model={scalePresentation?.id} data-scale-image={scalePresentation?.imageName}>
     <header><img src={icons[utility.id]} alt="" /><span>{title}</span></header>
     {isScale && !scaleConnected
       ? <button className="scale-search" type="button" onClick={onSearchScale} disabled={scale?.status === 'searching'}>{scale?.status === 'searching' ? 'Searching…' : 'Search'}</button>
