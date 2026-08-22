@@ -27,7 +27,7 @@ export function MiniShotChart({ shot }: { shot: PreviousShot }) {
   const weightMax = Math.max(1, (shot.targetYield ?? observedWeight) * 1.12, observedWeight * 1.05)
 
   return <div className="mini-chart">
-    <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Previous shot pressure, flow, and weight graph" preserveAspectRatio="none">
+    <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Previous shot pressure, flow, and yield weight graph" preserveAspectRatio="none">
       <path className="chart-line chart-line--pressure" d={snapshotPath(points, 'pressure', 12, durationMs)} />
       <path className="chart-line chart-line--flow" d={snapshotPath(points, 'flow', 6, durationMs)} />
       <path className="chart-line chart-line--weight mini-chart__weight" d={snapshotPath(points, 'weight', weightMax, durationMs)} />

@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react'
+import type { FixedValueSuggestion, ValueAdjustmentKey, ValueAdjustmentMode } from '../../domain/valueAdjustments'
 
-export type ValueAdjustmentMode = 'integer' | 'decimal'
+export type { ValueAdjustmentMode } from '../../domain/valueAdjustments'
 
 export interface ValueAdjustmentRequest {
   label: string
@@ -10,7 +11,10 @@ export interface ValueAdjustmentRequest {
   max: number
   step: number
   mode: ValueAdjustmentMode
-  presets?: number[]
+  suggestionKey: ValueAdjustmentKey
+  presets?: readonly number[]
+  fixedSuggestions?: readonly FixedValueSuggestion[]
+  valueHint?: (value: number) => string | undefined
   onSave: (value: number) => void
 }
 

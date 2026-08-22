@@ -60,7 +60,7 @@ export function LiveShotChart({ points, elapsedMs, targetYield }: LiveShotChartP
       <span className="chart-reading chart-reading--temperature"><i />{currentTemperature?.toFixed(1) ?? '—'} <small>°C</small></span>
       <strong>{secondsLabel(elapsedMs)}</strong>
     </div>
-    <svg viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`} role="img" aria-label="Live espresso pressure, flow, weight, and temperature chart" preserveAspectRatio="none">
+    <svg viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`} role="img" aria-label="Live espresso pressure, flow, yield weight, and temperature chart" preserveAspectRatio="none">
       <defs><clipPath id="live-shot-plot"><rect x={PLOT.left} y={PLOT.top} width={PLOT.right - PLOT.left} height={PLOT.bottom - PLOT.top} /></clipPath></defs>
       {gridTicks.map((ratio) => {
         const y = PLOT.top + ratio * (PLOT.bottom - PLOT.top)
@@ -75,7 +75,7 @@ export function LiveShotChart({ points, elapsedMs, targetYield }: LiveShotChartP
         <text className="chart-axis-label" x={PLOT.right + 13} y={PLOT.bottom - ratio * (PLOT.bottom - PLOT.top) + 4}>{Math.round(weightMax * ratio)}</text>
       </g>)}
       <text className="chart-axis-title" x={PLOT.left} y={PLOT.top - 13}>bar / ml/s</text>
-      <text className="chart-axis-title" x={PLOT.right} y={PLOT.top - 13} textAnchor="end">weight (g)</text>
+      <text className="chart-axis-title" x={PLOT.right} y={PLOT.top - 13} textAnchor="end">yield (g)</text>
       <g clipPath="url(#live-shot-plot)">
         <path className="chart-line chart-line--target-pressure" d={linePath(points, 'targetPressure', durationMs, 0, 12)} />
         <path className="chart-line chart-line--target-flow" d={linePath(points, 'targetFlow', durationMs, 0, 12)} />

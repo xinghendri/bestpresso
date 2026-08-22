@@ -3,7 +3,7 @@ import { MiniShotChart } from './MiniShotChart'
 
 const emptyMessage: Record<Exclude<PreviousShotStatus, 'loaded' | 'fixture'>, string> = {
   loading: 'Loading previous pull…',
-  empty: 'No completed pulls yet',
+  empty: 'You haven’t filled any cups yet',
   error: 'Previous pull unavailable',
 }
 

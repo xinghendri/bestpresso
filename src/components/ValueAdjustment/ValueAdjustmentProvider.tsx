@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react'
 import logo from '../../assets/figma/decent-logo.png'
+import { MAX_VALUE_SUGGESTIONS } from '../../domain/valueAdjustments'
 import { ValueAdjustmentContext } from './ValueAdjustmentContext'
 import type { ValueAdjustmentMode, ValueAdjustmentRequest } from './ValueAdjustmentContext'
 
+const SUGGESTION_STORAGE_KEY = 'bestpresso.value-adjustment-suggestions.v2'
+type SuggestionStore = Partial<Record<ValueAdjustmentRequest['suggestionKey'], number[]>>
+
 const formatValue = (value: number, mode: ValueAdjustmentMode) => mode === 'decimal' ? value.toFixed(1) : String(Math.round(value))
+const formatSuggestion = (value: number, mode: ValueAdjustmentMode) => mode === 'decimal' && !Number.isInteger(value) ? value.toFixed(1) : String(value)
 
 const normalizedValue = (value: number, request: ValueAdjustmentRequest) => {
   const steps = Math.round((Math.min(request.max, Math.max(request.min, value)) - request.min) / request.step)
@@ -12,9 +17,34 @@ const normalizedValue = (value: number, request: ValueAdjustmentRequest) => {
   return Number(stepped.toFixed(request.mode === 'decimal' ? 1 : 0))
 }
 
-const fallbackPresets = (request: ValueAdjustmentRequest) => {
-  const offsets = request.mode === 'decimal' ? [-5, -2, -1, 1, 2, 5] : [-10, -5, -2, 2, 5, 10]
-  return offsets.map((offset) => normalizedValue(request.value + offset, request))
+const clampedValue = (value: number, request: ValueAdjustmentRequest) => Math.min(request.max, Math.max(request.min, value))
+
+const normalizedSuggestions = (values: readonly number[], request: ValueAdjustmentRequest) => Array.from(new Set(values
+  .filter(Number.isFinite)
+  .map((suggestion) => normalizedValue(suggestion, request))))
+  .filter((suggestion) => suggestion >= request.min && suggestion <= request.max)
+  .slice(-MAX_VALUE_SUGGESTIONS)
+
+const readSuggestionStore = (): SuggestionStore => {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(SUGGESTION_STORAGE_KEY) ?? '{}')
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    return Object.fromEntries(Object.entries(parsed).flatMap(([key, values]) => {
+      if (!Array.isArray(values)) return []
+      const numericValues = values.filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+      return [[key, numericValues.slice(-MAX_VALUE_SUGGESTIONS)]]
+    })) as SuggestionStore
+  } catch {
+    return {}
+  }
+}
+
+const writeSuggestionStore = (store: SuggestionStore) => {
+  try {
+    window.localStorage.setItem(SUGGESTION_STORAGE_KEY, JSON.stringify(store))
+  } catch {
+    // Suggestion memory is optional when storage is unavailable or full.
+  }
 }
 
 function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentRequest; onClose: () => void }) {
@@ -24,7 +54,18 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const drag = useRef<{ pointerId: number; startX: number; startValue: number } | null>(null)
   const visualValueRef = useRef(value)
   const animationFrame = useRef<number | null>(null)
-  const presets = useMemo(() => Array.from(new Set((request.presets ?? fallbackPresets(request)).map((preset) => normalizedValue(preset, request)))).filter((preset) => preset >= request.min && preset <= request.max), [request])
+  const audioContext = useRef<AudioContext | null>(null)
+  const lastFeedbackValue = useRef(value)
+  const lastFeedbackAt = useRef(0)
+  const fixedSelection = useRef<number | null>(null)
+  const [suggestionStore, setSuggestionStore] = useState<SuggestionStore>(readSuggestionStore)
+  const suggestionStoreRef = useRef(suggestionStore)
+  const hasSuggestionHistory = Object.prototype.hasOwnProperty.call(suggestionStore, request.suggestionKey)
+  const presets = useMemo(() => [...normalizedSuggestions(
+    hasSuggestionHistory ? suggestionStore[request.suggestionKey] ?? [] : request.presets ?? [],
+    request,
+  )].sort((first, second) => first - second), [hasSuggestionHistory, request, suggestionStore])
+  const valueHint = request.valueHint?.(normalizedValue(visualValue, request))
   const centerLabel = Math.round(visualValue)
   const labels = Array.from({ length: 9 }, (_, index) => centerLabel + index - 4)
   const minorTickStep = request.mode === 'decimal' ? 0.1 : 0.25
@@ -40,15 +81,62 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     animationFrame.current = null
   }, [])
 
+  const prepareAudioFeedback = useCallback(() => {
+    if (!audioContext.current && typeof window.AudioContext !== 'undefined') {
+      try {
+        audioContext.current = new window.AudioContext()
+      } catch {
+        return
+      }
+    }
+
+    if (audioContext.current?.state === 'suspended') void audioContext.current.resume().catch(() => undefined)
+  }, [])
+
+  const playStepFeedback = useCallback((nextValue: number) => {
+    const selectedValue = normalizedValue(nextValue, request)
+    if (selectedValue === lastFeedbackValue.current) return
+    lastFeedbackValue.current = selectedValue
+
+    const now = performance.now()
+    if (now - lastFeedbackAt.current < 32) return
+    lastFeedbackAt.current = now
+
+    const context = audioContext.current
+    if (!context || context.state !== 'running') return
+
+    try {
+      const oscillator = context.createOscillator()
+      const gain = context.createGain()
+      const startedAt = context.currentTime
+      oscillator.type = 'sine'
+      oscillator.frequency.setValueAtTime(request.mode === 'integer' ? 460 : 560, startedAt)
+      gain.gain.setValueAtTime(0.0001, startedAt)
+      gain.gain.exponentialRampToValueAtTime(0.014, startedAt + 0.003)
+      gain.gain.exponentialRampToValueAtTime(0.0001, startedAt + 0.026)
+      oscillator.connect(gain)
+      gain.connect(context.destination)
+      oscillator.addEventListener('ended', () => {
+        oscillator.disconnect()
+        gain.disconnect()
+      }, { once: true })
+      oscillator.start(startedAt)
+      oscillator.stop(startedAt + 0.03)
+    } catch {
+      // Audio feedback is an enhancement; keep the ruler usable if audio is unavailable.
+    }
+  }, [request])
+
   const setImmediateValue = useCallback((nextValue: number) => {
     stopAnimation()
     const next = normalizedValue(nextValue, request)
     visualValueRef.current = next
     setVisualValue(next)
     setValue(next)
-  }, [request, stopAnimation])
+    playStepFeedback(next)
+  }, [playStepFeedback, request, stopAnimation])
 
-  const animateToValue = useCallback((nextValue: number) => {
+  const animateToValue = useCallback((nextValue: number, requestedDuration?: number) => {
     const target = normalizedValue(nextValue, request)
     const start = visualValueRef.current
     stopAnimation()
@@ -61,7 +149,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     }
 
     const distanceInSteps = Math.abs(target - start) / request.step
-    const duration = Math.min(720, Math.max(320, 240 + distanceInSteps * 18))
+    const duration = requestedDuration ?? Math.min(720, Math.max(320, 240 + distanceInSteps * 18))
     const startedAt = performance.now()
     const animate = (now: number) => {
       const progress = Math.min(1, (now - startedAt) / duration)
@@ -69,11 +157,36 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
       const next = start + (target - start) * easedProgress
       visualValueRef.current = next
       setVisualValue(next)
+      playStepFeedback(next)
       if (progress < 1) animationFrame.current = requestAnimationFrame(animate)
       else animationFrame.current = null
     }
     animationFrame.current = requestAnimationFrame(animate)
-  }, [request, stopAnimation])
+  }, [playStepFeedback, request, stopAnimation])
+
+  const rememberSuggestion = useCallback((nextValue: number) => {
+    const selected = normalizedValue(nextValue, request)
+    const current = suggestionStoreRef.current
+    const hasHistory = Object.prototype.hasOwnProperty.call(current, request.suggestionKey)
+    const source = hasHistory ? current[request.suggestionKey] ?? [] : request.presets ?? []
+    const existing = normalizedSuggestions(source, request)
+    const alreadyIncluded = existing.includes(selected)
+    let next = existing.filter((suggestion) => suggestion !== selected)
+
+    if (!alreadyIncluded && next.length >= MAX_VALUE_SUGGESTIONS) {
+      if (hasHistory) next = next.slice(1)
+      else {
+        const lowest = Math.min(...next)
+        next.splice(next.indexOf(lowest), 1)
+      }
+    }
+
+    next.push(selected)
+    const updated = { ...current, [request.suggestionKey]: next.slice(-MAX_VALUE_SUGGESTIONS) }
+    suggestionStoreRef.current = updated
+    writeSuggestionStore(updated)
+    setSuggestionStore(updated)
+  }, [request])
 
   useEffect(() => {
     ruler.current?.focus()
@@ -82,28 +195,38 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     return () => {
       window.removeEventListener('keydown', handleEscape)
       stopAnimation()
+      if (audioContext.current?.state !== 'closed') void audioContext.current?.close().catch(() => undefined)
+      audioContext.current = null
     }
   }, [onClose, stopAnimation])
 
-  const changeBySteps = (steps: number) => setImmediateValue(visualValueRef.current + steps * request.step)
+  const changeBySteps = (steps: number) => {
+    fixedSelection.current = null
+    setImmediateValue(visualValueRef.current + steps * request.step)
+  }
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowDown', 'ArrowRight', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End'].includes(event.key)) return
+    prepareAudioFeedback()
     if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') changeBySteps(-1)
     else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') changeBySteps(1)
     else if (event.key === 'PageDown') changeBySteps(-10)
     else if (event.key === 'PageUp') changeBySteps(10)
-    else if (event.key === 'Home') setImmediateValue(request.min)
-    else if (event.key === 'End') setImmediateValue(request.max)
-    else return
+    else if (event.key === 'Home') { fixedSelection.current = null; setImmediateValue(request.min) }
+    else if (event.key === 'End') { fixedSelection.current = null; setImmediateValue(request.max) }
     event.preventDefault()
   }
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    prepareAudioFeedback()
     stopAnimation()
-    const startValue = normalizedValue(visualValueRef.current, request)
+    fixedSelection.current = null
+    const startValue = clampedValue(visualValueRef.current, request)
+    const selectedValue = normalizedValue(startValue, request)
     visualValueRef.current = startValue
     setVisualValue(startValue)
-    setValue(startValue)
+    setValue(selectedValue)
+    lastFeedbackValue.current = selectedValue
     drag.current = { pointerId: event.pointerId, startX: event.clientX, startValue }
     event.currentTarget.setPointerCapture(event.pointerId)
   }
@@ -114,25 +237,35 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     const width = Math.max(1, event.currentTarget.getBoundingClientRect().width)
     const visibleSteps = request.mode === 'decimal' ? 80 : 10
     const stepDelta = (activeDrag.startX - event.clientX) / (width / visibleSteps)
-    const next = normalizedValue(activeDrag.startValue + stepDelta * request.step, request)
-    visualValueRef.current = next
-    setVisualValue(next)
-    setValue(next)
+    const rawValue = activeDrag.startValue + stepDelta * request.step
+    const nextVisualValue = request.mode === 'integer' ? clampedValue(rawValue, request) : normalizedValue(rawValue, request)
+    const selectedValue = normalizedValue(nextVisualValue, request)
+    visualValueRef.current = nextVisualValue
+    setVisualValue(nextVisualValue)
+    setValue(selectedValue)
+    playStepFeedback(selectedValue)
   }
 
   const endDrag = (event: PointerEvent<HTMLDivElement>) => {
-    if (drag.current?.pointerId === event.pointerId) drag.current = null
+    if (drag.current?.pointerId !== event.pointerId) return
+    drag.current = null
+    const selectedValue = normalizedValue(visualValueRef.current, request)
+    if (request.mode === 'integer') animateToValue(selectedValue, 160)
+    else setImmediateValue(selectedValue)
   }
 
-  return <main className={`value-adjuster value-adjuster--${request.mode}`} aria-label={`Adjust ${request.label}`}>
+  const hasFixedSuggestions = Boolean(request.fixedSuggestions?.length)
+
+  return <main className={`value-adjuster value-adjuster--${request.mode}${hasFixedSuggestions ? ' value-adjuster--has-fixed-suggestions' : ''}`} aria-label={`Adjust ${request.label}`}>
     <header className="value-adjuster__header">
       <img className="logo" src={logo} alt="decent" />
-      <div className="value-adjuster__actions"><button className="value-adjuster__cancel" type="button" onClick={onClose}>Cancel</button><button className="value-adjuster__save" type="button" onClick={() => { request.onSave(value); onClose() }}>Save</button></div>
+      <div className="value-adjuster__actions"><button className="value-adjuster__cancel" type="button" onClick={onClose}>Cancel</button><button className="value-adjuster__save" type="button" onClick={() => { if (fixedSelection.current !== value) rememberSuggestion(value); request.onSave(value); onClose() }}>Save</button></div>
     </header>
     <section className="value-adjuster__body">
       <p>{request.label}</p>
       <output aria-live="polite">{formatValue(visualValue, request.mode)}{request.unit && <small>{request.unit}</small>}</output>
-      <div ref={ruler} className="value-adjuster__scrubber" role="slider" tabIndex={0} aria-label={request.label} aria-valuemin={request.min} aria-valuemax={request.max} aria-valuenow={value} aria-valuetext={`${formatValue(value, request.mode)}${request.unit ?? ''}`} onKeyDown={handleKeyDown} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={endDrag} onPointerCancel={endDrag}>
+      {valueHint && <div className="value-adjuster__value-hint"><span>{valueHint}</span></div>}
+      <div ref={ruler} className="value-adjuster__scrubber" role="slider" tabIndex={0} aria-label={request.label} aria-valuemin={request.min} aria-valuemax={request.max} aria-valuenow={value} aria-valuetext={`${formatValue(value, request.mode)}${request.unit ?? ''}${valueHint ? `, ${valueHint}` : ''}`} onKeyDown={handleKeyDown} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={endDrag} onPointerCancel={endDrag}>
         <div className="value-adjuster__labels" aria-hidden="true">{labels.map((label, index) => {
           const inRange = label >= request.min && label <= request.max
           const isCenter = label === centerLabel
@@ -144,7 +277,14 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
         </div>
       </div>
     </section>
-    <footer className="value-adjuster__presets" aria-label={`${request.label} presets`}>{presets.map((preset) => <button key={preset} type="button" className={preset === value ? 'value-adjuster__preset value-adjuster__preset--active' : 'value-adjuster__preset'} onClick={() => animateToValue(preset)}>{formatValue(preset, request.mode)}{request.unit && <small>{request.unit}</small>}</button>)}</footer>
+    <footer className="value-adjuster__presets">
+      <div className="value-adjuster__preset-row" aria-label={`${request.label} suggestions`}>{presets.map((preset) => <button key={preset} type="button" className={preset === value ? 'value-adjuster__preset value-adjuster__preset--active' : 'value-adjuster__preset'} onClick={() => { fixedSelection.current = null; prepareAudioFeedback(); animateToValue(preset) }}>{formatSuggestion(preset, request.mode)}{request.unit && <small>{request.unit}</small>}</button>)}</div>
+      {request.fixedSuggestions && <div className="value-adjuster__preset-row value-adjuster__preset-row--fixed" aria-label={`${request.label} typical ratios`}>{request.fixedSuggestions.map((suggestion) => {
+        const available = Number.isFinite(suggestion.value) && suggestion.value >= request.min && suggestion.value <= request.max
+        const suggestionValue = available ? normalizedValue(suggestion.value, request) : suggestion.value
+        return <button key={suggestion.label} type="button" className={available && suggestionValue === value ? 'value-adjuster__fixed-preset value-adjuster__fixed-preset--active' : 'value-adjuster__fixed-preset'} disabled={!available} aria-label={`${suggestion.label}, ${formatSuggestion(suggestion.value, request.mode)}${request.unit ?? ''}, ${suggestion.detail}`} onClick={() => { fixedSelection.current = suggestionValue; prepareAudioFeedback(); animateToValue(suggestionValue) }}>{suggestion.label}</button>
+      })}</div>}
+    </footer>
   </main>
 }
 

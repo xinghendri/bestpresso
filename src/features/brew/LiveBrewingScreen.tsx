@@ -18,7 +18,7 @@ export function LiveBrewingScreen({ model, liveBrew, onDismiss }: LiveBrewingScr
     { label: 'Temperature', value: profile.temperature, unit: '°' },
     { label: 'Grind setting', value: profile.grindSetting },
     { label: 'Dose', value: profile.dose, unit: 'g' },
-    { label: 'Target yield', value: profile.targetYield, unit: 'g' },
+    { label: 'Yield', value: profile.targetYield, unit: 'g' },
   ]
 
   return <main className="live-brew-screen">
