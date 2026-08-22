@@ -1,6 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&display=swap');
 
-:root { --chart-pressure:#42c599; --chart-flow:#4286c5; --chart-weight:#973e9c; --chart-volume:#8a5638; --chart-temperature:#d65353; font-family:Inter,system-ui,sans-serif; color:#c0c0c0; background:#3c3c3c; font-synthesis:none; text-rendering:optimizeLegibility; }
+:root { --chart-pressure:#42c599; --chart-flow:#4286c5; --chart-weight:#8a5638; --chart-volume:#973e9c; --chart-temperature:#d65353; font-family:Inter,system-ui,sans-serif; color:#c0c0c0; background:#3c3c3c; font-synthesis:none; text-rendering:optimizeLegibility; }
 * { box-sizing:border-box; }
 body { margin:0; min-width:320px; min-height:100vh; }
 button { border:0; color:inherit; font:inherit; cursor:pointer; }
