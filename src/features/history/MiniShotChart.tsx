@@ -24,15 +24,13 @@ export function MiniShotChart({ shot }: { shot: PreviousShot }) {
   const points = shot.points ?? []
   const durationMs = Math.max(1, points.at(-1)?.elapsedMs ?? Number(shot.totalTime) * 1000)
   const observedWeight = Math.max(0, ...points.map((point) => point.weight ?? 0))
-  const observedVolume = Math.max(0, ...points.map((point) => point.volume ?? 0))
-  const outputMax = Math.max(1, (shot.targetYield ?? observedWeight) * 1.12, observedWeight * 1.05, observedVolume * 1.05)
+  const weightMax = Math.max(1, (shot.targetYield ?? observedWeight) * 1.12, observedWeight * 1.05)
 
   return <div className="mini-chart">
-    <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Previous shot pressure, flow, weight, and water volume graph" preserveAspectRatio="none">
+    <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Previous shot pressure, flow, and yield weight graph" preserveAspectRatio="none">
       <path className="chart-line chart-line--pressure" d={snapshotPath(points, 'pressure', 12, durationMs)} />
       <path className="chart-line chart-line--flow" d={snapshotPath(points, 'flow', 6, durationMs)} />
-      <path className="chart-line chart-line--volume" d={snapshotPath(points, 'volume', outputMax, durationMs)} />
-      <path className="chart-line chart-line--weight mini-chart__weight" d={snapshotPath(points, 'weight', outputMax, durationMs)} />
+      <path className="chart-line chart-line--weight mini-chart__weight" d={snapshotPath(points, 'weight', weightMax, durationMs)} />
     </svg>
   </div>
 }

@@ -269,8 +269,6 @@ export function useBrewingData() {
         const elapsedMs = Math.max(0, now - session.startedAt)
         const lastPoint = session.points.at(-1)
         if (!lastPoint || elapsedMs > lastPoint.elapsedMs) {
-          const elapsedSeconds = lastPoint ? (elapsedMs - lastPoint.elapsedMs) / 1000 : 0
-          const volume = (lastPoint?.volume ?? 0) + Math.max(0, snapshot.flow ?? 0) * elapsedSeconds
           session.points.push({
             elapsedMs,
             pressure: snapshot.pressure,
@@ -278,7 +276,6 @@ export function useBrewingData() {
             targetPressure: snapshot.targetPressure,
             targetFlow: snapshot.targetFlow,
             temperature: snapshot.mixTemperature ?? snapshot.groupTemperature,
-            volume,
             weight: latestScaleSnapshot.current.weight,
             weightFlow: latestScaleSnapshot.current.weightFlow,
           })

@@ -51,6 +51,5 @@ export interface ShotMeasurement {
     groupTemperature?: number
   }
   scale?: { weight?: number; weightFlow?: number }
-  volume?: number | null
 }
 export interface ShotRecord { id?: string; timestamp?: string; workflow?: DecaidWorkflow; measurements?: ShotMeasurement[]; annotations?: { actualYield?: number }; stopReason?: string | null }
