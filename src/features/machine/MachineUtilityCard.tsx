@@ -1,7 +1,8 @@
-import type { CSSProperties } from 'react'
+import type { CSSProperties, KeyboardEvent } from 'react'
 import hotWaterIcon from '../../assets/figma/hot-water.svg'
 import reservoirIcon from '../../assets/figma/reservoir.svg'
 import scaleIcon from '../../assets/figma/scale.svg'
+import steamCompactConnector from '../../assets/figma/steam-compact-connector.svg'
 import steamIcon from '../../assets/figma/steam.svg'
 import { Metric } from '../../components/Metric/Metric'
 import { WATER_TANK_CAPACITY_ML, WATER_TANK_LOW_LEVEL_ML } from '../../domain/brewing'
@@ -20,6 +21,7 @@ interface MachineUtilityCardProps {
   utility: MachineUtility
   compact?: boolean
   scale?: ScaleConnection
+  onExpand?: () => void
   onSearchScale?: () => void
   settingsDisabled?: boolean
   onUpdateSetting?: (setting: EditableMachineSetting, value: number) => void
@@ -54,7 +56,7 @@ const editForMetric = (utility: MachineUtility, label: string, onSave?: (setting
   }
 }
 
-export function MachineUtilityCard({ utility, compact = false, scale, onSearchScale, settingsDisabled, onUpdateSetting }: MachineUtilityCardProps) {
+export function MachineUtilityCard({ utility, compact = false, scale, onExpand, onSearchScale, settingsDisabled, onUpdateSetting }: MachineUtilityCardProps) {
   if (utility.id === 'tank') {
     const metric = utility.metrics[0]
     const volume = Number(metric?.value.replaceAll(',', ''))
@@ -84,12 +86,21 @@ export function MachineUtilityCard({ utility, compact = false, scale, onSearchSc
   const scalePresentation = scaleConnected ? scalePresentationForName(connectedScaleName) : undefined
   const title = scaleConnected ? scalePresentation?.displayName ?? withoutGenericScaleSuffix(connectedScaleName) : utility.label
   const cardClassName = `utility-card utility-card--${utility.id}${compact ? ' utility-card--compact' : ''}${scalePresentation?.imageSrc ? ' utility-card--scale-with-art' : ''}`
+  const expandLabel = `Expand utility panels to view ${title}`
+  const expandWithKeyboard = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    onExpand?.()
+  }
 
-  return <section className={cardClassName} data-layout={compact ? 'compact' : 'expanded'} data-scale-model={scalePresentation?.id} data-scale-image={scalePresentation?.imageName}>
+  return <section className={cardClassName} data-layout={compact ? 'compact' : 'expanded'} data-scale-model={scalePresentation?.id} data-scale-image={scalePresentation?.imageName} role={compact ? 'button' : undefined} tabIndex={compact ? 0 : undefined} aria-label={compact ? expandLabel : undefined} onClick={compact ? onExpand : undefined} onKeyDown={compact ? expandWithKeyboard : undefined}>
     <header><img src={icons[utility.id]} alt="" /><span>{title}</span></header>
     {isScale && !scaleConnected
-      ? <button className="scale-search" type="button" onClick={onSearchScale} disabled={scale?.status === 'searching'}>{scale?.status === 'searching' ? 'Searching…' : 'Search'}</button>
-      : <div className="utility-card__metrics">{utility.metrics.map((metric) => <Metric key={metric.label} metric={metric} compact edit={editForMetric(utility, metric.label, onUpdateSetting, settingsDisabled)} />)}</div>}
+      ? compact
+        ? <span className="scale-compact-summary">{scale?.status === 'searching' ? 'Searching…' : 'Search'}</span>
+        : <button className="scale-search" type="button" onClick={onSearchScale} disabled={scale?.status === 'searching'}>{scale?.status === 'searching' ? 'Searching…' : 'Search'}</button>
+      : <div className="utility-card__metrics">{utility.metrics.map((metric) => <Metric key={metric.label} metric={metric} compact edit={compact ? undefined : editForMetric(utility, metric.label, onUpdateSetting, settingsDisabled)} />)}</div>}
+    {compact && utility.id === 'steam' && <span className="utility-card__steam-connector" aria-hidden="true"><img src={steamCompactConnector} alt="" /></span>}
     {scalePresentation?.imageSrc && <span className="scale-device-art" aria-hidden="true"><img src={scalePresentation.imageSrc} alt="" /></span>}
   </section>
 }
