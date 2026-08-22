@@ -1,18 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { applyWorkflow, favoriteProfiles, profileRecordsToDomain, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres, tankSensorLevelForMillilitres } from '../../api/decaid/adapters'
 import { getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getWorkflow, scanForDevices, setDisplayBrightness, setMachineState, setSharedSetting, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
-import { readinessFromSnapshot, readinessTemperatureSample } from '../../api/decaid/readiness'
+import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
 import { WATER_TANK_LOW_LEVEL_ML, WATER_TANK_SENSOR_FULL_MM, WATER_TANK_WARNING_OFFSET_CLICKS } from '../../domain/brewing'
 import type { BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, MachineReadiness, PreviousShotStatus, ScaleConnection, SettingFeedback } from '../../domain/brewing'
 import { brewingFixture } from '../../fixtures/brewingFixture'
 
-const POWER_CHECK_DELAY_MS = 10_000
-const POWER_CHECK_MIN_TARGET_GAP_C = 1
-const POWER_CHECK_MIN_RISE_C = 0.3
-const READY_CONFIRMATION_MS = 500
-const HEATING_CONFIRMATION_MS = 2_000
 const MAX_LIVE_SHOT_POINTS = 900
 const MIN_SUCCESSFUL_SHOT_MS = 5_000
 
@@ -46,8 +41,7 @@ export function useBrewingData() {
   const sleepRequestInFlight = useRef(false)
   const wakeScreenDismissed = useRef(false)
   const previousReadiness = useRef<MachineReadiness | null>(null)
-  const readinessTransition = useRef<{ candidate: 'ready' | 'heating'; startedAt: number } | null>(null)
-  const heatingProgress = useRef<{ startedAt: number; baseline: number; lowest: number; sensor: 'mix' | 'group'; target: number; flagged: boolean } | null>(null)
+  const readinessTracker = useRef(createMachineReadinessTracker())
   const displayDimmed = useRef(false)
   const brightnessBeforeSleep = useRef<number | null>(null)
   const profileRecords = useRef<DecaidProfileRecord[]>([])
@@ -94,49 +88,6 @@ export function useBrewingData() {
     }, 5000)
   }
 
-  const stabilizedReadiness = (candidate: MachineReadiness) => {
-    const previous = previousReadiness.current
-    const previousThermalState = previous === 'notHeating' ? 'heating' : previous
-    const isThermalTransition = (candidate === 'ready' || candidate === 'heating') && (previousThermalState === 'ready' || previousThermalState === 'heating')
-    if (!previous || !isThermalTransition || candidate === previousThermalState) {
-      readinessTransition.current = null
-      return candidate
-    }
-
-    const now = Date.now()
-    const transition = readinessTransition.current
-    if (!transition || transition.candidate !== candidate) {
-      readinessTransition.current = { candidate, startedAt: now }
-      return previous
-    }
-    const confirmationDelay = candidate === 'ready' ? READY_CONFIRMATION_MS : HEATING_CONFIRMATION_MS
-    if (now - transition.startedAt < confirmationDelay) return previous
-    readinessTransition.current = null
-    return candidate
-  }
-
-  const readinessWithPowerCheck = (snapshot: MachineSnapshot, readiness: MachineReadiness) => {
-    const sample = readinessTemperatureSample(snapshot)
-    if (readiness !== 'heating' || !sample || sample.gap < POWER_CHECK_MIN_TARGET_GAP_C) {
-      heatingProgress.current = null
-      return readiness
-    }
-    const { current, sensor, target } = sample
-    const now = Date.now()
-    const progress = heatingProgress.current
-    if (!progress || progress.sensor !== sensor || Math.abs(progress.target - target) >= 0.1) {
-      heatingProgress.current = { startedAt: now, baseline: current, lowest: current, sensor, target, flagged: false }
-      return readiness
-    }
-    progress.lowest = Math.min(progress.lowest, current)
-    if ((!progress.flagged && current >= progress.baseline + POWER_CHECK_MIN_RISE_C) || (progress.flagged && current >= progress.lowest + POWER_CHECK_MIN_RISE_C)) {
-      heatingProgress.current = { startedAt: now, baseline: current, lowest: current, sensor, target, flagged: false }
-      return readiness
-    }
-    if (now - progress.startedAt >= POWER_CHECK_DELAY_MS) progress.flagged = true
-    return progress.flagged ? 'notHeating' : readiness
-  }
-
   useEffect(() => {
     let disposed = false
     let timeToReadyEstimate: { deadline: number; receivedAt: number } | null = null
@@ -149,8 +100,7 @@ export function useBrewingData() {
       setMachineConnection(next)
       if (next !== 'connected') {
         previousReadiness.current = null
-        readinessTransition.current = null
-        heatingProgress.current = null
+        readinessTracker.current.reset()
         setHeatingSeconds(null)
         if (previous === 'connected') {
           setSleepScreenActive(false)
@@ -286,8 +236,7 @@ export function useBrewingData() {
         completeLiveShot()
       }
 
-      const candidateReadiness = readinessFromSnapshot(snapshot, previousReadiness.current)
-      const readiness = readinessWithPowerCheck(snapshot, stabilizedReadiness(candidateReadiness))
+      const readiness = readinessTracker.current.evaluate(snapshot)
       if (readiness === 'sleeping') {
         if (previousReadiness.current !== 'sleeping') void dimDisplay()
         if (!wakeScreenDismissed.current && !sleepRequestInFlight.current) setSleepScreenActive(true)
@@ -309,8 +258,7 @@ export function useBrewingData() {
       }))
     }, (connected) => {
       if (!connected) {
-        heatingProgress.current = null
-        readinessTransition.current = null
+        readinessTracker.current.reset()
         completeLiveShot()
       } else if (machineConnectionRef.current === 'fixture') {
         updateMachineConnection('connecting')

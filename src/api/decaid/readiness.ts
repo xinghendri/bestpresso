@@ -1,41 +1,162 @@
 import type { MachineReadiness } from '../../domain/brewing'
 import type { MachineSnapshot } from './types'
 
-const HEATING_ENTER_GAP_C = 1
-const HEATING_EXIT_GAP_C = 0.5
+const READY_TARGET_DEFICIT_C = 8
+const NOT_HEATING_BELOW_C = 70
+const TEMPERATURE_RISE_C = 0.3
+const RISING_MEMORY_MS = 5_000
+const NOT_HEATING_OBSERVATION_MS = 10_000
+
 const EXPLICIT_HEATING_STATES = new Set(['booting', 'heating', 'preheating'])
-const THERMAL_HOLD_STATES = new Set(['espresso', 'hotwater', 'flush', 'steam', 'steamrinse', 'cleaning', 'descaling', 'calibration', 'selftest', 'airpurge'])
+const READY_MACHINE_STATES = new Set(['idle', 'schedidle', 'ready'])
+const OPERATION_STATES = new Set(['espresso', 'hotwater', 'flush', 'steam', 'steamrinse', 'cleaning', 'descaling', 'calibration', 'selftest', 'airpurge'])
+const EXPLICIT_NOT_HEATING_STATES = new Set(['notheating', 'noheat', 'poweredoff'])
+const EXPLICIT_NOT_HEATING_SUBSTATES = new Set(['errornoac'])
+
+type ThermalReadiness = Extract<MachineReadiness, 'ready' | 'heating' | 'notHeating'>
+type TemperatureSensor = 'mix' | 'group'
+
+interface TemperatureReading {
+  sensor: TemperatureSensor
+  current: number
+  target?: number
+  gap?: number
+}
+
+interface SensorProgress {
+  lowest: number
+}
 
 const finite = (value: number | undefined): value is number => value !== undefined && Number.isFinite(value)
 
 const normalizedMachineState = (snapshot: MachineSnapshot) => {
   const machineState = typeof snapshot.state === 'string' ? { state: snapshot.state } : snapshot.state
-  return machineState?.state?.toLowerCase()
+  return {
+    state: machineState?.state?.toLowerCase(),
+    substate: machineState?.substate?.toLowerCase(),
+  }
 }
 
-const previousThermalReadiness = (previous?: MachineReadiness | null) => previous === 'notHeating' ? 'heating' : previous
+const temperatureReadings = (snapshot: MachineSnapshot) => {
+  const readings: TemperatureReading[] = []
+  if (finite(snapshot.mixTemperature)) {
+    const target = finite(snapshot.targetMixTemperature) ? snapshot.targetMixTemperature : undefined
+    readings.push({ sensor: 'mix', current: snapshot.mixTemperature, target, gap: target === undefined ? undefined : target - snapshot.mixTemperature })
+  }
+  if (finite(snapshot.groupTemperature)) {
+    const target = finite(snapshot.targetGroupTemperature) ? snapshot.targetGroupTemperature : undefined
+    readings.push({ sensor: 'group', current: snapshot.groupTemperature, target, gap: target === undefined ? undefined : target - snapshot.groupTemperature })
+  }
+  return readings
+}
 
 export function readinessTemperatureSample(snapshot: MachineSnapshot) {
-  const samples: Array<{ sensor: 'mix' | 'group'; current: number; target: number; gap: number }> = []
-  if (finite(snapshot.mixTemperature) && finite(snapshot.targetMixTemperature)) samples.push({ sensor: 'mix', current: snapshot.mixTemperature, target: snapshot.targetMixTemperature, gap: snapshot.targetMixTemperature - snapshot.mixTemperature })
-  if (finite(snapshot.groupTemperature) && finite(snapshot.targetGroupTemperature)) samples.push({ sensor: 'group', current: snapshot.groupTemperature, target: snapshot.targetGroupTemperature, gap: snapshot.targetGroupTemperature - snapshot.groupTemperature })
-  return samples.sort((left, right) => right.gap - left.gap)[0]
+  return temperatureReadings(snapshot)
+    .filter((reading): reading is TemperatureReading & { target: number; gap: number } => reading.target !== undefined && reading.gap !== undefined)
+    .sort((left, right) => right.gap - left.gap)[0]
 }
 
-export const readinessTemperatureGap = (snapshot: MachineSnapshot) => readinessTemperatureSample(snapshot)?.gap
+export function createMachineReadinessTracker() {
+  let thermalState: ThermalReadiness | null = null
+  let operationState: Exclude<ThermalReadiness, 'notHeating'> | null = null
+  let sensorProgress: Partial<Record<TemperatureSensor, SensorProgress>> = {}
+  let lastRiseAt: number | null = null
+  let coldStallStartedAt: number | null = null
 
-export function readinessFromSnapshot(snapshot: MachineSnapshot, previous?: MachineReadiness | null): MachineReadiness {
-  const state = normalizedMachineState(snapshot)
-  const thermalPrevious = previousThermalReadiness(previous)
+  const reset = () => {
+    thermalState = null
+    operationState = null
+    sensorProgress = {}
+    lastRiseAt = null
+    coldStallStartedAt = null
+  }
 
-  if (state === 'sleeping') return 'sleeping'
-  if (state === 'error') return 'disconnected'
-  if (state === 'needswater') return 'thirsty'
-  if (state && EXPLICIT_HEATING_STATES.has(state)) return 'heating'
-  if (state && THERMAL_HOLD_STATES.has(state) && (thermalPrevious === 'ready' || thermalPrevious === 'heating')) return thermalPrevious
+  const commit = (readiness: ThermalReadiness) => {
+    thermalState = readiness
+    return readiness
+  }
 
-  const targetGap = readinessTemperatureGap(snapshot)
-  if (targetGap === undefined) return thermalPrevious === 'ready' || thermalPrevious === 'heating' ? thermalPrevious : 'heating'
-  if (thermalPrevious === 'heating') return targetGap > HEATING_EXIT_GAP_C ? 'heating' : 'ready'
-  return targetGap >= HEATING_ENTER_GAP_C ? 'heating' : 'ready'
+  const observeTemperature = (snapshot: MachineSnapshot, now: number) => {
+    const readings = temperatureReadings(snapshot)
+    let rose = false
+    const availableSensors = new Set<TemperatureSensor>()
+
+    for (const reading of readings) {
+      availableSensors.add(reading.sensor)
+      const progress = sensorProgress[reading.sensor]
+      if (!progress) {
+        sensorProgress[reading.sensor] = { lowest: reading.current }
+        continue
+      }
+      progress.lowest = Math.min(progress.lowest, reading.current)
+      if (reading.current >= progress.lowest + TEMPERATURE_RISE_C) {
+        rose = true
+        progress.lowest = reading.current
+      }
+    }
+
+    for (const sensor of ['mix', 'group'] as const) {
+      if (!availableSensors.has(sensor)) delete sensorProgress[sensor]
+    }
+
+    if (rose) lastRiseAt = now
+    const rising = lastRiseAt !== null && now - lastRiseAt <= RISING_MEMORY_MS
+    const observedTemperature = readings.length ? Math.min(...readings.map((reading) => reading.current)) : undefined
+    const cold = observedTemperature !== undefined && observedTemperature < NOT_HEATING_BELOW_C
+
+    if (cold && !rising) coldStallStartedAt ??= now
+    else coldStallStartedAt = null
+
+    return {
+      rising,
+      stalledCold: cold && coldStallStartedAt !== null && now - coldStallStartedAt >= NOT_HEATING_OBSERVATION_MS,
+    }
+  }
+
+  const evaluate = (snapshot: MachineSnapshot, now = Date.now()): MachineReadiness => {
+    const { state, substate } = normalizedMachineState(snapshot)
+    const temperature = observeTemperature(snapshot, now)
+    const sample = readinessTemperatureSample(snapshot)
+    const withinReadyRange = sample ? sample.gap <= READY_TARGET_DEFICIT_C : false
+    const machineSignalsReady = state !== undefined && READY_MACHINE_STATES.has(state)
+    const machineSignalsHeating = (state !== undefined && EXPLICIT_HEATING_STATES.has(state)) || substate === 'preparingforshot'
+    const machineSignalsNotHeating = (state !== undefined && EXPLICIT_NOT_HEATING_STATES.has(state)) || (substate !== undefined && EXPLICIT_NOT_HEATING_SUBSTATES.has(substate))
+
+    if (state === 'sleeping') {
+      operationState = null
+      return 'sleeping'
+    }
+    if (state === 'needswater') {
+      operationState = null
+      return 'thirsty'
+    }
+    if (machineSignalsNotHeating) {
+      operationState = null
+      return commit('notHeating')
+    }
+    if (state === 'error') {
+      operationState = null
+      return thermalState ?? commit('heating')
+    }
+
+    if (state !== undefined && OPERATION_STATES.has(state)) {
+      operationState ??= thermalState === 'ready' ? 'ready' : thermalState === 'heating' ? 'heating' : withinReadyRange ? 'ready' : 'heating'
+      return commit(operationState)
+    }
+    operationState = null
+
+    if (temperature.stalledCold) return commit('notHeating')
+    if (machineSignalsHeating) return commit('heating')
+
+    // Once usable, an operation-related dip of up to 8 °C must not demote the
+    // machine. A genuinely cold start still begins in Heating and remains there
+    // while either temperature sensor is making measurable progress.
+    if (thermalState === 'ready' && withinReadyRange) return commit('ready')
+    if (temperature.rising) return commit('heating')
+    if (withinReadyRange || (sample === undefined && machineSignalsReady)) return commit('ready')
+    if (sample && sample.gap > READY_TARGET_DEFICIT_C) return commit('heating')
+    return thermalState ?? commit('heating')
+  }
+
+  return { evaluate, reset }
 }
