@@ -98,9 +98,7 @@ export function MachineUtilityCard({ utility, compact = false, scale, onExpand, 
     {compact && isScale && <button className="utility-card__expand-surface" type="button" aria-label={expandLabel} onClick={onExpand} />}
     <header><img src={icons[utility.id]} alt="" /><span>{title}</span></header>
     {isScale && !scaleConnected
-      ? compact
-        ? <button className="scale-compact-summary" type="button" onClick={onSearchScale} disabled={scale?.status === 'searching'}>{scale?.status === 'searching' ? 'Searching…' : 'Search'}</button>
-        : <button className="scale-search" type="button" onClick={onSearchScale} disabled={scale?.status === 'searching'}>{scale?.status === 'searching' ? 'Searching…' : 'Search'}</button>
+      ? <button className={compact ? 'scale-search scale-compact-summary' : 'scale-search'} type="button" onClick={onSearchScale} disabled={scale?.status === 'searching'}>{scale?.status === 'searching' ? 'Searching…' : 'Search'}</button>
       : <div className="utility-card__metrics">{utility.metrics.map((metric) => <Metric key={metric.label} metric={metric} compact edit={compact ? undefined : editForMetric(utility, metric.label, onUpdateSetting, settingsDisabled)} />)}</div>}
     {compact && utility.id === 'steam' && <span className="utility-card__steam-connector" aria-hidden="true"><img src={steamCompactConnector} alt="" /></span>}
     {scalePresentation?.imageSrc && <span className="scale-device-art" aria-hidden="true"><img src={scalePresentation.imageSrc} alt="" /></span>}
