@@ -282,7 +282,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
       {request.fixedSuggestions && <div className="value-adjuster__preset-row value-adjuster__preset-row--fixed" aria-label={`${request.label} typical ratios`}>{request.fixedSuggestions.map((suggestion) => {
         const available = Number.isFinite(suggestion.value) && suggestion.value >= request.min && suggestion.value <= request.max
         const suggestionValue = available ? normalizedValue(suggestion.value, request) : suggestion.value
-        return <button key={suggestion.label} type="button" className={available && suggestionValue === value ? 'value-adjuster__fixed-preset value-adjuster__fixed-preset--active' : 'value-adjuster__fixed-preset'} disabled={!available} aria-label={`${suggestion.label}, ${formatSuggestion(suggestion.value, request.mode)}${request.unit ?? ''}, ${suggestion.detail}`} onClick={() => { fixedSelection.current = suggestionValue; prepareAudioFeedback(); animateToValue(suggestionValue) }}><span>{suggestion.label}</span><small>{formatSuggestion(suggestion.value, request.mode)}{request.unit} · {suggestion.detail}</small></button>
+        return <button key={suggestion.label} type="button" className={available && suggestionValue === value ? 'value-adjuster__fixed-preset value-adjuster__fixed-preset--active' : 'value-adjuster__fixed-preset'} disabled={!available} aria-label={`${suggestion.label}, ${formatSuggestion(suggestion.value, request.mode)}${request.unit ?? ''}, ${suggestion.detail}`} onClick={() => { fixedSelection.current = suggestionValue; prepareAudioFeedback(); animateToValue(suggestionValue) }}>{suggestion.label}</button>
       })}</div>}
     </footer>
   </main>
