@@ -87,17 +87,19 @@ export function MachineUtilityCard({ utility, compact = false, scale, onExpand, 
   const title = scaleConnected ? scalePresentation?.displayName ?? withoutGenericScaleSuffix(connectedScaleName) : utility.label
   const cardClassName = `utility-card utility-card--${utility.id}${compact ? ' utility-card--compact' : ''}${scalePresentation?.imageSrc ? ' utility-card--scale-with-art' : ''}`
   const expandLabel = `Expand utility panels to view ${title}`
+  const sectionIsExpandControl = compact && !isScale
   const expandWithKeyboard = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key !== 'Enter' && event.key !== ' ') return
     event.preventDefault()
     onExpand?.()
   }
 
-  return <section className={cardClassName} data-layout={compact ? 'compact' : 'expanded'} data-scale-model={scalePresentation?.id} data-scale-image={scalePresentation?.imageName} role={compact ? 'button' : undefined} tabIndex={compact ? 0 : undefined} aria-label={compact ? expandLabel : undefined} onClick={compact ? onExpand : undefined} onKeyDown={compact ? expandWithKeyboard : undefined}>
+  return <section className={cardClassName} data-layout={compact ? 'compact' : 'expanded'} data-scale-model={scalePresentation?.id} data-scale-image={scalePresentation?.imageName} role={sectionIsExpandControl ? 'button' : undefined} tabIndex={sectionIsExpandControl ? 0 : undefined} aria-label={sectionIsExpandControl ? expandLabel : undefined} onClick={sectionIsExpandControl ? onExpand : undefined} onKeyDown={sectionIsExpandControl ? expandWithKeyboard : undefined}>
+    {compact && isScale && <button className="utility-card__expand-surface" type="button" aria-label={expandLabel} onClick={onExpand} />}
     <header><img src={icons[utility.id]} alt="" /><span>{title}</span></header>
     {isScale && !scaleConnected
       ? compact
-        ? <span className="scale-compact-summary">{scale?.status === 'searching' ? 'Searching…' : 'Search'}</span>
+        ? <button className="scale-compact-summary" type="button" onClick={onSearchScale} disabled={scale?.status === 'searching'}>{scale?.status === 'searching' ? 'Searching…' : 'Search'}</button>
         : <button className="scale-search" type="button" onClick={onSearchScale} disabled={scale?.status === 'searching'}>{scale?.status === 'searching' ? 'Searching…' : 'Search'}</button>
       : <div className="utility-card__metrics">{utility.metrics.map((metric) => <Metric key={metric.label} metric={metric} compact edit={compact ? undefined : editForMetric(utility, metric.label, onUpdateSetting, settingsDisabled)} />)}</div>}
     {compact && utility.id === 'steam' && <span className="utility-card__steam-connector" aria-hidden="true"><img src={steamCompactConnector} alt="" /></span>}
