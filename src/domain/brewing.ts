@@ -1,13 +1,14 @@
-export type MachineReadiness = 'ready' | 'heating' | 'notHeating' | 'sleeping' | 'disconnected'
+export type MachineReadiness = 'ready' | 'heating' | 'notHeating' | 'thirsty' | 'sleeping' | 'disconnected'
 export type DataConnection = 'connecting' | 'connected' | 'fixture' | 'disconnected'
 export type UtilityId = 'water' | 'steam' | 'scale' | 'tank'
 export type ScaleConnectionStatus = 'connected' | 'disconnected' | 'searching'
 export type EditableMachineSetting = 'hotWaterVolume' | 'hotWaterTemperature' | 'steamTemperature' | 'steamDuration' | 'steamFlow'
 export type EditableProfileSetting = 'temperature' | 'grindSetting' | 'dose' | 'targetYield'
 export type PreviousShotStatus = 'loading' | 'loaded' | 'empty' | 'error' | 'fixture'
-export const WATER_TANK_CAPACITY_ML = 1277
-export const WATER_TANK_SENSOR_FULL_MM = 45
+export const WATER_TANK_CAPACITY_ML = 1207
+export const WATER_TANK_SENSOR_FULL_MM = 43
 export const WATER_TANK_LOW_LEVEL_ML = 450
+export const WATER_TANK_WARNING_OFFSET_CLICKS = 5
 
 export interface ScaleConnection {
   status: ScaleConnectionStatus
@@ -28,6 +29,7 @@ export interface MachineUtility {
   label: string
   metrics: DisplayMetric[]
   alert?: boolean
+  warning?: boolean
   levelPercent?: number
 }
 

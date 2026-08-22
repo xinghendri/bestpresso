@@ -30,7 +30,7 @@ export function readinessFromSnapshot(snapshot: MachineSnapshot, previous?: Mach
 
   if (state === 'sleeping') return 'sleeping'
   if (state === 'error') return 'disconnected'
-  if (state === 'needswater' && previous) return previous
+  if (state === 'needswater') return 'thirsty'
   if (state && EXPLICIT_HEATING_STATES.has(state)) return 'heating'
   if (state && THERMAL_HOLD_STATES.has(state) && (thermalPrevious === 'ready' || thermalPrevious === 'heating')) return thermalPrevious
 

@@ -36,13 +36,17 @@ export function MachineUtilityCard({ utility, scale, onSearchScale, settingsDisa
     const fallbackLevel = safeVolume / WATER_TANK_CAPACITY_ML * 100
     const level = Math.max(0, Math.min(100, utility.levelPercent ?? fallbackLevel))
     const needsWater = Boolean(utility.alert) || safeVolume <= WATER_TANK_LOW_LEVEL_ML
+    const warnsWater = !needsWater && Boolean(utility.warning)
     const valueLabel = Number.isFinite(volume) ? `${metric.value} ${metric.unit ?? 'ml'}` : 'unknown level'
     const statusLabel = needsWater
       ? `Water reservoir needs water, ${valueLabel}`
+      : warnsWater
+        ? `Water reservoir is getting low, ${valueLabel}`
       : `Water reservoir, ${valueLabel}`
     const style = { '--reservoir-level': `${level}%` } as CSSProperties
+    const className = `reservoir-meter${needsWater ? ' reservoir-meter--needs-water' : warnsWater ? ' reservoir-meter--warning' : ''}`
 
-    return <section className={needsWater ? 'reservoir-meter reservoir-meter--needs-water' : 'reservoir-meter'} role="meter" aria-label={statusLabel} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(level)} aria-valuetext={statusLabel} title={statusLabel} style={style}>
+    return <section className={className} role="meter" aria-label={statusLabel} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(level)} aria-valuetext={statusLabel} title={statusLabel} style={style}>
       <span className="reservoir-meter__icon" aria-hidden="true"><img src={reservoirIcon} alt="" /></span>
       <span className="reservoir-meter__track" aria-hidden="true"><span className="reservoir-meter__level" /></span>
     </section>

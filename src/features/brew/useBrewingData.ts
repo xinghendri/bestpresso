@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { applyWorkflow, favoriteProfiles, profileRecordsToDomain, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres } from '../../api/decaid/adapters'
+import { applyWorkflow, favoriteProfiles, profileRecordsToDomain, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres, tankSensorLevelForMillilitres } from '../../api/decaid/adapters'
 import { getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getWorkflow, scanForDevices, setDisplayBrightness, setMachineState, setSharedSetting, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
 import { readinessFromSnapshot, readinessTemperatureSample } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
-import { WATER_TANK_LOW_LEVEL_ML, WATER_TANK_SENSOR_FULL_MM } from '../../domain/brewing'
+import { WATER_TANK_LOW_LEVEL_ML, WATER_TANK_SENSOR_FULL_MM, WATER_TANK_WARNING_OFFSET_CLICKS } from '../../domain/brewing'
 import type { BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, MachineReadiness, PreviousShotStatus, ScaleConnection, SettingFeedback } from '../../domain/brewing'
 import { brewingFixture } from '../../fixtures/brewingFixture'
 
@@ -343,12 +343,20 @@ export function useBrewingData() {
       const sensorLevel = levels.currentLevel
       const volume = tankMillilitres(sensorLevel)
       const levelPercent = Math.max(0, Math.min(100, sensorLevel / WATER_TANK_SENSOR_FULL_MM * 100))
+      const calculatedRefillLevel = tankSensorLevelForMillilitres(WATER_TANK_LOW_LEVEL_ML)
+      const configuredRefillLevel = typeof levels.refillLevel === 'number' && Number.isFinite(levels.refillLevel)
+        ? levels.refillLevel
+        : calculatedRefillLevel
+      const refillLevel = Math.max(calculatedRefillLevel, configuredRefillLevel)
+      const needsWater = machineNeedsWater.current || volume <= WATER_TANK_LOW_LEVEL_ML
+      const warnsWater = !needsWater && sensorLevel <= refillLevel + WATER_TANK_WARNING_OFFSET_CLICKS
       latestTankVolume.current = volume
       setModel((current) => ({
         ...current,
         utilities: current.utilities.map((utility) => utility.id === 'tank' ? {
           ...utility,
-          alert: machineNeedsWater.current || volume <= WATER_TANK_LOW_LEVEL_ML,
+          alert: needsWater,
+          warning: warnsWater,
           levelPercent,
           metrics: utility.metrics.map((metric) => ({ ...metric, value: volume.toLocaleString('en-US') })),
         } : utility),

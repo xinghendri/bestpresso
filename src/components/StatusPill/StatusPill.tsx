@@ -1,6 +1,7 @@
 import heatingIcon from '../../assets/figma/heating.svg'
 import notHeatingIcon from '../../assets/figma/not-heating.svg'
 import readyIcon from '../../assets/figma/ready.svg'
+import thirstyIcon from '../../assets/figma/thirsty.svg'
 import type { DataConnection, MachineReadiness } from '../../domain/brewing'
 
 export function StatusPill({ status, connection, machineConnection, heatingSeconds }: { status: MachineReadiness; connection: DataConnection; machineConnection: DataConnection; heatingSeconds?: number | null }) {
@@ -18,6 +19,9 @@ export function StatusPill({ status, connection, machineConnection, heatingSecon
   }
   if (status === 'heating') {
     return <div className="status-pill status-pill--heating" title="Machine is heating" role="status" aria-live="polite"><img src={heatingIcon} alt="" /><strong>Heating</strong>{heatingSeconds !== null && heatingSeconds !== undefined && heatingSeconds > 0 && <span>{heatingSeconds}s</span>}</div>
+  }
+  if (status === 'thirsty') {
+    return <div className="status-pill status-pill--thirsty" title="Water reservoir needs water" role="status" aria-live="assertive"><img src={thirstyIcon} alt="" /><strong>Thirsty</strong></div>
   }
   return <div className={`status-pill status-pill--${status}`} title={`Machine: ${status}`} role="status"><img src={readyIcon} alt="" /><strong>{status}</strong></div>
 }

@@ -104,6 +104,11 @@ export function tankMillilitres(level: number) {
   return MM_TO_ML[Math.min(index, MM_TO_ML.length - 1)]
 }
 
+export function tankSensorLevelForMillilitres(volume: number) {
+  const index = MM_TO_ML.findIndex((millilitres) => millilitres >= volume)
+  return index === -1 ? MM_TO_ML.length - 1 : index
+}
+
 export function shotToDomain(shot: ShotRecord): PreviousShot {
   const measurements = shot.measurements ?? []
   const extraction = measurements.filter((entry) => entry.machine?.state?.substate !== 'preparingForShot')
