@@ -27,7 +27,7 @@ const editForMetric = (utility: MachineUtility, label: string, onSave?: (setting
   if (!onSave) return undefined
   if (utility.id === 'water' && label === 'Volume') return { title: 'Hot water volume', min: 1, max: 500, step: 1, mode: 'integer' as const, presets: [30, 40, 50, 60, 90, 120], disabled, onSave: (value: number) => onSave('hotWaterVolume', value) }
   if (utility.id === 'water' && label === 'Temp.') return { title: 'Hot water temperature', min: 40, max: 100, step: 1, mode: 'integer' as const, presets: [82, 89, 91, 92, 97, 98], disabled, onSave: (value: number) => onSave('hotWaterTemperature', value) }
-  if (utility.id === 'steam' && label === 'Target') return { title: 'Steam target temperature', min: 135, max: 165, step: 1, mode: 'integer' as const, presets: [135, 140, 145, 150, 155, 160], disabled, onSave: (value: number) => onSave('steamTemperature', value) }
+  if (utility.id === 'steam' && label === 'Target') return { title: 'Steam target temperature', min: 120, max: 170, step: 1, mode: 'integer' as const, presets: [120, 135, 145, 155, 165, 170], disabled, onSave: (value: number) => onSave('steamTemperature', value) }
   if (utility.id === 'steam' && label === 'Max time') return { title: 'Steam maximum time', min: 1, max: 120, step: 1, mode: 'integer' as const, presets: [30, 40, 50, 60, 90, 120], disabled, onSave: (value: number) => onSave('steamDuration', value) }
   if (utility.id === 'steam' && label === 'Flow') return { title: 'Steam flow', min: 0.1, max: 4, step: 0.1, mode: 'decimal' as const, presets: [0.4, 0.6, 0.8, 1, 1.2, 1.5], disabled, onSave: (value: number) => onSave('steamFlow', value) }
   return undefined

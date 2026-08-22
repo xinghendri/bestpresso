@@ -78,6 +78,7 @@ export interface LiveShotPoint {
   targetPressure?: number
   targetFlow?: number
   temperature?: number
+  volume?: number
   weight?: number
   weightFlow?: number
 }

@@ -127,6 +127,7 @@ export function shotToDomain(shot: ShotRecord): PreviousShot {
       targetPressure: entry.machine?.targetPressure,
       targetFlow: entry.machine?.targetFlow,
       temperature: entry.machine?.mixTemperature ?? entry.machine?.groupTemperature,
+      volume: entry.volume ?? undefined,
       weight: entry.scale?.weight,
       weightFlow: entry.scale?.weightFlow,
     }]

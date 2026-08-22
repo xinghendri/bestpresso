@@ -44,10 +44,12 @@ const secondsLabel = (milliseconds: number) => {
 export function LiveShotChart({ points, elapsedMs, targetYield }: LiveShotChartProps) {
   const durationMs = Math.max(30_000, Math.ceil(Math.max(elapsedMs, 1) / 10_000) * 10_000)
   const observedWeight = Math.max(0, ...points.map((point) => point.weight ?? 0))
-  const weightMax = Math.max(50, targetYield * 1.2, observedWeight * 1.12)
+  const observedVolume = Math.max(0, ...points.map((point) => point.volume ?? 0))
+  const outputMax = Math.max(50, targetYield * 1.2, observedWeight * 1.12, observedVolume * 1.12)
   const currentPressure = latestValue(points, 'pressure')
   const currentFlow = latestValue(points, 'flow')
   const currentWeight = latestValue(points, 'weight')
+  const currentVolume = latestValue(points, 'volume')
   const currentTemperature = latestValue(points, 'temperature')
   const timeTicks = Array.from({ length: 7 }, (_, index) => index / 6)
   const gridTicks = Array.from({ length: 5 }, (_, index) => index / 4)
@@ -57,10 +59,11 @@ export function LiveShotChart({ points, elapsedMs, targetYield }: LiveShotChartP
       <span className="chart-reading chart-reading--pressure"><i />{currentPressure?.toFixed(1) ?? '—'} <small>bar</small></span>
       <span className="chart-reading chart-reading--flow"><i />{currentFlow?.toFixed(1) ?? '—'} <small>ml/s</small></span>
       <span className="chart-reading chart-reading--weight"><i />{currentWeight?.toFixed(1) ?? '—'} <small>g</small></span>
+      <span className="chart-reading chart-reading--volume"><i />{currentVolume?.toFixed(1) ?? '—'} <small>ml</small></span>
       <span className="chart-reading chart-reading--temperature"><i />{currentTemperature?.toFixed(1) ?? '—'} <small>°C</small></span>
       <strong>{secondsLabel(elapsedMs)}</strong>
     </div>
-    <svg viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`} role="img" aria-label="Live espresso pressure, flow, weight, and temperature chart" preserveAspectRatio="none">
+    <svg viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`} role="img" aria-label="Live espresso pressure, flow, weight, water volume, and temperature chart" preserveAspectRatio="none">
       <defs><clipPath id="live-shot-plot"><rect x={PLOT.left} y={PLOT.top} width={PLOT.right - PLOT.left} height={PLOT.bottom - PLOT.top} /></clipPath></defs>
       {gridTicks.map((ratio) => {
         const y = PLOT.top + ratio * (PLOT.bottom - PLOT.top)
@@ -72,17 +75,18 @@ export function LiveShotChart({ points, elapsedMs, targetYield }: LiveShotChartP
       })}
       {gridTicks.map((ratio) => <g key={`axis-${ratio}`}>
         <text className="chart-axis-label" x={PLOT.left - 13} y={PLOT.bottom - ratio * (PLOT.bottom - PLOT.top) + 4} textAnchor="end">{Math.round(12 * ratio)}</text>
-        <text className="chart-axis-label" x={PLOT.right + 13} y={PLOT.bottom - ratio * (PLOT.bottom - PLOT.top) + 4}>{Math.round(weightMax * ratio)}</text>
+        <text className="chart-axis-label" x={PLOT.right + 13} y={PLOT.bottom - ratio * (PLOT.bottom - PLOT.top) + 4}>{Math.round(outputMax * ratio)}</text>
       </g>)}
       <text className="chart-axis-title" x={PLOT.left} y={PLOT.top - 13}>bar / ml/s</text>
-      <text className="chart-axis-title" x={PLOT.right} y={PLOT.top - 13} textAnchor="end">weight (g)</text>
+      <text className="chart-axis-title" x={PLOT.right} y={PLOT.top - 13} textAnchor="end">weight / volume (g / ml)</text>
       <g clipPath="url(#live-shot-plot)">
         <path className="chart-line chart-line--target-pressure" d={linePath(points, 'targetPressure', durationMs, 0, 12)} />
         <path className="chart-line chart-line--target-flow" d={linePath(points, 'targetFlow', durationMs, 0, 12)} />
         <path className="chart-line chart-line--temperature" d={linePath(points, 'temperature', durationMs, 70, 100)} />
         <path className="chart-line chart-line--pressure" d={linePath(points, 'pressure', durationMs, 0, 12)} />
         <path className="chart-line chart-line--flow" d={linePath(points, 'flow', durationMs, 0, 12)} />
-        <path className="chart-line chart-line--weight" d={linePath(points, 'weight', durationMs, 0, weightMax)} />
+        <path className="chart-line chart-line--volume" d={linePath(points, 'volume', durationMs, 0, outputMax)} />
+        <path className="chart-line chart-line--weight" d={linePath(points, 'weight', durationMs, 0, outputMax)} />
       </g>
     </svg>
     {points.length === 0 && <p className="live-shot-chart__empty">Waiting for brewing telemetry…</p>}

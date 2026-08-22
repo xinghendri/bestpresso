@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getDecaidSettingsUrl } from './api/decaid/config'
 import { AppShell } from './app/AppShell'
+import { InteractionSound } from './components/InteractionSound/InteractionSound'
 import { ValueAdjustmentProvider } from './components/ValueAdjustment/ValueAdjustmentProvider'
 import { useBrewingData } from './features/brew/useBrewingData'
 import { ProfilesPanel } from './features/profiles/ProfilesPanel'
@@ -38,5 +39,5 @@ export default function App() {
   else if (page === 'previous-pull' && !data.liveBrew.visible && data.model.previousShot) screen = <PreviousShotScreen shot={data.model.previousShot} onDismiss={() => navigate('home')} />
   else screen = <AppShell {...data} onSleep={data.toggleSleep} onWake={data.wakeMachine} onDismissLiveBrew={data.dismissLiveBrew} onSearchScale={data.searchForScale} onUpdateMachineSetting={data.updateMachineSetting} onUpdateProfileSetting={data.updateProfileSetting} onOpenSettings={() => window.location.assign(getDecaidSettingsUrl())} onManageProfiles={() => navigate('profiles')} onOpenPreviousShot={() => navigate('previous-pull')} />
 
-  return <ValueAdjustmentProvider>{screen}</ValueAdjustmentProvider>
+  return <ValueAdjustmentProvider><InteractionSound />{screen}</ValueAdjustmentProvider>
 }
