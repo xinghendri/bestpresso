@@ -61,10 +61,10 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const [suggestionStore, setSuggestionStore] = useState<SuggestionStore>(readSuggestionStore)
   const suggestionStoreRef = useRef(suggestionStore)
   const hasSuggestionHistory = Object.prototype.hasOwnProperty.call(suggestionStore, request.suggestionKey)
-  const presets = useMemo(() => normalizedSuggestions(
+  const presets = useMemo(() => [...normalizedSuggestions(
     hasSuggestionHistory ? suggestionStore[request.suggestionKey] ?? [] : request.presets ?? [],
     request,
-  ), [hasSuggestionHistory, request, suggestionStore])
+  )].sort((first, second) => first - second), [hasSuggestionHistory, request, suggestionStore])
   const valueHint = request.valueHint?.(normalizedValue(visualValue, request))
   const centerLabel = Math.round(visualValue)
   const labels = Array.from({ length: 9 }, (_, index) => centerLabel + index - 4)
@@ -278,7 +278,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
       </div>
     </section>
     <footer className="value-adjuster__presets">
-      <div className="value-adjuster__preset-row" aria-label={`${request.label} suggestions`}>{presets.map((preset) => <button key={preset} type="button" className={preset === value ? 'value-adjuster__preset value-adjuster__preset--active' : 'value-adjuster__preset'} onClick={() => { fixedSelection.current = null; prepareAudioFeedback(); rememberSuggestion(preset); animateToValue(preset) }}>{formatSuggestion(preset, request.mode)}{request.unit && <small>{request.unit}</small>}</button>)}</div>
+      <div className="value-adjuster__preset-row" aria-label={`${request.label} suggestions`}>{presets.map((preset) => <button key={preset} type="button" className={preset === value ? 'value-adjuster__preset value-adjuster__preset--active' : 'value-adjuster__preset'} onClick={() => { fixedSelection.current = null; prepareAudioFeedback(); animateToValue(preset) }}>{formatSuggestion(preset, request.mode)}{request.unit && <small>{request.unit}</small>}</button>)}</div>
       {request.fixedSuggestions && <div className="value-adjuster__preset-row value-adjuster__preset-row--fixed" aria-label={`${request.label} typical ratios`}>{request.fixedSuggestions.map((suggestion) => {
         const available = Number.isFinite(suggestion.value) && suggestion.value >= request.min && suggestion.value <= request.max
         const suggestionValue = available ? normalizedValue(suggestion.value, request) : suggestion.value
