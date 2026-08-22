@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react'
 import logo from '../../assets/figma/decent-logo.png'
+import { MAX_VALUE_SUGGESTIONS } from '../../domain/valueAdjustments'
 import { ValueAdjustmentContext } from './ValueAdjustmentContext'
 import type { ValueAdjustmentMode, ValueAdjustmentRequest } from './ValueAdjustmentContext'
 
+const SUGGESTION_STORAGE_KEY = 'bestpresso.value-adjustment-suggestions.v2'
+type SuggestionStore = Partial<Record<ValueAdjustmentRequest['suggestionKey'], number[]>>
+
 const formatValue = (value: number, mode: ValueAdjustmentMode) => mode === 'decimal' ? value.toFixed(1) : String(Math.round(value))
+const formatSuggestion = (value: number, mode: ValueAdjustmentMode) => mode === 'decimal' && !Number.isInteger(value) ? value.toFixed(1) : String(value)
 
 const normalizedValue = (value: number, request: ValueAdjustmentRequest) => {
   const steps = Math.round((Math.min(request.max, Math.max(request.min, value)) - request.min) / request.step)
@@ -14,9 +19,32 @@ const normalizedValue = (value: number, request: ValueAdjustmentRequest) => {
 
 const clampedValue = (value: number, request: ValueAdjustmentRequest) => Math.min(request.max, Math.max(request.min, value))
 
-const fallbackPresets = (request: ValueAdjustmentRequest) => {
-  const offsets = request.mode === 'decimal' ? [-5, -2, -1, 1, 2, 5] : [-10, -5, -2, 2, 5, 10]
-  return offsets.map((offset) => normalizedValue(request.value + offset, request))
+const normalizedSuggestions = (values: readonly number[], request: ValueAdjustmentRequest) => Array.from(new Set(values
+  .filter(Number.isFinite)
+  .map((suggestion) => normalizedValue(suggestion, request))))
+  .filter((suggestion) => suggestion >= request.min && suggestion <= request.max)
+  .slice(-MAX_VALUE_SUGGESTIONS)
+
+const readSuggestionStore = (): SuggestionStore => {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(SUGGESTION_STORAGE_KEY) ?? '{}')
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    return Object.fromEntries(Object.entries(parsed).flatMap(([key, values]) => {
+      if (!Array.isArray(values)) return []
+      const numericValues = values.filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+      return [[key, numericValues.slice(-MAX_VALUE_SUGGESTIONS)]]
+    })) as SuggestionStore
+  } catch {
+    return {}
+  }
+}
+
+const writeSuggestionStore = (store: SuggestionStore) => {
+  try {
+    window.localStorage.setItem(SUGGESTION_STORAGE_KEY, JSON.stringify(store))
+  } catch {
+    // Suggestion memory is optional when storage is unavailable or full.
+  }
 }
 
 function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentRequest; onClose: () => void }) {
@@ -29,7 +57,13 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const audioContext = useRef<AudioContext | null>(null)
   const lastFeedbackValue = useRef(value)
   const lastFeedbackAt = useRef(0)
-  const presets = useMemo(() => Array.from(new Set((request.presets ?? fallbackPresets(request)).map((preset) => normalizedValue(preset, request)))).filter((preset) => preset >= request.min && preset <= request.max), [request])
+  const [suggestionStore, setSuggestionStore] = useState<SuggestionStore>(readSuggestionStore)
+  const suggestionStoreRef = useRef(suggestionStore)
+  const hasSuggestionHistory = Object.prototype.hasOwnProperty.call(suggestionStore, request.suggestionKey)
+  const presets = useMemo(() => normalizedSuggestions(
+    hasSuggestionHistory ? suggestionStore[request.suggestionKey] ?? [] : request.presets ?? [],
+    request,
+  ), [hasSuggestionHistory, request, suggestionStore])
   const valueHint = request.valueHint?.(normalizedValue(visualValue, request))
   const centerLabel = Math.round(visualValue)
   const labels = Array.from({ length: 9 }, (_, index) => centerLabel + index - 4)
@@ -129,6 +163,30 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     animationFrame.current = requestAnimationFrame(animate)
   }, [playStepFeedback, request, stopAnimation])
 
+  const rememberSuggestion = useCallback((nextValue: number) => {
+    const selected = normalizedValue(nextValue, request)
+    const current = suggestionStoreRef.current
+    const hasHistory = Object.prototype.hasOwnProperty.call(current, request.suggestionKey)
+    const source = hasHistory ? current[request.suggestionKey] ?? [] : request.presets ?? []
+    const existing = normalizedSuggestions(source, request)
+    const alreadyIncluded = existing.includes(selected)
+    let next = existing.filter((suggestion) => suggestion !== selected)
+
+    if (!alreadyIncluded && next.length >= MAX_VALUE_SUGGESTIONS) {
+      if (hasHistory) next = next.slice(1)
+      else {
+        const lowest = Math.min(...next)
+        next.splice(next.indexOf(lowest), 1)
+      }
+    }
+
+    next.push(selected)
+    const updated = { ...current, [request.suggestionKey]: next.slice(-MAX_VALUE_SUGGESTIONS) }
+    suggestionStoreRef.current = updated
+    writeSuggestionStore(updated)
+    setSuggestionStore(updated)
+  }, [request])
+
   useEffect(() => {
     ruler.current?.focus()
     const handleEscape = (event: globalThis.KeyboardEvent) => { if (event.key === 'Escape') onClose() }
@@ -194,7 +252,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   return <main className={`value-adjuster value-adjuster--${request.mode}`} aria-label={`Adjust ${request.label}`}>
     <header className="value-adjuster__header">
       <img className="logo" src={logo} alt="decent" />
-      <div className="value-adjuster__actions"><button className="value-adjuster__cancel" type="button" onClick={onClose}>Cancel</button><button className="value-adjuster__save" type="button" onClick={() => { request.onSave(value); onClose() }}>Save</button></div>
+      <div className="value-adjuster__actions"><button className="value-adjuster__cancel" type="button" onClick={onClose}>Cancel</button><button className="value-adjuster__save" type="button" onClick={() => { rememberSuggestion(value); request.onSave(value); onClose() }}>Save</button></div>
     </header>
     <section className="value-adjuster__body">
       <p>{request.label}</p>
@@ -212,7 +270,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
         </div>
       </div>
     </section>
-    <footer className="value-adjuster__presets" aria-label={`${request.label} presets`}>{presets.map((preset) => <button key={preset} type="button" className={preset === value ? 'value-adjuster__preset value-adjuster__preset--active' : 'value-adjuster__preset'} onClick={() => { prepareAudioFeedback(); animateToValue(preset) }}>{formatValue(preset, request.mode)}{request.unit && <small>{request.unit}</small>}</button>)}</footer>
+    <footer className="value-adjuster__presets" aria-label={`${request.label} suggestions`}>{presets.map((preset) => <button key={preset} type="button" className={preset === value ? 'value-adjuster__preset value-adjuster__preset--active' : 'value-adjuster__preset'} onClick={() => { prepareAudioFeedback(); rememberSuggestion(preset); animateToValue(preset) }}>{formatSuggestion(preset, request.mode)}{request.unit && <small>{request.unit}</small>}</button>)}</footer>
   </main>
 }
 

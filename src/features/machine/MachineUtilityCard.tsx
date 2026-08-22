@@ -6,6 +6,7 @@ import steamIcon from '../../assets/figma/steam.svg'
 import { Metric } from '../../components/Metric/Metric'
 import { WATER_TANK_CAPACITY_ML, WATER_TANK_LOW_LEVEL_ML } from '../../domain/brewing'
 import type { EditableMachineSetting, MachineUtility, ScaleConnection } from '../../domain/brewing'
+import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { scalePresentationForName } from './scaleArtwork'
 
 const icons = { water: hotWaterIcon, steam: steamIcon, scale: scaleIcon }
@@ -25,12 +26,31 @@ interface MachineUtilityCardProps {
 
 const editForMetric = (utility: MachineUtility, label: string, onSave?: (setting: EditableMachineSetting, value: number) => void, disabled?: boolean) => {
   if (!onSave) return undefined
-  if (utility.id === 'water' && label === 'Volume') return { title: 'Hot water volume', min: 1, max: 500, step: 1, mode: 'integer' as const, presets: [30, 40, 50, 60, 90, 120], disabled, onSave: (value: number) => onSave('hotWaterVolume', value) }
-  if (utility.id === 'water' && label === 'Temp.') return { title: 'Hot water temperature', min: 40, max: 100, step: 1, mode: 'integer' as const, presets: [82, 89, 91, 92, 97, 98], disabled, onSave: (value: number) => onSave('hotWaterTemperature', value) }
-  if (utility.id === 'steam' && label === 'Target') return { title: 'Steam target temperature', min: 120, max: 170, step: 1, mode: 'integer' as const, presets: [120, 135, 145, 155, 165, 170], disabled, onSave: (value: number) => onSave('steamTemperature', value) }
-  if (utility.id === 'steam' && label === 'Max time') return { title: 'Steam maximum time', min: 1, max: 120, step: 1, mode: 'integer' as const, presets: [30, 40, 50, 60, 90, 120], disabled, onSave: (value: number) => onSave('steamDuration', value) }
-  if (utility.id === 'steam' && label === 'Flow') return { title: 'Steam flow', min: 0.1, max: 4, step: 0.1, mode: 'decimal' as const, presets: [0.4, 0.6, 0.8, 1, 1.2, 1.5], disabled, onSave: (value: number) => onSave('steamFlow', value) }
-  return undefined
+  const setting: EditableMachineSetting | undefined = utility.id === 'water' && label === 'Volume'
+    ? 'hotWaterVolume'
+    : utility.id === 'water' && label === 'Temp.'
+      ? 'hotWaterTemperature'
+      : utility.id === 'steam' && label === 'Target'
+        ? 'steamTemperature'
+        : utility.id === 'steam' && label === 'Max time'
+          ? 'steamDuration'
+          : utility.id === 'steam' && label === 'Flow'
+            ? 'steamFlow'
+            : undefined
+  if (!setting) return undefined
+
+  const definition = VALUE_ADJUSTMENTS[setting]
+  return {
+    title: definition.title,
+    min: definition.min,
+    max: definition.max,
+    step: definition.step,
+    mode: definition.mode,
+    suggestionKey: setting,
+    presets: definition.suggestions,
+    disabled,
+    onSave: (value: number) => onSave(setting, value),
+  }
 }
 
 export function MachineUtilityCard({ utility, scale, onSearchScale, settingsDisabled, onUpdateSetting }: MachineUtilityCardProps) {

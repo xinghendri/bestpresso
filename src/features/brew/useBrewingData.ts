@@ -6,6 +6,7 @@ import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
 import { WATER_TANK_LOW_LEVEL_ML, WATER_TANK_SENSOR_FULL_MM, WATER_TANK_WARNING_OFFSET_CLICKS } from '../../domain/brewing'
 import type { BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, MachineReadiness, PreviousShotStatus, ScaleConnection, SettingFeedback } from '../../domain/brewing'
+import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { brewingFixture } from '../../fixtures/brewingFixture'
 
 const MAX_LIVE_SHOT_POINTS = 900
@@ -487,10 +488,14 @@ export function useBrewingData() {
       return
     }
     const nextProfile = { ...currentProfile, [setting]: String(value) }
-    const temperature = Number(nextProfile.temperature)
-    const dose = Number(nextProfile.dose)
-    const targetYield = Number(nextProfile.targetYield)
-    const grinderSetting = String(nextProfile.grindSetting)
+    const profileTemperature = Number(nextProfile.temperature)
+    const profileDose = Number(nextProfile.dose)
+    const profileYield = Number(nextProfile.targetYield)
+    const profileGrindSetting = Number(nextProfile.grindSetting)
+    const temperature = Number.isFinite(profileTemperature) ? profileTemperature : Number(record.profile.steps[0]?.temperature) || 92
+    const dose = Number.isFinite(profileDose) ? profileDose : VALUE_ADJUSTMENTS.dose.defaultValue
+    const targetYield = Number.isFinite(profileYield) ? profileYield : VALUE_ADJUSTMENTS.targetYield.defaultValue
+    const grinderSetting = String(Number.isFinite(profileGrindSetting) ? profileGrindSetting : VALUE_ADJUSTMENTS.grindSetting.defaultValue)
     const workflowProfile = {
       ...record.profile,
       target_weight: targetYield,

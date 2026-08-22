@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent } from 'react'
 import { Metric } from '../../components/Metric/Metric'
 import type { BrewProfile, EditableProfileSetting } from '../../domain/brewing'
+import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { ProfileTargetChart } from './ProfileTargetChart'
 
 function wrappedOffset(index: number, activeIndex: number, length: number) {
@@ -29,6 +30,23 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
   const yieldValueHint = Number.isFinite(doseValue) && doseValue > 0
     ? (targetYield: number) => doseToYieldRatio(doseValue, targetYield)
     : undefined
+
+  const editProfileSetting = (setting: EditableProfileSetting, valueHint?: (value: number) => string | undefined) => {
+    const definition = VALUE_ADJUSTMENTS[setting]
+    return {
+      title: definition.title,
+      min: definition.min,
+      max: definition.max,
+      step: definition.step,
+      mode: definition.mode,
+      initialValue: 'defaultValue' in definition ? definition.defaultValue : undefined,
+      suggestionKey: setting,
+      presets: definition.suggestions,
+      valueHint,
+      disabled: settingsDisabled,
+      onSave: (value: number) => onUpdateProfile(activeProfile.id, setting, value),
+    }
+  }
 
   const selectRelative = (direction: number) => {
     setActiveIndex((current) => (current + direction + profiles.length) % profiles.length)
@@ -77,10 +95,10 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
     </div>
     <button className="manage-profiles" type="button" onClick={onManageProfiles}>Manage profiles →</button>
     <div className="brew-metrics" key={activeProfile.id} aria-live="polite">
-      <Metric metric={{ label: 'Temp.', value: activeProfile.temperature, unit: '°' }} edit={{ title: 'Brew temperature', min: 70, max: 110, step: 1, mode: 'integer', presets: [88, 89, 91, 92, 94, 96], disabled: settingsDisabled, onSave: (value) => onUpdateProfile(activeProfile.id, 'temperature', value) }} />
-      <Metric metric={{ label: 'Grind size', value: activeProfile.grindSetting }} edit={{ min: 0, max: 100, step: 0.1, mode: 'decimal', initialValue: 14.5, presets: [10, 12, 14.5, 16, 18, 20], disabled: settingsDisabled, onSave: (value) => onUpdateProfile(activeProfile.id, 'grindSetting', value) }} />
-      <Metric metric={{ label: 'Dose', value: activeProfile.dose, unit: 'g' }} edit={{ min: 1, max: 100, step: 0.1, mode: 'decimal', presets: [15, 16, 18, 20, 21, 22], disabled: settingsDisabled, onSave: (value) => onUpdateProfile(activeProfile.id, 'dose', value) }} />
-      <Metric metric={{ label: 'Yield', value: activeProfile.targetYield, unit: 'g', subtext: ratio, subtextVariant: 'pill' }} edit={{ min: 1, max: 200, step: 0.1, mode: 'decimal', presets: [20, 30, 34, 36, 40, 45], valueHint: yieldValueHint, disabled: settingsDisabled, onSave: (value) => onUpdateProfile(activeProfile.id, 'targetYield', value) }} />
+      <Metric metric={{ label: 'Temp.', value: activeProfile.temperature, unit: '°' }} edit={editProfileSetting('temperature')} />
+      <Metric metric={{ label: 'Grind size', value: activeProfile.grindSetting }} edit={editProfileSetting('grindSetting')} />
+      <Metric metric={{ label: 'Dose', value: activeProfile.dose, unit: 'g' }} edit={editProfileSetting('dose')} />
+      <Metric metric={{ label: 'Yield', value: activeProfile.targetYield, unit: 'g', subtext: ratio, subtextVariant: 'pill' }} edit={editProfileSetting('targetYield', yieldValueHint)} />
     </div>
   </section>
 }
