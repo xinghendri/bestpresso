@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, profileRecordsToDomain, retainedAdHocProfileAtBrewStart, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres, tankSensorLevelForMillilitres } from '../../api/decaid/adapters'
+import { applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isEspressoExtractionSnapshot, profileRecordsToDomain, retainedAdHocProfileAtBrewStart, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres, tankSensorLevelForMillilitres } from '../../api/decaid/adapters'
 import { getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getWorkflow, scanForDevices, setDisplayBrightness, setMachineState, setSharedSetting, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
@@ -272,7 +272,7 @@ export function useBrewingData() {
       if (machineConnectionRef.current !== 'connected') return
       const machineState = (typeof snapshot.state === 'string' ? snapshot.state : snapshot.state?.state)?.toLowerCase()
       machineNeedsWater.current = machineState === 'needswater'
-      if (machineState === 'espresso') {
+      if (isEspressoExtractionSnapshot(snapshot)) {
         const now = snapshotTime(snapshot.timestamp)
         if (!liveShotSession.current) {
           const currentModel = latestModel.current
