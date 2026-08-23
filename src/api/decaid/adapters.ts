@@ -102,18 +102,26 @@ export function favoriteProfileSlots(profiles: BrewProfile[], assignments: Favor
   })
 }
 
-export function carouselProfiles(profiles: BrewProfile[], assignments: FavoriteAssignments | null, activeProfileId?: string) {
+export function carouselProfiles(profiles: BrewProfile[], assignments: FavoriteAssignments | null, activeProfileId?: string, retainedAdHocProfileId?: string | null) {
   const favorites = favoriteProfiles(profiles, assignments)
-  const activeProfile = activeProfileId ? profiles.find((profile) => profile.id === activeProfileId) : undefined
-  return activeProfile && !favorites.some((profile) => profile.id === activeProfile.id)
-    ? [...favorites, activeProfile]
+  const inferredAdHocProfileId = activeProfileId && !favorites.some((profile) => profile.id === activeProfileId)
+    ? activeProfileId
+    : undefined
+  const adHocProfileId = retainedAdHocProfileId === undefined ? inferredAdHocProfileId : retainedAdHocProfileId ?? undefined
+  const adHocProfile = adHocProfileId ? profiles.find((profile) => profile.id === adHocProfileId) : undefined
+  return adHocProfile && !favorites.some((profile) => profile.id === adHocProfile.id)
+    ? [...favorites, adHocProfile]
     : favorites
 }
 
-export function applyWorkflow(model: BrewingScreenModel, workflow: DecaidWorkflow, records: DecaidProfileRecord[], assignments: FavoriteAssignments | null = null) {
+export function retainedAdHocProfileAtBrewStart(activeProfileId: string | undefined, retainedAdHocProfileId: string | null) {
+  return retainedAdHocProfileId && activeProfileId === retainedAdHocProfileId ? retainedAdHocProfileId : null
+}
+
+export function applyWorkflow(model: BrewingScreenModel, workflow: DecaidWorkflow, records: DecaidProfileRecord[], assignments: FavoriteAssignments | null = null, retainedAdHocProfileId?: string | null) {
   const allProfiles = profileRecordsToDomain(records, workflow, model.profiles)
   const active = allProfiles.find((profile) => profile.name === workflow.profile?.title)
-  const profiles = carouselProfiles(allProfiles, assignments, active?.id)
+  const profiles = carouselProfiles(allProfiles, assignments, active?.id, retainedAdHocProfileId)
   const utilities = model.utilities.map((utility) => {
     if (utility.id === 'water') return { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Volume' ? { ...metric, value: numberString(workflow.hotWaterData?.volume, metric.value) } : { ...metric, value: numberString(workflow.hotWaterData?.targetTemperature, metric.value) }) }
     if (utility.id === 'steam') return { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Target' ? { ...metric, value: numberString(workflow.steamSettings?.targetTemperature, metric.value) } : metric.label === 'Max time' ? { ...metric, value: numberString(workflow.steamSettings?.duration, metric.value) } : metric.label === 'Flow' ? { ...metric, value: numberString(workflow.steamSettings?.flow, metric.value) } : metric) }

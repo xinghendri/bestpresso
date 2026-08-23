@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, profileRecordsToDomain, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres, tankSensorLevelForMillilitres } from '../../api/decaid/adapters'
+import { applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, profileRecordsToDomain, retainedAdHocProfileAtBrewStart, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres, tankSensorLevelForMillilitres } from '../../api/decaid/adapters'
 import { getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getWorkflow, scanForDevices, setDisplayBrightness, setMachineState, setSharedSetting, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
@@ -100,8 +100,11 @@ export function useBrewingData() {
   const machineNeedsWater = useRef(false)
   const machineConnectionRef = useRef<DataConnection>('connecting')
   const liveShotSession = useRef<LiveShotSession | null>(null)
+  const allProfilesRef = useRef(allProfiles)
+  const retainedAdHocProfileId = useRef<string | null>(null)
   const latestModel = useRef(model)
 
+  useEffect(() => { allProfilesRef.current = allProfiles }, [allProfiles])
   useEffect(() => { latestModel.current = model }, [model])
 
   const dimDisplay = async () => {
@@ -236,9 +239,12 @@ export function useBrewingData() {
         favoriteAssignments.current = assignments
         const domainProfiles = profileRecordsToDomain(records, workflow, brewingFixture.profiles)
         const slots = resolveFavoriteProfileSlots(domainProfiles, assignments)
+        const activeProfile = domainProfiles.find((profile) => profile.name === workflow.profile?.title)
+        retainedAdHocProfileId.current = activeProfile && !slots.includes(activeProfile.id) ? activeProfile.id : null
+        allProfilesRef.current = domainProfiles
         setAllProfiles(domainProfiles)
         setFavoriteProfileSlots(slots)
-        setModel((current) => ({ ...applyWorkflow(current, workflow, records, assignments), previousShot: latestShot.shot ? shotToDomain(latestShot.shot) : null }))
+        setModel((current) => ({ ...applyWorkflow(current, workflow, records, assignments, retainedAdHocProfileId.current), previousShot: latestShot.shot ? shotToDomain(latestShot.shot) : null }))
         setPreviousShotStatus(latestShot.failed ? 'error' : latestShot.shot ? 'loaded' : 'empty')
         setConnection('connected')
       })
@@ -247,6 +253,9 @@ export function useBrewingData() {
         const assignments = storedFixtureFavoriteAssignments()
         const slots = resolveFavoriteProfileSlots(brewingFixture.profiles, assignments)
         favoriteAssignments.current = assignments
+        const activeProfileId = latestModel.current.activeProfileId
+        retainedAdHocProfileId.current = activeProfileId && !slots.includes(activeProfileId) ? activeProfileId : null
+        allProfilesRef.current = brewingFixture.profiles
         setAllProfiles(brewingFixture.profiles)
         setFavoriteProfileSlots(slots)
         setConnection('fixture')
@@ -254,7 +263,7 @@ export function useBrewingData() {
         setPreviousShotStatus('fixture')
         setModel((current) => ({
           ...current,
-          profiles: carouselProfiles(brewingFixture.profiles, assignments, current.activeProfileId),
+          profiles: carouselProfiles(brewingFixture.profiles, assignments, current.activeProfileId, retainedAdHocProfileId.current),
           previousShot: brewingFixture.previousShot,
         }))
       })
@@ -269,6 +278,14 @@ export function useBrewingData() {
           const currentModel = latestModel.current
           const profile = currentModel.profiles.find((candidate) => candidate.id === currentModel.activeProfileId) ?? currentModel.profiles[0]
           liveShotSession.current = { startedAt: now, profileName: profile?.name ?? 'Espresso', targetYield: Number(profile?.targetYield) || 36, points: [] }
+          const adHocProfileAtBrewStart = retainedAdHocProfileAtBrewStart(currentModel.activeProfileId, retainedAdHocProfileId.current)
+          if (adHocProfileAtBrewStart !== retainedAdHocProfileId.current) {
+            retainedAdHocProfileId.current = adHocProfileAtBrewStart
+            setModel((current) => ({
+              ...current,
+              profiles: carouselProfiles(allProfilesRef.current, favoriteAssignments.current, current.activeProfileId, adHocProfileAtBrewStart),
+            }))
+          }
         }
         const session = liveShotSession.current
         const elapsedMs = Math.max(0, now - session.startedAt)
@@ -387,7 +404,7 @@ export function useBrewingData() {
     }, 1000)
 
     const refreshWorkflow = window.setInterval(() => {
-      getWorkflow().then((workflow) => { if (!disposed) setModel((current) => applyWorkflow(current, workflow, profileRecords.current, favoriteAssignments.current)) }).catch(() => undefined)
+      getWorkflow().then((workflow) => { if (!disposed) setModel((current) => applyWorkflow(current, workflow, profileRecords.current, favoriteAssignments.current, retainedAdHocProfileId.current)) }).catch(() => undefined)
     }, 15000)
 
     const refreshDeviceConnections = window.setInterval(() => {
@@ -522,7 +539,7 @@ export function useBrewingData() {
     showSettingFeedback({ status: 'saving', message: `Saving ${update.label}…` })
     try {
       const workflow = await updateWorkflow(update.patch)
-      setModel((current) => applyWorkflow(current, workflow, profileRecords.current, favoriteAssignments.current))
+      setModel((current) => applyWorkflow(current, workflow, profileRecords.current, favoriteAssignments.current, retainedAdHocProfileId.current))
       if ('sharedKey' in update) await setSharedSetting(update.sharedKey, value)
       showSettingFeedback({ status: 'saved', message: `${update.label} saved to Decaid.` })
     } catch {
@@ -547,7 +564,7 @@ export function useBrewingData() {
     let workflow
     try {
       workflow = await updateWorkflow(patch)
-      setModel((current) => applyWorkflow(current, workflow!, profileRecords.current, favoriteAssignments.current))
+      setModel((current) => applyWorkflow(current, workflow!, profileRecords.current, favoriteAssignments.current, retainedAdHocProfileId.current))
     } catch {
       showSettingFeedback({ status: 'error', message: `${currentProfile.name} could not be applied to Decaid.` })
       return
@@ -556,9 +573,10 @@ export function useBrewingData() {
       const savedRecord = await updateProfileMetadata(profileId, metadata)
       profileRecords.current = profileRecords.current.map((candidate) => candidate.id === profileId ? savedRecord : candidate)
       const domainProfiles = profileRecordsToDomain(profileRecords.current, workflow, brewingFixture.profiles)
+      allProfilesRef.current = domainProfiles
       setAllProfiles(domainProfiles)
       setFavoriteProfileSlots(resolveFavoriteProfileSlots(domainProfiles, favoriteAssignments.current))
-      setModel((current) => applyWorkflow(current, workflow, profileRecords.current, favoriteAssignments.current))
+      setModel((current) => applyWorkflow(current, workflow, profileRecords.current, favoriteAssignments.current, retainedAdHocProfileId.current))
       showSettingFeedback({ status: 'saved', message: `${currentProfile.name} saved and applied.` })
     } catch {
       showSettingFeedback({ status: 'error', message: `${currentProfile.name} was applied, but its saved defaults could not be recorded.` })
@@ -571,11 +589,17 @@ export function useBrewingData() {
       showSettingFeedback({ status: 'error', message: 'That profile is no longer available.' })
       return false
     }
-    if (latestModel.current.activeProfileId === profileId) return true
+    const favoriteSlots = resolveFavoriteProfileSlots(allProfiles, favoriteAssignments.current)
+    const isFavorite = favoriteSlots.includes(profileId)
+    if (latestModel.current.activeProfileId === profileId) {
+      if (!isFavorite) retainedAdHocProfileId.current = profileId
+      return true
+    }
     if (connection === 'fixture') {
+      if (!isFavorite) retainedAdHocProfileId.current = profileId
       setModel((current) => ({
         ...current,
-        profiles: carouselProfiles(allProfiles, favoriteAssignments.current, profileId),
+        profiles: carouselProfiles(allProfiles, favoriteAssignments.current, profileId, retainedAdHocProfileId.current),
         activeProfileId: profileId,
       }))
       return true
@@ -591,7 +615,8 @@ export function useBrewingData() {
     }
     try {
       const workflow = await updateWorkflow(workflowValuesForProfile(record, profile).patch)
-      setModel((current) => applyWorkflow(current, workflow, profileRecords.current, favoriteAssignments.current))
+      if (!isFavorite) retainedAdHocProfileId.current = profileId
+      setModel((current) => applyWorkflow(current, workflow, profileRecords.current, favoriteAssignments.current, retainedAdHocProfileId.current))
       return true
     } catch {
       showSettingFeedback({ status: 'error', message: `${profile.name} could not be selected.` })
@@ -620,10 +645,13 @@ export function useBrewingData() {
       if (connection === 'connected') await setSharedSetting('favorite-profiles', assignments)
       else window.localStorage.setItem(localFavoriteStorageKey, JSON.stringify(nextSlots))
       favoriteAssignments.current = assignments
+      if (retainedAdHocProfileId.current && nextSlots.includes(retainedAdHocProfileId.current)) retainedAdHocProfileId.current = null
+      const activeProfileId = latestModel.current.activeProfileId
+      if (activeProfileId && !nextSlots.includes(activeProfileId)) retainedAdHocProfileId.current = activeProfileId
       setFavoriteProfileSlots(nextSlots)
       setModel((current) => ({
         ...current,
-        profiles: carouselProfiles(allProfiles, assignments, current.activeProfileId),
+        profiles: carouselProfiles(allProfiles, assignments, current.activeProfileId, retainedAdHocProfileId.current),
       }))
       return true
     } catch {
@@ -647,10 +675,11 @@ export function useBrewingData() {
       if (connection === 'connected') await setSharedSetting('favorite-profiles', assignments)
       else window.localStorage.setItem(localFavoriteStorageKey, JSON.stringify(nextSlots))
       favoriteAssignments.current = assignments
+      if (latestModel.current.activeProfileId === profileId) retainedAdHocProfileId.current = profileId
       setFavoriteProfileSlots(nextSlots)
       setModel((current) => ({
         ...current,
-        profiles: carouselProfiles(allProfiles, assignments, current.activeProfileId),
+        profiles: carouselProfiles(allProfiles, assignments, current.activeProfileId, retainedAdHocProfileId.current),
       }))
       return true
     } catch {
