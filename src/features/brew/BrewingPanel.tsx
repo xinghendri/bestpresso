@@ -120,7 +120,7 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
         </button>
       })}
     </div>
-    <button className="manage-profiles" type="button" onClick={onManageProfiles}>Manage profiles →</button>
+    <button className="manage-profiles" type="button" onClick={onManageProfiles}>See all profiles →</button>
     <div className="brew-metrics" key={activeProfile.id} aria-live="polite">
       <Metric metric={{ label: 'Temp.', value: activeProfile.temperature, unit: '°' }} edit={editProfileSetting('temperature')} />
       <Metric metric={{ label: 'Grind size', value: activeProfile.grindSetting }} edit={editProfileSetting('grindSetting')} />

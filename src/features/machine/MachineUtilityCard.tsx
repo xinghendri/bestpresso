@@ -31,11 +31,11 @@ const editForMetric = (utility: MachineUtility, label: string, onSave?: (setting
   if (!onSave) return undefined
   const setting: EditableMachineSetting | undefined = utility.id === 'water' && label === 'Volume'
     ? 'hotWaterVolume'
-    : utility.id === 'water' && label === 'Temp.'
+    : utility.id === 'water' && label === 'Temperature'
       ? 'hotWaterTemperature'
       : utility.id === 'steam' && label === 'Target'
         ? 'steamTemperature'
-        : utility.id === 'steam' && label === 'Max time'
+        : utility.id === 'steam' && label === 'Duration'
           ? 'steamDuration'
           : utility.id === 'steam' && label === 'Flow'
             ? 'steamFlow'

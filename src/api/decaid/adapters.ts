@@ -163,7 +163,7 @@ export function applyWorkflow(model: BrewingScreenModel, workflow: DecaidWorkflo
   const profiles = carouselProfiles(allProfiles, assignments, active?.id, retainedAdHocProfileId)
   const utilities = model.utilities.map((utility) => {
     if (utility.id === 'water') return { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Volume' ? { ...metric, value: numberString(workflow.hotWaterData?.volume, metric.value) } : { ...metric, value: numberString(workflow.hotWaterData?.targetTemperature, metric.value) }) }
-    if (utility.id === 'steam') return { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Target' ? { ...metric, value: numberString(workflow.steamSettings?.targetTemperature, metric.value) } : metric.label === 'Max time' ? { ...metric, value: numberString(workflow.steamSettings?.duration, metric.value) } : metric.label === 'Flow' ? { ...metric, value: numberString(workflow.steamSettings?.flow, metric.value) } : metric) }
+    if (utility.id === 'steam') return { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Target' ? { ...metric, value: numberString(workflow.steamSettings?.targetTemperature, metric.value) } : metric.label === 'Duration' ? { ...metric, value: numberString(workflow.steamSettings?.duration, metric.value) } : metric.label === 'Flow' ? { ...metric, value: numberString(workflow.steamSettings?.flow, metric.value) } : metric) }
     return utility
   })
   return { ...model, profiles, activeProfileId: active?.id ?? profiles[0]?.id, utilities }

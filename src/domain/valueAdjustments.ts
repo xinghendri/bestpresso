@@ -47,7 +47,7 @@ export const VALUE_ADJUSTMENTS = {
     suggestions: [150, 155, 160, 165, 170],
   },
   steamDuration: {
-    title: 'Steam maximum time',
+    title: 'Steam duration',
     min: 0,
     max: 120,
     step: 1,

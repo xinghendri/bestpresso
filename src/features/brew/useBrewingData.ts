@@ -533,7 +533,7 @@ export function useBrewingData() {
       hotWaterVolume: { label: 'Hot water yield', patch: { hotWaterData: { volume: value } }, sharedKey: 'last-hot-water-volume' },
       hotWaterTemperature: { label: 'Hot water temperature', patch: { hotWaterData: { targetTemperature: value } }, sharedKey: 'last-hot-water-temp' },
       steamTemperature: { label: 'Steam temperature', patch: { steamSettings: { targetTemperature: value } } },
-      steamDuration: { label: 'Steam maximum time', patch: { steamSettings: { duration: value } }, sharedKey: 'last-steam-duration' },
+      steamDuration: { label: 'Steam duration', patch: { steamSettings: { duration: value } }, sharedKey: 'last-steam-duration' },
       steamFlow: { label: 'Steam flow', patch: { steamSettings: { flow: value } }, sharedKey: 'last-steam-flow' },
     } as const
     const update = settings[setting]

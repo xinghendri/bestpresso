@@ -234,8 +234,9 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const activeDrag = drag.current
     if (!activeDrag || activeDrag.pointerId !== event.pointerId) return
-    const width = Math.max(1, event.currentTarget.getBoundingClientRect().width)
-    const visibleSteps = request.mode === 'decimal' ? 80 : 10
+    const track = event.currentTarget.querySelector<HTMLElement>('.value-adjuster__scrubber-track')
+    const width = Math.max(1, track?.getBoundingClientRect().width ?? event.currentTarget.getBoundingClientRect().width)
+    const visibleSteps = request.mode === 'decimal' ? 80 : 12
     const stepDelta = (activeDrag.startX - event.clientX) / (width / visibleSteps)
     const rawValue = activeDrag.startValue + stepDelta * request.step
     const nextVisualValue = request.mode === 'integer' ? clampedValue(rawValue, request) : normalizedValue(rawValue, request)
@@ -266,14 +267,16 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
       <output aria-live="polite">{formatValue(visualValue, request.mode)}{request.unit && <small>{request.unit}</small>}</output>
       {valueHint && <div className="value-adjuster__value-hint"><span>{valueHint}</span></div>}
       <div ref={ruler} className="value-adjuster__scrubber" role="slider" tabIndex={0} aria-label={request.label} aria-valuemin={request.min} aria-valuemax={request.max} aria-valuenow={value} aria-valuetext={`${formatValue(value, request.mode)}${request.unit ?? ''}${valueHint ? `, ${valueHint}` : ''}`} onKeyDown={handleKeyDown} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={endDrag} onPointerCancel={endDrag}>
-        <div className="value-adjuster__labels" aria-hidden="true">{labels.map((label, index) => {
-          const inRange = label >= request.min && label <= request.max
-          const isCenter = label === centerLabel
-          return <span key={`${label}-${index}`} data-distance={Math.abs(index - 4)}>{inRange && !isCenter ? label : ''}</span>
-        })}</div>
-        <div className="value-adjuster__ruler">
-          <div className="value-adjuster__ticks" aria-hidden="true">{ticks.map((tick, index) => <i key={index} style={{ left: `${tick.left}%` }} className={tick.major ? 'value-adjuster__tick--major' : ''} />)}</div>
-          <span className="value-adjuster__pointer" aria-hidden="true" />
+        <div className="value-adjuster__scrubber-track">
+          <div className="value-adjuster__labels" aria-hidden="true">{labels.map((label, index) => {
+            const inRange = label >= request.min && label <= request.max
+            const isCenter = label === centerLabel
+            return <span key={`${label}-${index}`} data-distance={Math.abs(index - 4)}>{inRange && !isCenter ? label : ''}</span>
+          })}</div>
+          <div className="value-adjuster__ruler">
+            <div className="value-adjuster__ticks" aria-hidden="true">{ticks.map((tick, index) => <i key={index} style={{ left: `${tick.left}%` }} className={tick.major ? 'value-adjuster__tick--major' : ''} />)}</div>
+            <span className="value-adjuster__pointer" aria-hidden="true" />
+          </div>
         </div>
       </div>
     </section>
