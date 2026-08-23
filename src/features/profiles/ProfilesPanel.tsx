@@ -1,65 +1,177 @@
-import { useState } from 'react'
-import logo from '../../assets/figma/decent-logo.png'
+import { useMemo, useState } from 'react'
+import favoriteRemoveIcon from '../../assets/figma/favorite-remove.svg'
+import favoriteReplaceIcon from '../../assets/figma/favorite-replace.svg'
+import profileChevronIcon from '../../assets/figma/profile-chevron.svg'
+import profileDetailEditIcon from '../../assets/figma/profile-detail-edit.svg'
+import profileEditIcon from '../../assets/figma/profile-edit.svg'
+import profileFavoriteIcon from '../../assets/figma/profile-favorite.svg'
+import profileUseIcon from '../../assets/figma/profile-use.svg'
+import profilesAddIcon from '../../assets/figma/profiles-add.svg'
+import profilesBackIcon from '../../assets/figma/profiles-back.svg'
+import profilesSearchIcon from '../../assets/figma/profiles-search.svg'
 import type { BrewProfile, SettingFeedback } from '../../domain/brewing'
+import { ProfileTargetChart } from '../brew/ProfileTargetChart'
+
+const PROFILE_AUTHORING_ENABLED = false
+const PROFILE_CATEGORIES = ['Popular', 'A-Flow', 'D-Flow', 'Cleaning', 'Gagné', 'GHC', 'Tea Portafilter', 'Tea', 'Pour-over basket'] as const
 
 interface ProfilesPanelProps {
   profiles: BrewProfile[]
-  favoriteProfileIds: string[]
+  favoriteProfileSlots: Array<string | null>
   activeProfileId?: string
   feedback: SettingFeedback | null
   onSelectProfile: (profileId: string) => Promise<boolean>
   onSetFavoriteSlot: (profileId: string, slot: number) => Promise<boolean>
+  onRemoveFavorite: (profileId: string) => Promise<boolean>
   onClose: () => void
+  onAddProfile?: () => void
+  onEditProfile?: (profileId: string) => void
 }
 
-export function ProfilesPanel({ profiles, favoriteProfileIds, activeProfileId, feedback, onSelectProfile, onSetFavoriteSlot, onClose }: ProfilesPanelProps) {
-  const [favoritePickerId, setFavoritePickerId] = useState<string | null>(null)
+export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId, feedback, onSelectProfile, onSetFavoriteSlot, onRemoveFavorite, onClose, onAddProfile, onEditProfile }: ProfilesPanelProps) {
+  const [selectedProfileId, setSelectedProfileId] = useState(activeProfileId ?? profiles[0]?.id)
+  const [activeCategory, setActiveCategory] = useState('All')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const [pendingProfileId, setPendingProfileId] = useState<string | null>(null)
-  const favoriteSlots = new Map(favoriteProfileIds.map((id, index) => [id, index + 1]))
+  const [replacementProfileId, setReplacementProfileId] = useState<string | null>(null)
 
-  const selectProfile = async (profileId: string) => {
+  const favoriteIds = favoriteProfileSlots.filter((id): id is string => Boolean(id))
+  const favoriteIdSet = new Set(favoriteIds)
+  const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId)
+    ?? profiles.find((profile) => profile.id === activeProfileId)
+    ?? profiles[0]
+  const availableCategories = useMemo(() => {
+    const extraCategories = profiles
+      .map((profile) => profile.category)
+      .filter((category): category is string => Boolean(category) && !PROFILE_CATEGORIES.includes(category as typeof PROFILE_CATEGORIES[number]))
+    return ['All', ...PROFILE_CATEGORIES, ...Array.from(new Set(extraCategories))]
+  }, [profiles])
+  const normalizedQuery = searchQuery.trim().toLowerCase()
+  const visibleProfiles = profiles.filter((profile) => {
+    const matchesCategory = activeCategory === 'All' || profile.category === activeCategory
+    const searchText = `${profile.name} ${profile.category ?? ''} ${profile.description ?? ''}`.toLowerCase()
+    return matchesCategory && (!normalizedQuery || searchText.includes(normalizedQuery))
+  })
+  const emptyFavoriteSlot = favoriteProfileSlots.findIndex((id) => !id)
+  const replacingFavorite = replacementProfileId !== null
+
+  const selectPreview = (profileId: string) => {
+    setSelectedProfileId(profileId)
+    setReplacementProfileId(null)
+  }
+
+  const selectCategory = (category: string) => {
+    setActiveCategory(category)
+    setReplacementProfileId(null)
+    const firstProfile = category === 'All' ? profiles[0] : profiles.find((profile) => profile.category === category)
+    if (firstProfile) setSelectedProfileId(firstProfile.id)
+  }
+
+  const applyProfile = async (profileId: string) => {
     setPendingProfileId(profileId)
     await onSelectProfile(profileId)
     setPendingProfileId(null)
   }
 
-  const setFavoriteSlot = async (profileId: string, slot: number) => {
+  const removeFavorite = async (profileId: string) => {
     setPendingProfileId(profileId)
-    const saved = await onSetFavoriteSlot(profileId, slot)
+    await onRemoveFavorite(profileId)
     setPendingProfileId(null)
-    if (saved) setFavoritePickerId(null)
+  }
+
+  const requestFavorite = async () => {
+    if (!selectedProfile || favoriteIdSet.has(selectedProfile.id)) return
+    if (replacementProfileId === selectedProfile.id) {
+      setReplacementProfileId(null)
+      return
+    }
+    if (emptyFavoriteSlot >= 0) {
+      setPendingProfileId(selectedProfile.id)
+      await onSetFavoriteSlot(selectedProfile.id, emptyFavoriteSlot)
+      setPendingProfileId(null)
+      return
+    }
+    setReplacementProfileId(selectedProfile.id)
+  }
+
+  const replaceFavorite = async (slot: number) => {
+    if (!replacementProfileId) return
+    setPendingProfileId(replacementProfileId)
+    const replaced = await onSetFavoriteSlot(replacementProfileId, slot)
+    setPendingProfileId(null)
+    if (replaced) setReplacementProfileId(null)
   }
 
   return <main className="app-shell profiles-page">
-    <header className="subpage-header">
-      <img className="logo" src={logo} alt="decent" />
-      <button type="button" className="subpage-done" onClick={onClose}>Done</button>
-    </header>
-    {feedback && <div className="system-messages"><div className={`system-message system-message--${feedback.status}`} role={feedback.status === 'error' ? 'alert' : 'status'}>{feedback.message}</div></div>}
-    <section className="profiles-page__content">
-      <div className="profiles-page__title"><p>Profiles</p><h1>Select your next brew</h1><span>{profiles.length} available · {favoriteProfileIds.length} favorites</span></div>
-      <div className="profile-list">
-        {profiles.map((profile) => {
-          const slot = favoriteSlots.get(profile.id)
-          const selected = profile.id === activeProfileId
-          const pending = profile.id === pendingProfileId
-          const choosingSlot = favoritePickerId === profile.id
-          return <article className={`profile-list__item${selected ? ' profile-list__item--selected' : ''}${choosingSlot ? ' profile-list__item--choosing-slot' : ''}`} key={profile.id}>
-            <div className="profile-list__heading"><h2>{profile.name}</h2><div className="profile-list__badges">{selected && <span className="profile-list__selected-badge">Selected</span>}{slot && <span>Favorite {slot}</span>}</div></div>
-            <dl>
-              <div><dt>Temp.</dt><dd>{profile.temperature}°</dd></div>
-              <div><dt>Grind</dt><dd>{profile.grindSetting}</dd></div>
-              <div><dt>Dose</dt><dd>{profile.dose}g</dd></div>
-              <div><dt>Yield</dt><dd>{profile.targetYield}g</dd></div>
-            </dl>
-            <div className="profile-list__actions">
-              <button className="profile-list__select" type="button" disabled={selected || pending} onClick={() => void selectProfile(profile.id)}>{pending ? 'Applying…' : selected ? 'Selected' : 'Use profile'}</button>
-              <button className="profile-list__favorite" type="button" aria-expanded={choosingSlot} onClick={() => setFavoritePickerId((current) => current === profile.id ? null : profile.id)}>{slot ? `Move Favorite ${slot}` : 'Set favorite'}</button>
-            </div>
-            {choosingSlot && <div className="profile-list__slot-picker" aria-label={`Favorite slot for ${profile.name}`}><span>{slot ? 'Move or swap with' : 'Replace favorite'}</span>{favoriteProfileIds.map((favoriteId, index) => <button key={favoriteId} type="button" disabled={pending || slot === index + 1} aria-label={`Favorite ${index + 1}: ${profiles.find((candidate) => candidate.id === favoriteId)?.name ?? 'Empty'}`} onClick={() => void setFavoriteSlot(profile.id, index)}>{index + 1}</button>)}</div>}
-          </article>
-        })}
+    <header className="profiles-header">
+      <div className="profiles-header__title">
+        <button className="profiles-icon-button profiles-back" type="button" onClick={onClose} aria-label="Back to brewing"><img src={profilesBackIcon} alt="" /></button>
+        <h1>Profiles</h1>
       </div>
+      <div className="profiles-header__actions">
+        {searchOpen && <label className="profiles-search-field"><span>Search profiles</span><input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} autoFocus /></label>}
+        <button className="profiles-icon-button profiles-search" type="button" aria-pressed={searchOpen} onClick={() => { setSearchOpen((current) => !current); if (searchOpen) setSearchQuery('') }} aria-label={searchOpen ? 'Close profile search' : 'Search profiles'}><img src={profilesSearchIcon} alt="" /></button>
+        {/* Future profile creation is scaffolded but intentionally unavailable until Decaid authoring is designed. */}
+        {PROFILE_AUTHORING_ENABLED && <button className="profiles-icon-button profiles-add" type="button" onClick={onAddProfile} aria-label="Add profile"><img src={profilesAddIcon} alt="" /></button>}
+      </div>
+    </header>
+
+    {feedback?.status === 'error' && <div className="system-messages"><div className="system-message system-message--error" role="alert">{feedback.message}</div></div>}
+
+    <section className="profiles-workspace">
+      <aside className="favorites-panel" aria-label="Favorite profiles">
+        <div className="favorites-panel__heading"><h2>Favorites</h2>{replacingFavorite && <span>Choose one to replace</span>}</div>
+        <div className="favorites-list">
+          {Array.from({ length: 5 }, (_, slot) => {
+            const profileId = favoriteProfileSlots[slot]
+            const profile = profiles.find((candidate) => candidate.id === profileId)
+            if (!profile) return <div className="favorite-slot favorite-slot--empty" key={`empty-${slot}`}><span>Empty</span></div>
+            const pending = pendingProfileId === profile.id || (replacementProfileId !== null && pendingProfileId === replacementProfileId)
+            return <article className={`favorite-slot${replacingFavorite ? ' favorite-slot--replace' : ''}`} key={profile.id}>
+              <button className="favorite-slot__profile" type="button" onClick={() => selectPreview(profile.id)} aria-label={`View ${profile.name}`}>
+                <strong>{profile.name}</strong><img src={profileChevronIcon} alt="" />
+              </button>
+              {replacingFavorite
+                ? <button className="favorite-slot__replace" type="button" disabled={pending} onClick={() => void replaceFavorite(slot)}><img src={favoriteReplaceIcon} alt="" /><span>{pending ? 'Replacing…' : 'Replace favorite'}</span></button>
+                : <div className="favorite-slot__actions">
+                  <button type="button" disabled={pending} onClick={() => void removeFavorite(profile.id)}><img src={favoriteRemoveIcon} alt="" /><span>{pending ? 'Removing…' : 'Remove'}</span></button>
+                  {/* Future profile editing stays compiled behind the authoring flag for the next phase. */}
+                  {PROFILE_AUTHORING_ENABLED && <button type="button" onClick={() => onEditProfile?.(profile.id)}><img src={profileEditIcon} alt="" /><span>Edit</span></button>}
+                </div>}
+            </article>
+          })}
+        </div>
+      </aside>
+
+      <section className="profile-browser">
+        <nav className="profile-categories" aria-label="Profile categories">
+          {availableCategories.map((category) => <button className={activeCategory === category ? 'profile-category profile-category--active' : 'profile-category'} type="button" key={category} aria-pressed={activeCategory === category} onClick={() => selectCategory(category)}>{category}</button>)}
+        </nav>
+
+        <div className="profile-catalog">
+          <div className="profile-directory" role="listbox" aria-label="Profiles">
+            {visibleProfiles.map((profile) => <button className={selectedProfile?.id === profile.id ? 'profile-directory__item profile-directory__item--selected' : 'profile-directory__item'} type="button" role="option" aria-selected={selectedProfile?.id === profile.id} key={profile.id} onClick={() => selectPreview(profile.id)}><strong>{profile.name}</strong>{profile.category && <small>{profile.category}</small>}</button>)}
+            {!visibleProfiles.length && <p className="profile-directory__empty">No profiles found here.</p>}
+          </div>
+
+          {selectedProfile && <article className="profile-detail">
+            <ProfileTargetChart profileName={selectedProfile.name} points={selectedProfile.targetPoints} variant="detail" />
+            <div className="profile-detail__body">
+              <div className="profile-detail__heading">
+                <div><h2>{selectedProfile.name}</h2>{selectedProfile.category && <p>{selectedProfile.category}</p>}</div>
+                <div className="profile-detail__actions">
+                  <button type="button" disabled={pendingProfileId === selectedProfile.id} onClick={() => void applyProfile(selectedProfile.id)} aria-label={`Use ${selectedProfile.name}`} title="Use profile"><img src={profileUseIcon} alt="" /></button>
+                  {/* Future editing is intentionally hidden while retaining its integration point. */}
+                  {PROFILE_AUTHORING_ENABLED && <button type="button" onClick={() => onEditProfile?.(selectedProfile.id)} aria-label={`Edit ${selectedProfile.name}`} title="Edit profile"><img src={profileDetailEditIcon} alt="" /></button>}
+                  <button className={`${favoriteIdSet.has(selectedProfile.id) ? 'profile-detail__favorite profile-detail__favorite--active' : 'profile-detail__favorite'}${replacementProfileId === selectedProfile.id ? ' profile-detail__favorite--replacing' : ''}`} type="button" disabled={favoriteIdSet.has(selectedProfile.id) || pendingProfileId === selectedProfile.id} aria-pressed={favoriteIdSet.has(selectedProfile.id)} onClick={() => void requestFavorite()} aria-label={favoriteIdSet.has(selectedProfile.id) ? `${selectedProfile.name} is a favorite` : replacementProfileId === selectedProfile.id ? 'Cancel favorite replacement' : `Favorite ${selectedProfile.name}`} title={favoriteIdSet.has(selectedProfile.id) ? 'Already a favorite' : replacementProfileId === selectedProfile.id ? 'Cancel replacement' : 'Add to favorites'}><img src={profileFavoriteIcon} alt="" /></button>
+                </div>
+              </div>
+              <p className="profile-detail__description">{selectedProfile.description ?? 'This profile does not have a description yet.'}</p>
+            </div>
+          </article>}
+        </div>
+      </section>
     </section>
   </main>
 }

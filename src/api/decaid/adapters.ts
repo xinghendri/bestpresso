@@ -6,6 +6,7 @@ export const STEAM_HEATER_READY_C = 130
 
 const numberString = (value: unknown, fallback: string) => value === null || value === undefined || value === '' || Number.isNaN(Number(value)) ? fallback : String(value)
 const finiteNumber = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : undefined
+const textValue = (...values: unknown[]) => values.find((value): value is string => typeof value === 'string' && value.trim().length > 0)?.trim()
 
 const transitionProgress = (type: string, progress: number) => {
   if (type === 'ease-in') return progress * progress
@@ -71,6 +72,8 @@ export function profileRecordsToDomain(records: DecaidProfileRecord[], workflow:
     return {
       id: record.id || profile.title || crypto.randomUUID(),
       name: profile.title || 'Untitled profile',
+      category: textValue(metadata.category, metadata.profileCategory, profile.category) ?? 'Popular',
+      description: textValue(metadata.description, metadata.profileDescription, profile.description),
       temperature: numberString(isActive ? workflow.profile?.steps?.[0]?.temperature : metadata.temperature ?? profile.steps?.[0]?.temperature, '—'),
       grindSetting: numberString(isActive ? workflow.context?.grinderSetting : metadata.grinderSetting, '—'),
       dose: numberString(isActive ? workflow.context?.targetDoseWeight : metadata.targetDoseWeight ?? profile.dose_weight, '18'),
@@ -81,12 +84,22 @@ export function profileRecordsToDomain(records: DecaidProfileRecord[], workflow:
 }
 
 export function favoriteProfiles(profiles: BrewProfile[], assignments: FavoriteAssignments | null) {
-  const assigned = Array.from({ length: 5 }, (_, slot) => assignments?.[slot])
+  return favoriteProfileSlots(profiles, assignments)
     .map((id) => profiles.find((profile) => profile.id === id))
-    .filter((profile, index, selected): profile is BrewProfile => Boolean(profile) && selected.findIndex((candidate) => candidate?.id === profile?.id) === index)
-  const assignedIds = new Set(assigned.map((profile) => profile.id))
-  const fallback = profiles.filter((profile) => !assignedIds.has(profile.id))
-  return [...assigned, ...fallback].slice(0, 5)
+    .filter((profile): profile is BrewProfile => Boolean(profile))
+}
+
+export function favoriteProfileSlots(profiles: BrewProfile[], assignments: FavoriteAssignments | null) {
+  if (assignments === null) {
+    return Array.from({ length: 5 }, (_, slot) => profiles[slot]?.id ?? null)
+  }
+  const seen = new Set<string>()
+  return Array.from({ length: 5 }, (_, slot) => {
+    const id = assignments[slot]
+    if (!id || seen.has(id) || !profiles.some((profile) => profile.id === id)) return null
+    seen.add(id)
+    return id
+  })
 }
 
 export function carouselProfiles(profiles: BrewProfile[], assignments: FavoriteAssignments | null, activeProfileId?: string) {

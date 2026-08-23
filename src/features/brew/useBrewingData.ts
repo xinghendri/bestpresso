@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { applyWorkflow, carouselProfiles, favoriteProfiles, profileRecordsToDomain, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres, tankSensorLevelForMillilitres } from '../../api/decaid/adapters'
+import { applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, profileRecordsToDomain, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres, tankSensorLevelForMillilitres } from '../../api/decaid/adapters'
 import { getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getWorkflow, scanForDevices, setDisplayBrightness, setMachineState, setSharedSetting, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
@@ -26,12 +26,14 @@ const snapshotTime = (timestamp?: string) => {
 
 const localFavoriteStorageKey = 'bestpresso.favorite-profile-ids.v1'
 
-const favoriteAssignmentsForIds = (ids: string[]): FavoriteAssignments => Object.fromEntries(ids.slice(0, 5).map((id, slot) => [String(slot), id]))
+const favoriteAssignmentsForSlots = (slots: Array<string | null>): FavoriteAssignments => Object.fromEntries(Array.from({ length: 5 }, (_, slot) => [String(slot), slots[slot] ?? null]))
 
 const storedFixtureFavoriteAssignments = () => {
   try {
-    const stored = JSON.parse(window.localStorage.getItem(localFavoriteStorageKey) ?? '[]')
-    return Array.isArray(stored) ? favoriteAssignmentsForIds(stored.filter((id): id is string => typeof id === 'string')) : null
+    const raw = window.localStorage.getItem(localFavoriteStorageKey)
+    if (raw === null) return null
+    const stored = JSON.parse(raw)
+    return Array.isArray(stored) ? favoriteAssignmentsForSlots(Array.from({ length: 5 }, (_, slot) => typeof stored[slot] === 'string' ? stored[slot] : null)) : null
   } catch {
     return null
   }
@@ -70,7 +72,7 @@ const workflowValuesForProfile = (record: DecaidProfileRecord, profile: BrewProf
 export function useBrewingData() {
   const [model, setModel] = useState<BrewingScreenModel>({ ...brewingFixture, profiles: brewingFixture.profiles.slice(0, 5), previousShot: null })
   const [allProfiles, setAllProfiles] = useState(brewingFixture.profiles)
-  const [favoriteProfileIds, setFavoriteProfileIds] = useState(brewingFixture.profiles.slice(0, 5).map((profile) => profile.id))
+  const [favoriteProfileSlots, setFavoriteProfileSlots] = useState<Array<string | null>>(brewingFixture.profiles.slice(0, 5).map((profile) => profile.id))
   const [heatingSeconds, setHeatingSeconds] = useState<number | null>(null)
   const [connection, setConnection] = useState<DataConnection>('connecting')
   const [machineConnection, setMachineConnection] = useState<DataConnection>('connecting')
@@ -233,9 +235,9 @@ export function useBrewingData() {
         profileRecords.current = records
         favoriteAssignments.current = assignments
         const domainProfiles = profileRecordsToDomain(records, workflow, brewingFixture.profiles)
-        const favorites = favoriteProfiles(domainProfiles, assignments)
+        const slots = resolveFavoriteProfileSlots(domainProfiles, assignments)
         setAllProfiles(domainProfiles)
-        setFavoriteProfileIds(favorites.map((profile) => profile.id))
+        setFavoriteProfileSlots(slots)
         setModel((current) => ({ ...applyWorkflow(current, workflow, records, assignments), previousShot: latestShot.shot ? shotToDomain(latestShot.shot) : null }))
         setPreviousShotStatus(latestShot.failed ? 'error' : latestShot.shot ? 'loaded' : 'empty')
         setConnection('connected')
@@ -243,10 +245,10 @@ export function useBrewingData() {
       .catch(() => {
         if (disposed) return
         const assignments = storedFixtureFavoriteAssignments()
-        const favorites = favoriteProfiles(brewingFixture.profiles, assignments)
+        const slots = resolveFavoriteProfileSlots(brewingFixture.profiles, assignments)
         favoriteAssignments.current = assignments
         setAllProfiles(brewingFixture.profiles)
-        setFavoriteProfileIds(favorites.map((profile) => profile.id))
+        setFavoriteProfileSlots(slots)
         setConnection('fixture')
         updateMachineConnection('fixture')
         setPreviousShotStatus('fixture')
@@ -554,9 +556,8 @@ export function useBrewingData() {
       const savedRecord = await updateProfileMetadata(profileId, metadata)
       profileRecords.current = profileRecords.current.map((candidate) => candidate.id === profileId ? savedRecord : candidate)
       const domainProfiles = profileRecordsToDomain(profileRecords.current, workflow, brewingFixture.profiles)
-      const favorites = favoriteProfiles(domainProfiles, favoriteAssignments.current)
       setAllProfiles(domainProfiles)
-      setFavoriteProfileIds(favorites.map((profile) => profile.id))
+      setFavoriteProfileSlots(resolveFavoriteProfileSlots(domainProfiles, favoriteAssignments.current))
       setModel((current) => applyWorkflow(current, workflow, profileRecords.current, favoriteAssignments.current))
       showSettingFeedback({ status: 'saved', message: `${currentProfile.name} saved and applied.` })
     } catch {
@@ -608,24 +609,49 @@ export function useBrewingData() {
       showSettingFeedback({ status: 'error', message: 'Connect to Decaid before changing favorites.' })
       return false
     }
-    const currentIds = favoriteProfiles(allProfiles, favoriteAssignments.current).map((candidate) => candidate.id)
-    const existingSlot = currentIds.indexOf(profileId)
+    const currentSlots = resolveFavoriteProfileSlots(allProfiles, favoriteAssignments.current)
+    const existingSlot = currentSlots.indexOf(profileId)
     if (existingSlot === slot) return true
-    const nextIds = [...currentIds]
-    if (existingSlot >= 0) [nextIds[existingSlot], nextIds[slot]] = [nextIds[slot], nextIds[existingSlot]]
-    else nextIds[slot] = profileId
-    const assignments = favoriteAssignmentsForIds(nextIds)
-    showSettingFeedback({ status: 'saving', message: `Updating Favorite ${slot + 1}…` })
+    const nextSlots = [...currentSlots]
+    if (existingSlot >= 0) [nextSlots[existingSlot], nextSlots[slot]] = [nextSlots[slot], nextSlots[existingSlot]]
+    else nextSlots[slot] = profileId
+    const assignments = favoriteAssignmentsForSlots(nextSlots)
     try {
       if (connection === 'connected') await setSharedSetting('favorite-profiles', assignments)
-      else window.localStorage.setItem(localFavoriteStorageKey, JSON.stringify(nextIds))
+      else window.localStorage.setItem(localFavoriteStorageKey, JSON.stringify(nextSlots))
       favoriteAssignments.current = assignments
-      setFavoriteProfileIds(nextIds)
+      setFavoriteProfileSlots(nextSlots)
       setModel((current) => ({
         ...current,
         profiles: carouselProfiles(allProfiles, assignments, current.activeProfileId),
       }))
-      showSettingFeedback({ status: 'saved', message: `${profile.name} is now Favorite ${slot + 1}.` })
+      return true
+    } catch {
+      showSettingFeedback({ status: 'error', message: 'Favorite profiles could not be saved.' })
+      return false
+    }
+  }
+
+  const removeFavoriteProfile = async (profileId: string) => {
+    if (connection !== 'connected' && connection !== 'fixture') {
+      showSettingFeedback({ status: 'error', message: 'Connect to Decaid before changing favorites.' })
+      return false
+    }
+    const currentSlots = resolveFavoriteProfileSlots(allProfiles, favoriteAssignments.current)
+    const slot = currentSlots.indexOf(profileId)
+    if (slot < 0) return true
+    const nextSlots = [...currentSlots]
+    nextSlots[slot] = null
+    const assignments = favoriteAssignmentsForSlots(nextSlots)
+    try {
+      if (connection === 'connected') await setSharedSetting('favorite-profiles', assignments)
+      else window.localStorage.setItem(localFavoriteStorageKey, JSON.stringify(nextSlots))
+      favoriteAssignments.current = assignments
+      setFavoriteProfileSlots(nextSlots)
+      setModel((current) => ({
+        ...current,
+        profiles: carouselProfiles(allProfiles, assignments, current.activeProfileId),
+      }))
       return true
     } catch {
       showSettingFeedback({ status: 'error', message: 'Favorite profiles could not be saved.' })
@@ -635,6 +661,7 @@ export function useBrewingData() {
 
   const settingsDisabled = connection !== 'connected' || settingFeedback?.status === 'saving'
   const dismissLiveBrew = () => setLiveBrew((current) => current.active ? current : { ...current, visible: false })
+  const favoriteProfileIds = favoriteProfileSlots.filter((id): id is string => Boolean(id))
 
-  return { model, allProfiles, favoriteProfileIds, liveBrew, previousShotStatus, heatingSeconds, connection, machineConnection, scale, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, dismissLiveBrew, searchForScale, updateMachineSetting, updateProfileSetting, selectProfile, setFavoriteProfileSlot }
+  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, previousShotStatus, heatingSeconds, connection, machineConnection, scale, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, dismissLiveBrew, searchForScale, updateMachineSetting, updateProfileSetting, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
 }
