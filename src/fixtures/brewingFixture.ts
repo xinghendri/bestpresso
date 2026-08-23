@@ -2,6 +2,7 @@ import type { BrewingScreenModel } from '../domain/brewing'
 
 export const brewingFixture: BrewingScreenModel = {
   readiness: 'ready',
+  activeProfileId: 'adaptive-v2',
   utilities: [
     { id: 'water', label: 'Hot water', metrics: [{ label: 'Volume', value: '50', unit: 'ml' }, { label: 'Temp.', value: '92', unit: '°' }] },
     { id: 'steam', label: 'Steam', metrics: [{ label: 'Current', value: '121', unit: '°', highlight: true }, { label: 'Target', value: '160', unit: '°' }, { label: 'Max time', value: '50', unit: 's' }, { label: 'Flow', value: '0.6', unit: 'ml/s' }] },
@@ -14,6 +15,7 @@ export const brewingFixture: BrewingScreenModel = {
     { id: 'best-practice-light', name: 'Best practice (light roast)', temperature: '94', grindSetting: '12.8', dose: '18', targetYield: '45', targetPoints: [{ elapsedMs: 0, pressure: 0, flow: 0 }, { elapsedMs: 7000, pressure: 2, flow: 3.5 }, { elapsedMs: 12000, pressure: 9, flow: 2 }, { elapsedMs: 40000, pressure: 6, flow: 2.5 }] },
     { id: 'turbo-bloom', name: 'Turbo bloom', temperature: '93', grindSetting: '11.8', dose: '18', targetYield: '48', targetPoints: [{ elapsedMs: 0, pressure: 0, flow: 0 }, { elapsedMs: 3000, pressure: 3, flow: 6 }, { elapsedMs: 10000, pressure: 1, flow: 0 }, { elapsedMs: 15000, pressure: 6, flow: 4 }, { elapsedMs: 30000, pressure: 4, flow: 3.5 }] },
     { id: 'gentle-sweet', name: 'Gentle and sweet', temperature: '90', grindSetting: '15.1', dose: '20', targetYield: '40', targetPoints: [{ elapsedMs: 0, pressure: 0, flow: 0 }, { elapsedMs: 8000, pressure: 3, flow: 2.5 }, { elapsedMs: 16000, pressure: 7, flow: 2.3 }, { elapsedMs: 42000, pressure: 4, flow: 1.8 }] },
+    { id: 'classic-nine-bar', name: 'Classic 9 bar', temperature: '93', grindSetting: '13.8', dose: '18', targetYield: '36', targetPoints: [{ elapsedMs: 0, pressure: 0, flow: 0 }, { elapsedMs: 4000, pressure: 3, flow: 3 }, { elapsedMs: 8000, pressure: 9, flow: 2.4 }, { elapsedMs: 32000, pressure: 9, flow: 2.1 }] },
   ],
   previousShot: {
     profileName: 'Adaptive V2',
