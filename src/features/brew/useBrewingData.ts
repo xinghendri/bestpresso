@@ -577,7 +577,6 @@ export function useBrewingData() {
         profiles: carouselProfiles(allProfiles, favoriteAssignments.current, profileId),
         activeProfileId: profileId,
       }))
-      showSettingFeedback({ status: 'saved', message: `${profile.name} selected for the next brew.` })
       return true
     }
     if (connection !== 'connected') {
@@ -589,11 +588,9 @@ export function useBrewingData() {
       showSettingFeedback({ status: 'error', message: 'This profile cannot be applied to Decaid.' })
       return false
     }
-    showSettingFeedback({ status: 'saving', message: `Selecting ${profile.name}…` })
     try {
       const workflow = await updateWorkflow(workflowValuesForProfile(record, profile).patch)
       setModel((current) => applyWorkflow(current, workflow, profileRecords.current, favoriteAssignments.current))
-      showSettingFeedback({ status: 'saved', message: `${profile.name} selected for the next brew.` })
       return true
     } catch {
       showSettingFeedback({ status: 'error', message: `${profile.name} could not be selected.` })
