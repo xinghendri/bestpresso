@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import favoriteRemoveIcon from '../../assets/figma/favorite-remove.svg'
 import favoriteReplaceIcon from '../../assets/figma/favorite-replace.svg'
 import profileChevronIcon from '../../assets/figma/profile-chevron.svg'
@@ -32,6 +32,7 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
   const [activeCategory, setActiveCategory] = useState('All')
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const searchInput = useRef<HTMLInputElement>(null)
   const [pendingProfileId, setPendingProfileId] = useState<string | null>(null)
   const [replacementProfileId, setReplacementProfileId] = useState<string | null>(null)
 
@@ -54,6 +55,12 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
   })
   const emptyFavoriteSlot = favoriteProfileSlots.findIndex((id) => !id)
   const replacingFavorite = replacementProfileId !== null
+
+  useEffect(() => {
+    if (!searchOpen) return
+    const frame = window.requestAnimationFrame(() => searchInput.current?.focus())
+    return () => window.cancelAnimationFrame(frame)
+  }, [searchOpen])
 
   const selectPreview = (profileId: string) => {
     setSelectedProfileId(profileId)
@@ -109,8 +116,13 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
         <h1>Profiles</h1>
       </div>
       <div className="profiles-header__actions">
-        {searchOpen && <label className="profiles-search-field"><span>Search profiles</span><input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} autoFocus /></label>}
-        <button className="profiles-icon-button profiles-search" type="button" aria-pressed={searchOpen} onClick={() => { setSearchOpen((current) => !current); if (searchOpen) setSearchQuery('') }} aria-label={searchOpen ? 'Close profile search' : 'Search profiles'}><img src={profilesSearchIcon} alt="" /></button>
+        <div className={`profiles-search-control${searchOpen ? ' profiles-search-control--open' : ''}`}>
+          <label className="profiles-search-field" aria-hidden={!searchOpen}>
+            <span>Search profiles</span>
+            <input ref={searchInput} id="profiles-search-input" value={searchQuery} placeholder="Try a keyword—your dream shot awaits…" disabled={!searchOpen} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Escape') { setSearchOpen(false); setSearchQuery('') } }} />
+          </label>
+          <button className="profiles-icon-button profiles-search" type="button" aria-controls="profiles-search-input" aria-expanded={searchOpen} onClick={() => { setSearchOpen((current) => !current); if (searchOpen) setSearchQuery('') }} aria-label={searchOpen ? 'Close profile search' : 'Search profiles'}><img src={profilesSearchIcon} alt="" /></button>
+        </div>
         {/* Future profile creation is scaffolded but intentionally unavailable until Decaid authoring is designed. */}
         {PROFILE_AUTHORING_ENABLED && <button className="profiles-icon-button profiles-add" type="button" onClick={onAddProfile} aria-label="Add profile"><img src={profilesAddIcon} alt="" /></button>}
       </div>
@@ -120,7 +132,7 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
 
     <section className="profiles-workspace">
       <aside className="favorites-panel" aria-label="Favorite profiles">
-        <div className="favorites-panel__heading"><h2>Favorites</h2>{replacingFavorite && <span>Choose one to replace</span>}</div>
+        <div className="favorites-panel__heading"><h2>Favorites</h2></div>
         <div className="favorites-list">
           {Array.from({ length: 5 }, (_, slot) => {
             const profileId = favoriteProfileSlots[slot]
