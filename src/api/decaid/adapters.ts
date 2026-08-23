@@ -1,11 +1,21 @@
 import type { BrewProfile, BrewingScreenModel, PreviousShot, ProfileTargetPoint } from '../../domain/brewing'
-import type { DecaidProfileRecord, DecaidProfileStep, DecaidWorkflow, FavoriteAssignments, ShotRecord } from './types'
+import type { DecaidProfileRecord, DecaidProfileStep, DecaidWorkflow, FavoriteAssignments, MachineSnapshot, ShotRecord } from './types'
 
 const MM_TO_ML = [0,16,43,70,97,124,151,179,206,233,261,288,316,343,371,398,426,453,481,509,537,564,592,620,648,676,704,732,760,788,816,844,872,900,929,957,985,1013,1042,1070,1104,1138,1172,1207,1242,1277,1312,1347,1382,1417,1453,1488,1523,1559,1594,1630,1665,1701,1736,1772,1808,1843,1879,1915,1951,1986,2022,2058]
 export const STEAM_HEATER_READY_C = 130
 
 const numberString = (value: unknown, fallback: string) => value === null || value === undefined || value === '' || Number.isNaN(Number(value)) ? fallback : String(value)
 const finiteNumber = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : undefined
+const textValue = (...values: unknown[]) => values.find((value): value is string => typeof value === 'string' && value.trim().length > 0)?.trim()
+const ESPRESSO_EXTRACTION_SUBSTATES = new Set(['preinfusion', 'pouring'])
+
+export function isEspressoExtractionSnapshot(snapshot: Pick<MachineSnapshot, 'state'>) {
+  const state = (typeof snapshot.state === 'string' ? snapshot.state : snapshot.state?.state)?.toLowerCase()
+  const substate = (typeof snapshot.state === 'object' ? snapshot.state?.substate : undefined)?.toLowerCase()
+  if (state && state !== 'espresso') return false
+  if (substate) return ESPRESSO_EXTRACTION_SUBSTATES.has(substate)
+  return state === 'espresso'
+}
 
 const transitionProgress = (type: string, progress: number) => {
   if (type === 'ease-in') return progress * progress
@@ -61,16 +71,38 @@ export function profileStepsToTargetPoints(steps: DecaidProfileStep[] | undefine
   return points
 }
 
+export function parseProfileTitle(title: string | undefined) {
+  const fullTitle = title?.trim() || 'Untitled profile'
+  const separatorIndex = fullTitle.indexOf('/')
+  if (separatorIndex < 0) return { name: fullTitle, category: undefined }
+
+  const category = fullTitle.slice(0, separatorIndex).trim()
+  const name = fullTitle.slice(separatorIndex + 1).trim()
+  if (!category || !name) return { name: fullTitle, category: undefined }
+
+  return {
+    name,
+    category: category.toLowerCase() === 'popular' ? undefined : category,
+  }
+}
+
+export function profilesWithParsedTitles(profiles: BrewProfile[]): BrewProfile[] {
+  return profiles.map((profile) => ({ ...profile, ...parseProfileTitle(profile.name) }))
+}
+
 export function profileRecordsToDomain(records: DecaidProfileRecord[], workflow: DecaidWorkflow, fallback: BrewProfile[]) {
   const visible = records.filter((record) => record.visibility !== 'hidden' && record.visibility !== 'deleted' && record.profile?.title)
-  if (!visible.length) return fallback
+  if (!visible.length) return profilesWithParsedTitles(fallback)
   return visible.map((record): BrewProfile => {
     const profile = record.profile ?? {}
     const metadata = record.metadata ?? {}
     const isActive = profile.title === workflow.profile?.title
+    const parsedTitle = parseProfileTitle(profile.title)
     return {
       id: record.id || profile.title || crypto.randomUUID(),
-      name: profile.title || 'Untitled profile',
+      name: parsedTitle.name,
+      category: parsedTitle.category,
+      description: textValue(metadata.description, metadata.profileDescription, metadata.notes, metadata.profileNotes, metadata.profile_notes, profile.description, profile.notes, profile.profile_notes),
       temperature: numberString(isActive ? workflow.profile?.steps?.[0]?.temperature : metadata.temperature ?? profile.steps?.[0]?.temperature, '—'),
       grindSetting: numberString(isActive ? workflow.context?.grinderSetting : metadata.grinderSetting, '—'),
       dose: numberString(isActive ? workflow.context?.targetDoseWeight : metadata.targetDoseWeight ?? profile.dose_weight, '18'),
@@ -80,17 +112,55 @@ export function profileRecordsToDomain(records: DecaidProfileRecord[], workflow:
   })
 }
 
-export function favoriteProfiles(profiles: BrewProfile[], assignments: FavoriteAssignments | null) {
-  const assigned = Array.from({ length: 5 }, (_, slot) => assignments?.[slot])
-    .map((id) => profiles.find((profile) => profile.id === id))
-    .filter((profile): profile is BrewProfile => Boolean(profile))
-  return assigned.length ? assigned : profiles.slice(0, 5)
+export function activeProfileForWorkflow(profiles: BrewProfile[], records: DecaidProfileRecord[], workflow: DecaidWorkflow) {
+  const activeRecord = records.find((record) => record.profile?.title === workflow.profile?.title)
+  if (activeRecord?.id) {
+    const activeById = profiles.find((profile) => profile.id === activeRecord.id)
+    if (activeById) return activeById
+  }
+  const activeTitle = parseProfileTitle(workflow.profile?.title)
+  return profiles.find((profile) => profile.name === activeTitle.name && profile.category === activeTitle.category)
 }
 
-export function applyWorkflow(model: BrewingScreenModel, workflow: DecaidWorkflow, records: DecaidProfileRecord[], assignments: FavoriteAssignments | null = null) {
+export function favoriteProfiles(profiles: BrewProfile[], assignments: FavoriteAssignments | null) {
+  return favoriteProfileSlots(profiles, assignments)
+    .map((id) => profiles.find((profile) => profile.id === id))
+    .filter((profile): profile is BrewProfile => Boolean(profile))
+}
+
+export function favoriteProfileSlots(profiles: BrewProfile[], assignments: FavoriteAssignments | null) {
+  if (assignments === null) {
+    return Array.from({ length: 5 }, (_, slot) => profiles[slot]?.id ?? null)
+  }
+  const seen = new Set<string>()
+  return Array.from({ length: 5 }, (_, slot) => {
+    const id = assignments[slot]
+    if (!id || seen.has(id) || !profiles.some((profile) => profile.id === id)) return null
+    seen.add(id)
+    return id
+  })
+}
+
+export function carouselProfiles(profiles: BrewProfile[], assignments: FavoriteAssignments | null, activeProfileId?: string, retainedAdHocProfileId?: string | null) {
+  const favorites = favoriteProfiles(profiles, assignments)
+  const inferredAdHocProfileId = activeProfileId && !favorites.some((profile) => profile.id === activeProfileId)
+    ? activeProfileId
+    : undefined
+  const adHocProfileId = retainedAdHocProfileId === undefined ? inferredAdHocProfileId : retainedAdHocProfileId ?? undefined
+  const adHocProfile = adHocProfileId ? profiles.find((profile) => profile.id === adHocProfileId) : undefined
+  return adHocProfile && !favorites.some((profile) => profile.id === adHocProfile.id)
+    ? [...favorites, adHocProfile]
+    : favorites
+}
+
+export function retainedAdHocProfileAtBrewStart(activeProfileId: string | undefined, retainedAdHocProfileId: string | null) {
+  return retainedAdHocProfileId && activeProfileId === retainedAdHocProfileId ? retainedAdHocProfileId : null
+}
+
+export function applyWorkflow(model: BrewingScreenModel, workflow: DecaidWorkflow, records: DecaidProfileRecord[], assignments: FavoriteAssignments | null = null, retainedAdHocProfileId?: string | null) {
   const allProfiles = profileRecordsToDomain(records, workflow, model.profiles)
-  const profiles = favoriteProfiles(allProfiles, assignments)
-  const active = profiles.find((profile) => profile.name === workflow.profile?.title)
+  const active = activeProfileForWorkflow(allProfiles, records, workflow)
+  const profiles = carouselProfiles(allProfiles, assignments, active?.id, retainedAdHocProfileId)
   const utilities = model.utilities.map((utility) => {
     if (utility.id === 'water') return { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Volume' ? { ...metric, value: numberString(workflow.hotWaterData?.volume, metric.value) } : { ...metric, value: numberString(workflow.hotWaterData?.targetTemperature, metric.value) }) }
     if (utility.id === 'steam') return { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Target' ? { ...metric, value: numberString(workflow.steamSettings?.targetTemperature, metric.value) } : metric.label === 'Max time' ? { ...metric, value: numberString(workflow.steamSettings?.duration, metric.value) } : metric.label === 'Flow' ? { ...metric, value: numberString(workflow.steamSettings?.flow, metric.value) } : metric) }
@@ -111,7 +181,10 @@ export function tankSensorLevelForMillilitres(volume: number) {
 
 export function shotToDomain(shot: ShotRecord): PreviousShot {
   const measurements = shot.measurements ?? []
-  const extraction = measurements.filter((entry) => entry.machine?.state?.substate !== 'preparingForShot')
+  const hasMachineSubstates = measurements.some((entry) => entry.machine?.state?.substate)
+  const extraction = hasMachineSubstates
+    ? measurements.filter((entry) => ESPRESSO_EXTRACTION_SUBSTATES.has(entry.machine?.state?.substate?.toLowerCase() ?? ''))
+    : measurements
   const firstTimestamp = extraction[0]?.machine?.timestamp
   const lastTimestamp = extraction.at(-1)?.machine?.timestamp
   const duration = firstTimestamp && lastTimestamp ? Math.max(0, Math.round((Date.parse(lastTimestamp) - Date.parse(firstTimestamp)) / 1000)) : undefined
@@ -131,8 +204,9 @@ export function shotToDomain(shot: ShotRecord): PreviousShot {
       weightFlow: entry.scale?.weightFlow,
     }]
   }) : []
+  const shotProfileTitle = shot.workflow?.profile?.title || shot.workflow?.name || 'Previous pull'
   return {
-    profileName: shot.workflow?.profile?.title || shot.workflow?.name || 'Previous pull',
+    profileName: parseProfileTitle(shotProfileTitle).name,
     timestamp: shot.timestamp ?? firstTimestamp ?? lastTimestamp,
     totalYield: numberString(shot.annotations?.actualYield ?? lastWeight, '—'),
     totalTime: numberString(duration, '—'),

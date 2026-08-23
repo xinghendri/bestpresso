@@ -42,6 +42,8 @@ export interface ProfileTargetPoint {
 export interface BrewProfile {
   id: string
   name: string
+  category?: string
+  description?: string
   temperature: string
   grindSetting: string
   dose: string

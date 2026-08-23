@@ -20,11 +20,14 @@ function doseToYieldRatio(dose: string | number, targetYield: string | number) {
   return `1:${(yieldValue / doseValue).toFixed(1)} ratio`
 }
 
-export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUpdateProfile, onManageProfiles }: { profiles: BrewProfile[]; activeProfileId?: string; settingsDisabled?: boolean; onUpdateProfile: (profileId: string, setting: EditableProfileSetting, value: number) => void; onManageProfiles: () => void }) {
-  const initialIndex = Math.max(0, profiles.findIndex((profile) => profile.id === activeProfileId || profile.id === 'adaptive-v2'))
+export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUpdateProfile, onSelectProfile, onManageProfiles }: { profiles: BrewProfile[]; activeProfileId?: string; settingsDisabled?: boolean; onUpdateProfile: (profileId: string, setting: EditableProfileSetting, value: number) => void; onSelectProfile: (profileId: string) => Promise<boolean>; onManageProfiles: () => void }) {
+  const selectedIndex = profiles.findIndex((profile) => profile.id === activeProfileId)
+  const fallbackIndex = profiles.findIndex((profile) => profile.id === 'adaptive-v2')
+  const initialIndex = Math.max(0, selectedIndex >= 0 ? selectedIndex : fallbackIndex)
   const [activeIndex, setActiveIndex] = useState(initialIndex)
-  const pointerStart = useRef<number | null>(null)
+  const pointerStart = useRef<{ x: number; moved: boolean } | null>(null)
   const suppressClick = useRef(false)
+  const selectionRequest = useRef(0)
   const activeProfile = profiles[activeIndex] ?? profiles[0]
   const ratio = doseToYieldRatio(activeProfile.dose, activeProfile.targetYield)
   const doseValue = Number(activeProfile.dose)
@@ -57,20 +60,35 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
     }
   }
 
+  const selectIndex = async (index: number) => {
+    const profile = profiles[index]
+    if (!profile) return
+    const previousIndex = activeIndex
+    setActiveIndex(index)
+    if (profile.id === activeProfileId) return
+    const request = ++selectionRequest.current
+    const selected = await onSelectProfile(profile.id)
+    if (!selected && request === selectionRequest.current) setActiveIndex(previousIndex)
+  }
+
   const selectRelative = (direction: number) => {
-    setActiveIndex((current) => (current + direction + profiles.length) % profiles.length)
+    void selectIndex((activeIndex + direction + profiles.length) % profiles.length)
   }
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    pointerStart.current = event.clientX
-    event.currentTarget.setPointerCapture(event.pointerId)
+    pointerStart.current = { x: event.clientX, moved: false }
+  }
+
+  const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (pointerStart.current && Math.abs(event.clientX - pointerStart.current.x) >= 8) pointerStart.current.moved = true
   }
 
   const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
     if (pointerStart.current === null) return
-    const distance = event.clientX - pointerStart.current
+    const { x, moved } = pointerStart.current
+    const distance = event.clientX - x
     pointerStart.current = null
-    if (Math.abs(distance) >= 42) {
+    if (moved && Math.abs(distance) >= 42) {
       suppressClick.current = true
       selectRelative(distance < 0 ? 1 : -1)
     }
@@ -82,7 +100,7 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
   }
 
   return <section className="brew-panel">
-    <div className="profile-carousel" aria-label="Profiles" aria-roledescription="carousel" tabIndex={0} onKeyDown={handleKeyDown} onPointerDown={handlePointerDown} onPointerUp={handlePointerUp} onPointerCancel={() => { pointerStart.current = null }}>
+    <div className="profile-carousel" aria-label="Profiles" aria-roledescription="carousel" tabIndex={0} onKeyDown={handleKeyDown} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={() => { pointerStart.current = null }}>
       {profiles.map((profile, index) => {
         const offset = wrappedOffset(index, activeIndex, profiles.length)
         const position = offset === 0
@@ -96,7 +114,7 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
                 : offset === 2
                   ? 'far-right'
                   : 'hidden'
-        return <button key={profile.id} className={`profile-card profile-card--${position}`} type="button" onClick={() => { if (suppressClick.current) { suppressClick.current = false; return } setActiveIndex(index) }} aria-current={offset === 0 ? 'true' : undefined} aria-label={`${profile.name}${offset === 0 ? ', selected' : ''}`}>
+        return <button key={profile.id} className={`profile-card profile-card--${position}`} type="button" onClick={() => { if (suppressClick.current) { suppressClick.current = false; return } void selectIndex(index) }} aria-current={offset === 0 ? 'true' : undefined} aria-label={`${profile.name}${offset === 0 ? ', selected' : ''}`}>
           <h1>{profile.name}</h1>
           {offset === 0 && <ProfileTargetChart profileName={profile.name} points={profile.targetPoints} />}
         </button>
