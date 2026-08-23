@@ -71,18 +71,38 @@ export function profileStepsToTargetPoints(steps: DecaidProfileStep[] | undefine
   return points
 }
 
+export function parseProfileTitle(title: string | undefined) {
+  const fullTitle = title?.trim() || 'Untitled profile'
+  const separatorIndex = fullTitle.indexOf('/')
+  if (separatorIndex < 0) return { name: fullTitle, category: undefined }
+
+  const category = fullTitle.slice(0, separatorIndex).trim()
+  const name = fullTitle.slice(separatorIndex + 1).trim()
+  if (!category || !name) return { name: fullTitle, category: undefined }
+
+  return {
+    name,
+    category: category.toLowerCase() === 'popular' ? undefined : category,
+  }
+}
+
+export function profilesWithParsedTitles(profiles: BrewProfile[]): BrewProfile[] {
+  return profiles.map((profile) => ({ ...profile, ...parseProfileTitle(profile.name) }))
+}
+
 export function profileRecordsToDomain(records: DecaidProfileRecord[], workflow: DecaidWorkflow, fallback: BrewProfile[]) {
   const visible = records.filter((record) => record.visibility !== 'hidden' && record.visibility !== 'deleted' && record.profile?.title)
-  if (!visible.length) return fallback
+  if (!visible.length) return profilesWithParsedTitles(fallback)
   return visible.map((record): BrewProfile => {
     const profile = record.profile ?? {}
     const metadata = record.metadata ?? {}
     const isActive = profile.title === workflow.profile?.title
+    const parsedTitle = parseProfileTitle(profile.title)
     return {
       id: record.id || profile.title || crypto.randomUUID(),
-      name: profile.title || 'Untitled profile',
-      category: textValue(metadata.category, metadata.profileCategory, profile.category) ?? 'Popular',
-      description: textValue(metadata.description, metadata.profileDescription, profile.description),
+      name: parsedTitle.name,
+      category: parsedTitle.category,
+      description: textValue(metadata.description, metadata.profileDescription, metadata.notes, metadata.profileNotes, metadata.profile_notes, profile.description, profile.notes, profile.profile_notes),
       temperature: numberString(isActive ? workflow.profile?.steps?.[0]?.temperature : metadata.temperature ?? profile.steps?.[0]?.temperature, '—'),
       grindSetting: numberString(isActive ? workflow.context?.grinderSetting : metadata.grinderSetting, '—'),
       dose: numberString(isActive ? workflow.context?.targetDoseWeight : metadata.targetDoseWeight ?? profile.dose_weight, '18'),
@@ -90,6 +110,16 @@ export function profileRecordsToDomain(records: DecaidProfileRecord[], workflow:
       targetPoints: profileStepsToTargetPoints(isActive ? workflow.profile?.steps : profile.steps),
     }
   })
+}
+
+export function activeProfileForWorkflow(profiles: BrewProfile[], records: DecaidProfileRecord[], workflow: DecaidWorkflow) {
+  const activeRecord = records.find((record) => record.profile?.title === workflow.profile?.title)
+  if (activeRecord?.id) {
+    const activeById = profiles.find((profile) => profile.id === activeRecord.id)
+    if (activeById) return activeById
+  }
+  const activeTitle = parseProfileTitle(workflow.profile?.title)
+  return profiles.find((profile) => profile.name === activeTitle.name && profile.category === activeTitle.category)
 }
 
 export function favoriteProfiles(profiles: BrewProfile[], assignments: FavoriteAssignments | null) {
@@ -129,7 +159,7 @@ export function retainedAdHocProfileAtBrewStart(activeProfileId: string | undefi
 
 export function applyWorkflow(model: BrewingScreenModel, workflow: DecaidWorkflow, records: DecaidProfileRecord[], assignments: FavoriteAssignments | null = null, retainedAdHocProfileId?: string | null) {
   const allProfiles = profileRecordsToDomain(records, workflow, model.profiles)
-  const active = allProfiles.find((profile) => profile.name === workflow.profile?.title)
+  const active = activeProfileForWorkflow(allProfiles, records, workflow)
   const profiles = carouselProfiles(allProfiles, assignments, active?.id, retainedAdHocProfileId)
   const utilities = model.utilities.map((utility) => {
     if (utility.id === 'water') return { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Volume' ? { ...metric, value: numberString(workflow.hotWaterData?.volume, metric.value) } : { ...metric, value: numberString(workflow.hotWaterData?.targetTemperature, metric.value) }) }
@@ -174,8 +204,9 @@ export function shotToDomain(shot: ShotRecord): PreviousShot {
       weightFlow: entry.scale?.weightFlow,
     }]
   }) : []
+  const shotProfileTitle = shot.workflow?.profile?.title || shot.workflow?.name || 'Previous pull'
   return {
-    profileName: shot.workflow?.profile?.title || shot.workflow?.name || 'Previous pull',
+    profileName: parseProfileTitle(shotProfileTitle).name,
     timestamp: shot.timestamp ?? firstTimestamp ?? lastTimestamp,
     totalYield: numberString(shot.annotations?.actualYield ?? lastWeight, '—'),
     totalTime: numberString(duration, '—'),

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isEspressoExtractionSnapshot, profileRecordsToDomain, retainedAdHocProfileAtBrewStart, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres, tankSensorLevelForMillilitres } from '../../api/decaid/adapters'
+import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isEspressoExtractionSnapshot, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres, tankSensorLevelForMillilitres } from '../../api/decaid/adapters'
 import { getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getWorkflow, scanForDevices, setDisplayBrightness, setMachineState, setSharedSetting, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
@@ -11,6 +11,7 @@ import { brewingFixture } from '../../fixtures/brewingFixture'
 
 const MAX_LIVE_SHOT_POINTS = 900
 const MIN_SUCCESSFUL_SHOT_MS = 5_000
+const fixtureProfiles = profilesWithParsedTitles(brewingFixture.profiles)
 
 interface LiveShotSession {
   startedAt: number
@@ -70,9 +71,9 @@ const workflowValuesForProfile = (record: DecaidProfileRecord, profile: BrewProf
 }
 
 export function useBrewingData() {
-  const [model, setModel] = useState<BrewingScreenModel>({ ...brewingFixture, profiles: brewingFixture.profiles.slice(0, 5), previousShot: null })
-  const [allProfiles, setAllProfiles] = useState(brewingFixture.profiles)
-  const [favoriteProfileSlots, setFavoriteProfileSlots] = useState<Array<string | null>>(brewingFixture.profiles.slice(0, 5).map((profile) => profile.id))
+  const [model, setModel] = useState<BrewingScreenModel>({ ...brewingFixture, profiles: fixtureProfiles.slice(0, 5), previousShot: null })
+  const [allProfiles, setAllProfiles] = useState(fixtureProfiles)
+  const [favoriteProfileSlots, setFavoriteProfileSlots] = useState<Array<string | null>>(fixtureProfiles.slice(0, 5).map((profile) => profile.id))
   const [heatingSeconds, setHeatingSeconds] = useState<number | null>(null)
   const [connection, setConnection] = useState<DataConnection>('connecting')
   const [machineConnection, setMachineConnection] = useState<DataConnection>('connecting')
@@ -237,9 +238,9 @@ export function useBrewingData() {
         if (disposed) return
         profileRecords.current = records
         favoriteAssignments.current = assignments
-        const domainProfiles = profileRecordsToDomain(records, workflow, brewingFixture.profiles)
+        const domainProfiles = profileRecordsToDomain(records, workflow, fixtureProfiles)
         const slots = resolveFavoriteProfileSlots(domainProfiles, assignments)
-        const activeProfile = domainProfiles.find((profile) => profile.name === workflow.profile?.title)
+        const activeProfile = activeProfileForWorkflow(domainProfiles, records, workflow)
         retainedAdHocProfileId.current = activeProfile && !slots.includes(activeProfile.id) ? activeProfile.id : null
         allProfilesRef.current = domainProfiles
         setAllProfiles(domainProfiles)
@@ -251,19 +252,19 @@ export function useBrewingData() {
       .catch(() => {
         if (disposed) return
         const assignments = storedFixtureFavoriteAssignments()
-        const slots = resolveFavoriteProfileSlots(brewingFixture.profiles, assignments)
+        const slots = resolveFavoriteProfileSlots(fixtureProfiles, assignments)
         favoriteAssignments.current = assignments
         const activeProfileId = latestModel.current.activeProfileId
         retainedAdHocProfileId.current = activeProfileId && !slots.includes(activeProfileId) ? activeProfileId : null
-        allProfilesRef.current = brewingFixture.profiles
-        setAllProfiles(brewingFixture.profiles)
+        allProfilesRef.current = fixtureProfiles
+        setAllProfiles(fixtureProfiles)
         setFavoriteProfileSlots(slots)
         setConnection('fixture')
         updateMachineConnection('fixture')
         setPreviousShotStatus('fixture')
         setModel((current) => ({
           ...current,
-          profiles: carouselProfiles(brewingFixture.profiles, assignments, current.activeProfileId, retainedAdHocProfileId.current),
+          profiles: carouselProfiles(fixtureProfiles, assignments, current.activeProfileId, retainedAdHocProfileId.current),
           previousShot: brewingFixture.previousShot,
         }))
       })
@@ -572,7 +573,7 @@ export function useBrewingData() {
     try {
       const savedRecord = await updateProfileMetadata(profileId, metadata)
       profileRecords.current = profileRecords.current.map((candidate) => candidate.id === profileId ? savedRecord : candidate)
-      const domainProfiles = profileRecordsToDomain(profileRecords.current, workflow, brewingFixture.profiles)
+      const domainProfiles = profileRecordsToDomain(profileRecords.current, workflow, fixtureProfiles)
       allProfilesRef.current = domainProfiles
       setAllProfiles(domainProfiles)
       setFavoriteProfileSlots(resolveFavoriteProfileSlots(domainProfiles, favoriteAssignments.current))

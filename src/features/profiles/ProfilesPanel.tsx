@@ -13,7 +13,6 @@ import type { BrewProfile, SettingFeedback } from '../../domain/brewing'
 import { ProfileTargetChart } from '../brew/ProfileTargetChart'
 
 const PROFILE_AUTHORING_ENABLED = false
-const PROFILE_CATEGORIES = ['Popular', 'A-Flow', 'D-Flow', 'Cleaning', 'Gagné', 'GHC', 'Tea Portafilter', 'Tea', 'Pour-over basket'] as const
 
 interface ProfilesPanelProps {
   profiles: BrewProfile[]
@@ -42,10 +41,10 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
     ?? profiles.find((profile) => profile.id === activeProfileId)
     ?? profiles[0]
   const availableCategories = useMemo(() => {
-    const extraCategories = profiles
+    const categories = profiles
       .map((profile) => profile.category)
-      .filter((category): category is string => Boolean(category) && !PROFILE_CATEGORIES.includes(category as typeof PROFILE_CATEGORIES[number]))
-    return ['All', ...PROFILE_CATEGORIES, ...Array.from(new Set(extraCategories))]
+      .filter((category): category is string => typeof category === 'string' && category.toLowerCase() !== 'popular')
+    return ['All', ...Array.from(new Set(categories))]
   }, [profiles])
   const normalizedQuery = searchQuery.trim().toLowerCase()
   const visibleProfiles = profiles.filter((profile) => {
@@ -164,10 +163,10 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
                   <button type="button" disabled={pendingProfileId === selectedProfile.id} onClick={() => void applyProfile(selectedProfile.id)} aria-label={`Use ${selectedProfile.name}`} title="Use profile"><img src={profileUseIcon} alt="" /></button>
                   {/* Future editing is intentionally hidden while retaining its integration point. */}
                   {PROFILE_AUTHORING_ENABLED && <button type="button" onClick={() => onEditProfile?.(selectedProfile.id)} aria-label={`Edit ${selectedProfile.name}`} title="Edit profile"><img src={profileDetailEditIcon} alt="" /></button>}
-                  <button className={`${favoriteIdSet.has(selectedProfile.id) ? 'profile-detail__favorite profile-detail__favorite--active' : 'profile-detail__favorite'}${replacementProfileId === selectedProfile.id ? ' profile-detail__favorite--replacing' : ''}`} type="button" disabled={favoriteIdSet.has(selectedProfile.id) || pendingProfileId === selectedProfile.id} aria-pressed={favoriteIdSet.has(selectedProfile.id)} onClick={() => void requestFavorite()} aria-label={favoriteIdSet.has(selectedProfile.id) ? `${selectedProfile.name} is a favorite` : replacementProfileId === selectedProfile.id ? 'Cancel favorite replacement' : `Favorite ${selectedProfile.name}`} title={favoriteIdSet.has(selectedProfile.id) ? 'Already a favorite' : replacementProfileId === selectedProfile.id ? 'Cancel replacement' : 'Add to favorites'}><img src={profileFavoriteIcon} alt="" /></button>
+                  {!favoriteIdSet.has(selectedProfile.id) && <button className={`profile-detail__favorite${replacementProfileId === selectedProfile.id ? ' profile-detail__favorite--replacing' : ''}`} type="button" disabled={pendingProfileId === selectedProfile.id} aria-pressed="false" onClick={() => void requestFavorite()} aria-label={replacementProfileId === selectedProfile.id ? 'Cancel favorite replacement' : `Favorite ${selectedProfile.name}`} title={replacementProfileId === selectedProfile.id ? 'Cancel replacement' : 'Add to favorites'}><img src={profileFavoriteIcon} alt="" /></button>}
                 </div>
               </div>
-              <p className="profile-detail__description">{selectedProfile.description ?? 'This profile does not have a description yet.'}</p>
+              <p className="profile-detail__description">{selectedProfile.description ?? 'No description provided for this profile.'}</p>
             </div>
           </article>}
         </div>
