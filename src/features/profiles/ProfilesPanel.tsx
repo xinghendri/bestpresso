@@ -119,7 +119,7 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
         <div className={`profiles-search-control${searchOpen ? ' profiles-search-control--open' : ''}`}>
           <label className="profiles-search-field" aria-hidden={!searchOpen}>
             <span>Search profiles</span>
-            <input ref={searchInput} id="profiles-search-input" value={searchQuery} placeholder="Try a keyword—your dream shot awaits…" disabled={!searchOpen} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Escape') { setSearchOpen(false); setSearchQuery('') } }} />
+            <input ref={searchInput} id="profiles-search-input" value={searchQuery} placeholder="Try a keyword (eg. turbo, 6 bar)" disabled={!searchOpen} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Escape') { setSearchOpen(false); setSearchQuery('') } }} />
           </label>
           <button className="profiles-icon-button profiles-search" type="button" aria-controls="profiles-search-input" aria-expanded={searchOpen} onClick={() => { setSearchOpen((current) => !current); if (searchOpen) setSearchQuery('') }} aria-label={searchOpen ? 'Close profile search' : 'Search profiles'}><img src={profilesSearchIcon} alt="" /></button>
         </div>
