@@ -9,7 +9,7 @@ export interface SupportedScaleDefinition {
 // devices API exposes only the device name, so matching must remain name-based.
 export const supportedScales = [
   { id: 'bengle-scale', displayName: 'Bengle', imageName: 'bengle-scale.png', aliases: [/^bengle.*scale$/i] },
-  { id: 'half-decent-scale-usb', displayName: 'Half Decent Scale', imageName: 'half-decent-scale-usb.png', aliases: [/^half\s+decent\s+scale(?:\s*\(usb\))?$/i, /^decent\s*scale$/i, /^decent$/i, /^hds\s*serial$/i] },
+  { id: 'half-decent-scale-usb', displayName: 'Half Decent Scale', imageName: 'half-decent-scale-usb.png', aliases: [/^half\s+decent\s+scale(?:\s*\(usb\))?$/i, /^hds\s*serial$/i] },
   { id: 'half-decent-scale-wifi', displayName: 'Half Decent Scale', imageName: 'half-decent-scale-wifi.png', aliases: [/^half\s+decent\s+scale\s*\(wi-?fi\)$/i] },
   { id: 'skale2', displayName: 'Atomax Skale', imageName: 'skale2.png', aliases: [/^skale/i, /atomax.*skale/i] },
   { id: 'acaia-lunar', displayName: 'Acaia Lunar', imageName: 'acaia-lunar.png', aliases: [/\blunar\b/i] },
