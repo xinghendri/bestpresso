@@ -45,6 +45,7 @@ export interface ShotMeasurement {
   machine?: {
     timestamp?: string
     state?: { substate?: string }
+    profileFrame?: number
     pressure?: number
     flow?: number
     targetPressure?: number
@@ -55,3 +56,4 @@ export interface ShotMeasurement {
   scale?: { weight?: number; weightFlow?: number }
 }
 export interface ShotRecord { id?: string; timestamp?: string; workflow?: DecaidWorkflow; measurements?: ShotMeasurement[]; annotations?: { actualYield?: number }; stopReason?: string | null }
+export interface PaginatedShots { items: ShotRecord[]; total: number; limit: number; offset: number }

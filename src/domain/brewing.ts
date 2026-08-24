@@ -53,6 +53,7 @@ export interface BrewProfile {
 }
 
 export interface PreviousShot {
+  id?: string
   profileName: string
   timestamp?: string
   totalYield: string

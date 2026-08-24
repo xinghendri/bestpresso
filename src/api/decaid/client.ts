@@ -1,5 +1,5 @@
 import { getDecaidEndpoints } from './config'
-import type { DecaidDevice, DecaidProfileRecord, DecaidSettings, DecaidWorkflow, DecaidWorkflowPatch, DisplayState, FavoriteAssignments, ShotRecord } from './types'
+import type { DecaidDevice, DecaidProfileRecord, DecaidSettings, DecaidWorkflow, DecaidWorkflowPatch, DisplayState, FavoriteAssignments, PaginatedShots, ShotRecord } from './types'
 
 export class DecaidApiError extends Error {
   status: number
@@ -89,3 +89,6 @@ export async function getLatestShot() {
   const latest = await getJson<ShotRecord | null>('/shots/latest')
   return latest?.id ? getJson<ShotRecord>(`/shots/${encodeURIComponent(latest.id)}`) : null
 }
+
+export const getShotHistory = (limit = 30, offset = 0) => getJson<PaginatedShots>(`/shots?limit=${limit}&offset=${offset}&orderBy=timestamp&order=desc`)
+export const getShot = (id: string) => getJson<ShotRecord>(`/shots/${encodeURIComponent(id)}`)

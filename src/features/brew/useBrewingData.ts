@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isEspressoExtractionSnapshot, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres, tankSensorLevelForMillilitres } from '../../api/decaid/adapters'
-import { DecaidApiError, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getSettings, getWorkflow, scanForDevices, setDisplayBrightness, setMachineState, setSharedSetting, tareScale, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
+import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isEspressoExtractionSnapshot, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotStage, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres, tankSensorLevelForMillilitres } from '../../api/decaid/adapters'
+import { DecaidApiError, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getSettings, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineState, setSharedSetting, tareScale, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, DecaidWorkflowPatch, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
 import { WATER_TANK_LOW_LEVEL_ML, WATER_TANK_SENSOR_FULL_MM, WATER_TANK_WARNING_OFFSET_CLICKS } from '../../domain/brewing'
-import type { BrewProfile, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, MachineReadiness, PreviousShotStatus, ScaleConnection, SettingFeedback } from '../../domain/brewing'
+import type { BrewProfile, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, MachineReadiness, PreviousShot, PreviousShotStatus, ScaleConnection, SettingFeedback } from '../../domain/brewing'
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { brewingFixture } from '../../fixtures/brewingFixture'
 
@@ -23,24 +23,6 @@ interface LiveShotSession {
 const snapshotTime = (timestamp?: string) => {
   const parsed = timestamp ? Date.parse(timestamp) : Number.NaN
   return Number.isFinite(parsed) ? parsed : Date.now()
-}
-
-const readableStageName = (snapshot: MachineSnapshot, stepNames: string[] | undefined) => {
-  const frame = typeof snapshot.profileFrame === 'number' && Number.isFinite(snapshot.profileFrame)
-    ? Math.max(0, Math.floor(snapshot.profileFrame))
-    : undefined
-  const configuredName = frame === undefined ? undefined : stepNames?.[frame]?.trim()
-  if (configuredName) return { stageIndex: frame, stageName: configuredName.replaceAll('_', ' ') }
-
-  const substate = typeof snapshot.state === 'object' ? snapshot.state.substate?.toLowerCase() : undefined
-  const stageName = substate === 'preinfusion'
-    ? 'Pre-infusion'
-    : substate === 'pouringdone'
-      ? 'Cooling'
-      : substate === 'pouring'
-        ? 'Extraction'
-        : frame === undefined ? 'Extraction' : `Stage ${frame + 1}`
-  return { stageIndex: frame, stageName }
 }
 
 const localFavoriteStorageKey = 'bestpresso.favorite-profile-ids.v1'
@@ -104,6 +86,7 @@ export function useBrewingData() {
   const [settingFeedback, setSettingFeedback] = useState<SettingFeedback | null>(null)
   const [settingFeedbackVisible, setSettingFeedbackVisible] = useState(false)
   const [previousShotStatus, setPreviousShotStatus] = useState<PreviousShotStatus>('loading')
+  const [shotHistory, setShotHistory] = useState<PreviousShot[]>(() => brewingFixture.previousShot ? [{ ...brewingFixture.previousShot, id: 'fixture-latest' }] : [])
   const [liveBrew, setLiveBrew] = useState<LiveBrewState>({ active: false, visible: false, elapsedMs: 0, points: [] })
   const sleepRequestInFlight = useRef(false)
   const wakeScreenDismissed = useRef(false)
@@ -127,6 +110,7 @@ export function useBrewingData() {
   const allProfilesRef = useRef(allProfiles)
   const retainedAdHocProfileId = useRef<string | null>(null)
   const latestModel = useRef(model)
+  const shotHistoryCache = useRef(new Map<string, NonNullable<BrewingScreenModel['previousShot']>>())
 
   useEffect(() => { allProfilesRef.current = allProfiles }, [allProfiles])
   useEffect(() => { latestModel.current = model }, [model])
@@ -247,7 +231,10 @@ export function useBrewingData() {
           const timestamp = shot?.timestamp ? Date.parse(shot.timestamp) : Number.NaN
           const isCompletedSession = shot && (!Number.isFinite(timestamp) || timestamp >= session.startedAt - 2_000)
           if (isCompletedSession) {
-            setModel((current) => ({ ...current, previousShot: shotToDomain(shot) }))
+            const domainShot = shotToDomain(shot)
+            if (domainShot.id) shotHistoryCache.current.set(domainShot.id, domainShot)
+            setModel((current) => ({ ...current, previousShot: domainShot }))
+            setShotHistory((current) => [domainShot, ...current.filter((candidate) => candidate.id !== domainShot.id && candidate.id !== `live:${session.startedAt}`)])
             setPreviousShotStatus('loaded')
           } else if (attempt < 2) schedulePersistedShotRefresh(session, attempt + 1)
         }).catch(() => { if (!disposed && attempt < 2) schedulePersistedShotRefresh(session, attempt + 1) })
@@ -267,17 +254,21 @@ export function useBrewingData() {
       const hasExtraction = points.some((point) => (point.pressure ?? 0) > 0.5 || (point.flow ?? 0) > 0.1)
       if (elapsedMs < MIN_SUCCESSFUL_SHOT_MS || !hasExtraction) return
       const finalWeight = [...points].reverse().find((point) => point.weight !== undefined)?.weight
+      const localShot = {
+        id: `live:${session.startedAt}`,
+        profileName: session.profileName,
+        timestamp: new Date(session.startedAt).toISOString(),
+        totalYield: finalWeight === undefined ? '—' : finalWeight.toFixed(1),
+        totalTime: String(Math.max(1, Math.round(elapsedMs / 1000))),
+        targetYield: session.targetYield,
+        points,
+      }
       setModel((current) => ({
         ...current,
-        previousShot: {
-          profileName: session.profileName,
-          timestamp: new Date(session.startedAt).toISOString(),
-          totalYield: finalWeight === undefined ? '—' : finalWeight.toFixed(1),
-          totalTime: String(Math.max(1, Math.round(elapsedMs / 1000))),
-          targetYield: session.targetYield,
-          points,
-        },
+        previousShot: localShot,
       }))
+      shotHistoryCache.current.set(localShot.id, localShot)
+      setShotHistory((current) => [localShot, ...current])
       setPreviousShotStatus('loaded')
       schedulePersistedShotRefresh(session)
     }
@@ -304,9 +295,12 @@ export function useBrewingData() {
     const latestShotRequest = getLatestShot()
       .then((shot) => ({ shot, failed: false }))
       .catch(() => ({ shot: null, failed: true }))
+    const shotHistoryRequest = getShotHistory()
+      .then((history) => ({ history, failed: false }))
+      .catch(() => ({ history: null, failed: true }))
 
-    Promise.all([getWorkflow(), getProfiles(), getFavoriteAssignments().catch(() => null), latestShotRequest])
-      .then(([workflow, records, assignments, latestShot]) => {
+    Promise.all([getWorkflow(), getProfiles(), getFavoriteAssignments().catch(() => null), latestShotRequest, shotHistoryRequest])
+      .then(([workflow, records, assignments, latestShot, historyResult]) => {
         if (disposed) return
         profileRecords.current = records
         favoriteAssignments.current = assignments
@@ -317,8 +311,16 @@ export function useBrewingData() {
         allProfilesRef.current = domainProfiles
         setAllProfiles(domainProfiles)
         setFavoriteProfileSlots(slots)
-        setModel((current) => ({ ...applyWorkflow(current, workflow, records, assignments, retainedAdHocProfileId.current), previousShot: latestShot.shot ? shotToDomain(latestShot.shot) : null }))
-        setPreviousShotStatus(latestShot.failed ? 'error' : latestShot.shot ? 'loaded' : 'empty')
+        const latestDomainShot = latestShot.shot ? shotToDomain(latestShot.shot) : null
+        const history = historyResult.history?.items.map(shotToDomain) ?? []
+        const reconciledHistory = latestDomainShot
+          ? [latestDomainShot, ...history.filter((shot) => shot.id !== latestDomainShot.id)]
+          : history
+        shotHistoryCache.current.clear()
+        if (latestDomainShot?.id) shotHistoryCache.current.set(latestDomainShot.id, latestDomainShot)
+        setShotHistory(reconciledHistory)
+        setModel((current) => ({ ...applyWorkflow(current, workflow, records, assignments, retainedAdHocProfileId.current), previousShot: latestDomainShot }))
+        setPreviousShotStatus(latestShot.failed && historyResult.failed ? 'error' : reconciledHistory.length ? 'loaded' : 'empty')
         setConnection('connected')
       })
       .catch(() => {
@@ -334,10 +336,14 @@ export function useBrewingData() {
         setConnection('fixture')
         updateMachineConnection('fixture')
         setPreviousShotStatus('fixture')
+        const fixtureShot = brewingFixture.previousShot ? { ...brewingFixture.previousShot, id: 'fixture-latest' } : null
+        shotHistoryCache.current.clear()
+        if (fixtureShot) shotHistoryCache.current.set(fixtureShot.id, fixtureShot)
+        setShotHistory(fixtureShot ? [fixtureShot] : [])
         setModel((current) => ({
           ...current,
           profiles: carouselProfiles(fixtureProfiles, assignments, current.activeProfileId, retainedAdHocProfileId.current),
-          previousShot: brewingFixture.previousShot,
+          previousShot: fixtureShot,
         }))
       })
 
@@ -365,7 +371,7 @@ export function useBrewingData() {
         const elapsedMs = Math.max(0, now - session.startedAt)
         const lastPoint = session.points.at(-1)
         if (!lastPoint || elapsedMs > lastPoint.elapsedMs) {
-          const stage = readableStageName(snapshot, profile?.stepNames)
+          const stage = shotStage(snapshot.profileFrame, typeof snapshot.state === 'object' ? snapshot.state.substate : undefined, profile?.stepNames)
           session.points.push({
             elapsedMs,
             pressure: snapshot.pressure,
@@ -799,9 +805,19 @@ export function useBrewingData() {
     }
   }
 
+  const loadHistoryShot = async (shotId: string) => {
+    const cached = shotHistoryCache.current.get(shotId)
+    if (cached) return cached
+    if (connection !== 'connected') return null
+    const shot = shotToDomain(await getShot(shotId))
+    if (shot.id) shotHistoryCache.current.set(shot.id, shot)
+    setShotHistory((current) => current.map((candidate) => candidate.id === shotId ? shot : candidate))
+    return shot
+  }
+
   const settingsDisabled = connection !== 'connected' || settingFeedback?.status === 'saving'
   const dismissLiveBrew = () => setLiveBrew((current) => current.active ? current : { ...current, visible: false })
   const favoriteProfileIds = favoriteProfileSlots.filter((id): id is string => Boolean(id))
 
-  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, previousShotStatus, heatingSeconds, connection, machineConnection, scale, scaleTarePending, brewStopPending, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, dismissLiveBrew, searchForScale, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
+  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, previousShotStatus, shotHistory, loadHistoryShot, heatingSeconds, connection, machineConnection, scale, scaleTarePending, brewStopPending, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, dismissLiveBrew, searchForScale, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
 }
