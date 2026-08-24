@@ -25,6 +25,24 @@ const snapshotTime = (timestamp?: string) => {
   return Number.isFinite(parsed) ? parsed : Date.now()
 }
 
+const readableStageName = (snapshot: MachineSnapshot, stepNames: string[] | undefined) => {
+  const frame = typeof snapshot.profileFrame === 'number' && Number.isFinite(snapshot.profileFrame)
+    ? Math.max(0, Math.floor(snapshot.profileFrame))
+    : undefined
+  const configuredName = frame === undefined ? undefined : stepNames?.[frame]?.trim()
+  if (configuredName) return { stageIndex: frame, stageName: configuredName.replaceAll('_', ' ') }
+
+  const substate = typeof snapshot.state === 'object' ? snapshot.state.substate?.toLowerCase() : undefined
+  const stageName = substate === 'preinfusion'
+    ? 'Pre-infusion'
+    : substate === 'pouringdone'
+      ? 'Cooling'
+      : substate === 'pouring'
+        ? 'Extraction'
+        : frame === undefined ? 'Extraction' : `Stage ${frame + 1}`
+  return { stageIndex: frame, stageName }
+}
+
 const localFavoriteStorageKey = 'bestpresso.favorite-profile-ids.v1'
 
 const favoriteAssignmentsForSlots = (slots: Array<string | null>): FavoriteAssignments => Object.fromEntries(Array.from({ length: 5 }, (_, slot) => [String(slot), slots[slot] ?? null]))
@@ -79,6 +97,7 @@ export function useBrewingData() {
   const [machineConnection, setMachineConnection] = useState<DataConnection>('connecting')
   const [scale, setScale] = useState<ScaleConnection>({ status: 'disconnected' })
   const [scaleTarePending, setScaleTarePending] = useState(false)
+  const [brewStopPending, setBrewStopPending] = useState(false)
   const [sleepPending, setSleepPending] = useState(false)
   const [sleepScreenActive, setSleepScreenActive] = useState(false)
   const [machineActionError, setMachineActionError] = useState<string | null>(null)
@@ -99,6 +118,7 @@ export function useBrewingData() {
   const scaleSearchTimeout = useRef<number | null>(null)
   const connectedScale = useRef(false)
   const scaleTareInFlight = useRef(false)
+  const brewStopRequestInFlight = useRef(false)
   const latestScaleSnapshot = useRef<Pick<LiveShotPoint, 'weight' | 'weightFlow'>>({})
   const latestTankVolume = useRef<number | null>(null)
   const machineNeedsWater = useRef(false)
@@ -238,6 +258,8 @@ export function useBrewingData() {
       const session = liveShotSession.current
       if (!session) return
       liveShotSession.current = null
+      brewStopRequestInFlight.current = false
+      setBrewStopPending(false)
       const points = [...session.points]
       const elapsedMs = points.at(-1)?.elapsedMs ?? 0
       setLiveBrew({ active: false, visible: true, elapsedMs, points })
@@ -325,9 +347,9 @@ export function useBrewingData() {
       machineNeedsWater.current = machineState === 'needswater'
       if (isEspressoExtractionSnapshot(snapshot)) {
         const now = snapshotTime(snapshot.timestamp)
+        const currentModel = latestModel.current
+        const profile = currentModel.profiles.find((candidate) => candidate.id === currentModel.activeProfileId) ?? currentModel.profiles[0]
         if (!liveShotSession.current) {
-          const currentModel = latestModel.current
-          const profile = currentModel.profiles.find((candidate) => candidate.id === currentModel.activeProfileId) ?? currentModel.profiles[0]
           liveShotSession.current = { startedAt: now, profileName: profile?.name ?? 'Espresso', targetYield: Number(profile?.targetYield) || 36, points: [] }
           void requestScaleTare(true)
           const adHocProfileAtBrewStart = retainedAdHocProfileAtBrewStart(currentModel.activeProfileId, retainedAdHocProfileId.current)
@@ -343,6 +365,7 @@ export function useBrewingData() {
         const elapsedMs = Math.max(0, now - session.startedAt)
         const lastPoint = session.points.at(-1)
         if (!lastPoint || elapsedMs > lastPoint.elapsedMs) {
+          const stage = readableStageName(snapshot, profile?.stepNames)
           session.points.push({
             elapsedMs,
             pressure: snapshot.pressure,
@@ -352,6 +375,7 @@ export function useBrewingData() {
             temperature: snapshot.mixTemperature ?? snapshot.groupTemperature,
             weight: latestScaleSnapshot.current.weight,
             weightFlow: latestScaleSnapshot.current.weightFlow,
+            ...stage,
           })
           if (session.points.length > MAX_LIVE_SHOT_POINTS) session.points.shift()
         }
@@ -582,6 +606,24 @@ export function useBrewingData() {
     }
   }
 
+  const stopEspresso = async () => {
+    if (brewStopRequestInFlight.current || !liveShotSession.current) return
+    if (connection !== 'connected' || machineConnection !== 'connected') {
+      showMachineActionError('The machine is disconnected, so the pull could not be stopped.')
+      return
+    }
+    brewStopRequestInFlight.current = true
+    setBrewStopPending(true)
+    showMachineActionError(null)
+    try {
+      await setMachineState('idle')
+    } catch {
+      brewStopRequestInFlight.current = false
+      setBrewStopPending(false)
+      showMachineActionError('The machine did not accept the stop command.')
+    }
+  }
+
   const showSettingFeedback = (feedback: SettingFeedback) => {
     if (feedbackTimeout.current !== null) window.clearTimeout(feedbackTimeout.current)
     setSettingFeedback(feedback)
@@ -761,5 +803,5 @@ export function useBrewingData() {
   const dismissLiveBrew = () => setLiveBrew((current) => current.active ? current : { ...current, visible: false })
   const favoriteProfileIds = favoriteProfileSlots.filter((id): id is string => Boolean(id))
 
-  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, previousShotStatus, heatingSeconds, connection, machineConnection, scale, scaleTarePending, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, dismissLiveBrew, searchForScale, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
+  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, previousShotStatus, heatingSeconds, connection, machineConnection, scale, scaleTarePending, brewStopPending, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, dismissLiveBrew, searchForScale, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
 }

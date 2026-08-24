@@ -49,6 +49,7 @@ export interface BrewProfile {
   dose: string
   targetYield: string
   targetPoints?: ProfileTargetPoint[]
+  stepNames?: string[]
 }
 
 export interface PreviousShot {
@@ -82,6 +83,8 @@ export interface LiveShotPoint {
   temperature?: number
   weight?: number
   weightFlow?: number
+  stageIndex?: number
+  stageName?: string
 }
 
 export interface LiveBrewState {

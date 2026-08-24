@@ -108,6 +108,7 @@ export function profileRecordsToDomain(records: DecaidProfileRecord[], workflow:
       dose: numberString(isActive ? workflow.context?.targetDoseWeight : metadata.targetDoseWeight ?? profile.dose_weight, '18'),
       targetYield: numberString(isActive ? workflow.context?.targetYield : metadata.targetYield ?? profile.target_weight, '—'),
       targetPoints: profileStepsToTargetPoints(isActive ? workflow.profile?.steps : profile.steps),
+      stepNames: (isActive ? workflow.profile?.steps : profile.steps)?.map((step, index) => textValue(step.name) ?? `Stage ${index + 1}`),
     }
   })
 }

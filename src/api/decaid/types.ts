@@ -1,4 +1,5 @@
 export interface DecaidProfileStep {
+  name?: string
   temperature?: number
   seconds?: number
   duration?: number

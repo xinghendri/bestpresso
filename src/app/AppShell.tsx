@@ -25,8 +25,10 @@ interface AppShellProps {
   settingsDisabled: boolean
   scale: ScaleConnection
   scaleTarePending: boolean
+  brewStopPending: boolean
   onSleep: () => void
   onWake: () => void
+  onStopEspresso: () => void
   onDismissLiveBrew: () => void
   onSearchScale: () => void
   onTareScale: () => void
@@ -48,7 +50,7 @@ const initialUtilityLayout = () => {
   }
 }
 
-export function AppShell({ model, liveBrew, previousShotStatus, connection, machineConnection, heatingSeconds, sleepPending, sleepScreenActive, machineActionError, settingFeedback, settingsDisabled, scale, scaleTarePending, onSleep, onWake, onDismissLiveBrew, onSearchScale, onTareScale, onUpdateMachineSetting, onUpdateProfileSetting, onSelectProfile, onOpenSettings, onManageProfiles, onOpenPreviousShot }: AppShellProps) {
+export function AppShell({ model, liveBrew, previousShotStatus, connection, machineConnection, heatingSeconds, sleepPending, sleepScreenActive, machineActionError, settingFeedback, settingsDisabled, scale, scaleTarePending, brewStopPending, onSleep, onWake, onStopEspresso, onDismissLiveBrew, onSearchScale, onTareScale, onUpdateMachineSetting, onUpdateProfileSetting, onSelectProfile, onOpenSettings, onManageProfiles, onOpenPreviousShot }: AppShellProps) {
   const [utilitiesCollapsed, setUtilitiesCollapsed] = useState(initialUtilityLayout)
   const [utilityLayoutHasChanged, setUtilityLayoutHasChanged] = useState(false)
   const sleepLabel = model.readiness === 'sleeping' ? 'Wake' : 'Sleep'
@@ -66,7 +68,7 @@ export function AppShell({ model, liveBrew, previousShotStatus, connection, mach
   }
 
   if (sleepScreenActive) return <button className="sleep-screen" type="button" aria-label="Wake machine" onClick={onWake}><span>Tap to wake</span></button>
-  if (liveBrew.visible) return <LiveBrewingScreen model={model} liveBrew={liveBrew} onDismiss={onDismissLiveBrew} />
+  if (liveBrew.visible) return <LiveBrewingScreen model={model} liveBrew={liveBrew} stopPending={brewStopPending} actionError={machineActionError} onStop={onStopEspresso} onDismiss={onDismissLiveBrew} />
   return <main className={`app-shell${utilitiesCollapsed ? ' app-shell--utilities-collapsed' : ''}${utilityLayoutHasChanged ? ' app-shell--utility-layout-transitioned' : ''}`}>
     <header className="topbar"><div className="topbar__brand"><button className="utility-layout-toggle" type="button" aria-label={utilitiesCollapsed ? 'Expand utility panels' : 'Minimize utility panels'} aria-controls="machine-utilities" aria-expanded={!utilitiesCollapsed} title={utilitiesCollapsed ? 'Expand utility panels' : 'Minimize utility panels'} onClick={toggleUtilityLayout}><img src={utilitiesCollapsed ? utilityExpand : utilityCollapse} alt="" /></button><img className="logo" src={logo} alt="decent" /></div><nav aria-label="Machine controls"><button className={sleepPending ? 'control-button control-button--pending' : 'control-button'} type="button" aria-label={sleepPending ? `${sleepLabel} request in progress` : sleepLabel} title={sleepLabel} disabled={sleepPending} onClick={onSleep}><img src={sleep} alt="" /></button><button className="control-button" type="button" aria-label="Settings" title="Settings" onClick={onOpenSettings}><img src={settings} alt="" /></button><StatusPill status={model.readiness} connection={connection} machineConnection={machineConnection} heatingSeconds={heatingSeconds} /></nav></header>
     {(machineActionError || settingFeedback) && <div className="system-messages">
