@@ -62,8 +62,8 @@ export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, o
 
   return <main className="history-browser-screen">
     <aside className="history-browser-rail">
-      <header><h1>Previous pulls</h1><span>{shots.length}</span></header>
-      <div className="history-browser-list" role="listbox" aria-label="Previous pulls">
+      <header><h1>Shot history</h1><span>{shots.length}</span></header>
+      <div className="history-browser-list" role="listbox" aria-label="Shot history">
         {shots.map((shot, index) => <button className={`history-browser-item${shot.id === activeId ? ' history-browser-item--selected' : ''}`} type="button" role="option" aria-selected={shot.id === activeId} aria-busy={loadingId === shot.id} key={shot.id ?? `${shot.timestamp}:${index}`} onClick={() => void selectShot(shot)}>
           <strong>{shot.profileName}</strong>
           <time dateTime={shot.timestamp}>{pullTime(shot.timestamp)}</time>
@@ -81,12 +81,12 @@ export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, o
         <div className="live-pull-header__metrics">
           <div><span>Timer</span><strong>{activeShot ? timerLabel(activeShot) : '—'}</strong></div>
           <i aria-hidden="true" />
-          <div><span>Yield</span><strong>{activeShot?.totalYield ?? '—'}{activeShot?.totalYield !== '—' && <small>g</small>} {activeShot && <><em>/</em> {targetYield.toFixed(Number.isInteger(targetYield) ? 0 : 1)}<small>g</small></>}</strong></div>
+          <div><span>Total yield</span><strong>{activeShot?.totalYield ?? '—'}{activeShot?.totalYield !== '—' && <small>g</small>}</strong></div>
         </div>
         <button className="live-pull-action live-pull-action--close" type="button" onClick={onDismiss}>Close</button>
       </header>
 
-      <section className={`live-pull-chart-panel history-pull-chart${loadingId ? ' history-pull-chart--loading' : ''}`} aria-label={activeShot ? `Previous pull: ${activeShot.profileName}` : 'Previous pull chart'}>
+      <section className={`live-pull-chart-panel history-pull-chart${loadingId ? ' history-pull-chart--loading' : ''}`} aria-label={activeShot ? `Shot history: ${activeShot.profileName}` : 'Shot history chart'}>
         {activeShot && <LiveShotChart points={points} elapsedMs={elapsedMs} targetYield={targetYield} />}
         {loadError && <p className="history-pull-error">That pull couldn’t be loaded. Try selecting it again.</p>}
       </section>
