@@ -1,5 +1,17 @@
 import { getDecaidEndpoints } from './config'
-import type { DecaidDevice, DecaidProfileRecord, DecaidWorkflow, DecaidWorkflowPatch, DisplayState, FavoriteAssignments, ShotRecord } from './types'
+import type { DecaidDevice, DecaidProfileRecord, DecaidSettings, DecaidWorkflow, DecaidWorkflowPatch, DisplayState, FavoriteAssignments, ShotRecord } from './types'
+
+export class DecaidApiError extends Error {
+  status: number
+  type?: string
+
+  constructor(message: string, status: number, type?: string) {
+    super(message)
+    this.name = 'DecaidApiError'
+    this.status = status
+    this.type = type
+  }
+}
 
 async function getJson<T>(path: string, timeoutMs = 4500): Promise<T> {
   const controller = new AbortController()
@@ -19,6 +31,15 @@ export const getFavoriteAssignments = () => getJson<FavoriteAssignments>('/store
 export const getDevices = () => getJson<DecaidDevice[]>('/devices')
 export const scanForDevices = () => getJson<unknown[]>('/devices/scan?quick=true')
 export const getDisplayState = () => getJson<DisplayState>('/display')
+export const getSettings = () => getJson<DecaidSettings>('/settings')
+
+export async function tareScale() {
+  const response = await fetch(`${getDecaidEndpoints().apiBase}/scale/tare`, { method: 'PUT' })
+  if (response.ok) return
+
+  const body = await response.json().catch(() => null) as { message?: string; type?: string } | null
+  throw new DecaidApiError(body?.message || `Decaid scale tare returned ${response.status}`, response.status, body?.type)
+}
 
 export async function setDisplayBrightness(brightness: number) {
   const response = await fetch(`${getDecaidEndpoints().apiBase}/display/brightness`, {

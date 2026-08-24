@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isEspressoExtractionSnapshot, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres, tankSensorLevelForMillilitres } from '../../api/decaid/adapters'
-import { getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getWorkflow, scanForDevices, setDisplayBrightness, setMachineState, setSharedSetting, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
+import { DecaidApiError, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getSettings, getWorkflow, scanForDevices, setDisplayBrightness, setMachineState, setSharedSetting, tareScale, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, DecaidWorkflowPatch, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
@@ -78,6 +78,7 @@ export function useBrewingData() {
   const [connection, setConnection] = useState<DataConnection>('connecting')
   const [machineConnection, setMachineConnection] = useState<DataConnection>('connecting')
   const [scale, setScale] = useState<ScaleConnection>({ status: 'disconnected' })
+  const [scaleTarePending, setScaleTarePending] = useState(false)
   const [sleepPending, setSleepPending] = useState(false)
   const [sleepScreenActive, setSleepScreenActive] = useState(false)
   const [machineActionError, setMachineActionError] = useState<string | null>(null)
@@ -96,6 +97,8 @@ export function useBrewingData() {
   const feedbackTimeout = useRef<number | null>(null)
   const actionErrorTimeout = useRef<number | null>(null)
   const scaleSearchTimeout = useRef<number | null>(null)
+  const connectedScale = useRef(false)
+  const scaleTareInFlight = useRef(false)
   const latestScaleSnapshot = useRef<Pick<LiveShotPoint, 'weight' | 'weightFlow'>>({})
   const latestTankVolume = useRef<number | null>(null)
   const machineNeedsWater = useRef(false)
@@ -138,10 +141,50 @@ export function useBrewingData() {
     }, 5000)
   }
 
+  const setDisplayedScaleWeight = (weight: number) => {
+    latestScaleSnapshot.current = { ...latestScaleSnapshot.current, weight }
+    setModel((current) => ({
+      ...current,
+      utilities: current.utilities.map((utility) => utility.id === 'scale'
+        ? { ...utility, metrics: utility.metrics.map((metric) => ({ ...metric, value: weight.toFixed(1) })) }
+        : utility),
+    }))
+  }
+
+  const requestScaleTare = async (silent = false) => {
+    if (!connectedScale.current || scaleTareInFlight.current) return false
+    scaleTareInFlight.current = true
+    if (!silent) {
+      showMachineActionError(null)
+      setScaleTarePending(true)
+    }
+    try {
+      await tareScale()
+      setDisplayedScaleWeight(0)
+      return true
+    } catch (error) {
+      if (!silent) {
+        if (error instanceof DecaidApiError && error.type === 'block_tare_during_shot') {
+          showMachineActionError('Scale tare is unavailable during the shot.')
+        } else if (error instanceof DecaidApiError && error.status === 404) {
+          showMachineActionError('The scale disconnected before it could be tared.')
+        } else {
+          showMachineActionError('The scale did not accept the tare command.')
+        }
+      }
+      return false
+    } finally {
+      scaleTareInFlight.current = false
+      if (!silent) setScaleTarePending(false)
+    }
+  }
+
   useEffect(() => {
     let disposed = false
     let timeToReadyEstimate: { deadline: number; receivedAt: number } | null = null
     let latestShotRefreshTimeout: number | null = null
+    let preferredScaleId: string | null = null
+    let backgroundScaleScanInFlight = false
 
     const updateMachineConnection = (next: DataConnection) => {
       const previous = machineConnectionRef.current
@@ -161,12 +204,13 @@ export function useBrewingData() {
 
     const applyConnectedDevices = (devices: Awaited<ReturnType<typeof getDevices>>) => {
       const connectedMachine = devices.find((device) => device.type === 'machine' && device.state === 'connected')
-      const connectedScale = devices.find((device) => device.type === 'scale' && device.state === 'connected')
+      const activeScale = devices.find((device) => device.type === 'scale' && device.state === 'connected')
+      connectedScale.current = Boolean(activeScale)
       updateMachineConnection(connectedMachine ? 'connected' : 'disconnected')
       setScale((current) => current.status === 'searching'
         ? current
-        : connectedScale
-          ? { status: 'connected', name: connectedScale.name || 'Scale' }
+        : activeScale
+          ? { status: 'connected', name: activeScale.name || 'Scale' }
           : { status: 'disconnected' })
     }
 
@@ -217,6 +261,7 @@ export function useBrewingData() {
     }
 
     const refreshConnectedScale = () => {
+      connectedScale.current = true
       setScale((current) => ({ ...current, status: 'connected' }))
       if (scaleSearchTimeout.current !== null) window.clearTimeout(scaleSearchTimeout.current)
       scaleSearchTimeout.current = null
@@ -228,6 +273,11 @@ export function useBrewingData() {
     }
 
     refreshConnectedDevices().catch(() => undefined)
+
+    const refreshPreferredScale = () => getSettings().then((settings) => {
+      if (!disposed) preferredScaleId = settings.preferredScaleId?.trim() || null
+    }).catch(() => undefined)
+    void refreshPreferredScale()
 
     const latestShotRequest = getLatestShot()
       .then((shot) => ({ shot, failed: false }))
@@ -279,6 +329,7 @@ export function useBrewingData() {
           const currentModel = latestModel.current
           const profile = currentModel.profiles.find((candidate) => candidate.id === currentModel.activeProfileId) ?? currentModel.profiles[0]
           liveShotSession.current = { startedAt: now, profileName: profile?.name ?? 'Espresso', targetYield: Number(profile?.targetYield) || 36, points: [] }
+          void requestScaleTare(true)
           const adHocProfileAtBrewStart = retainedAdHocProfileAtBrewStart(currentModel.activeProfileId, retainedAdHocProfileId.current)
           if (adHocProfileAtBrewStart !== retainedAdHocProfileId.current) {
             retainedAdHocProfileId.current = adHocProfileAtBrewStart
@@ -347,15 +398,18 @@ export function useBrewingData() {
         }
       }
       if (snapshot.status === 'connected') {
+        connectedScale.current = true
         refreshConnectedScale()
         return
       }
       if (snapshot.status === 'disconnected') {
+        connectedScale.current = false
         latestScaleSnapshot.current = {}
         setScale((current) => current.status === 'searching' ? current : { status: 'disconnected' })
         return
       }
       if (snapshot.weight === undefined) return
+      connectedScale.current = true
       setModel((current) => ({ ...current, utilities: current.utilities.map((utility) => utility.id === 'scale' ? { ...utility, metrics: utility.metrics.map((metric) => ({ ...metric, value: snapshot.weight!.toFixed(1) })) } : utility) }))
     }, () => undefined)
 
@@ -412,10 +466,24 @@ export function useBrewingData() {
       refreshConnectedDevices().catch(() => undefined)
     }, 3000)
 
+    const refreshPreferredScaleSetting = window.setInterval(() => {
+      void refreshPreferredScale()
+    }, 30000)
+
+    const backgroundScaleSearch = window.setInterval(() => {
+      if (!preferredScaleId || connectedScale.current || backgroundScaleScanInFlight) return
+      backgroundScaleScanInFlight = true
+      scanForDevices()
+        .catch(() => undefined)
+        .finally(() => { backgroundScaleScanInFlight = false })
+    }, 5000)
+
     return () => {
       disposed = true
       window.clearInterval(refreshWorkflow)
       window.clearInterval(refreshDeviceConnections)
+      window.clearInterval(refreshPreferredScaleSetting)
+      window.clearInterval(backgroundScaleSearch)
       window.clearInterval(heatingCountdown)
       if (latestShotRefreshTimeout !== null) window.clearTimeout(latestShotRefreshTimeout)
       if (feedbackTimeout.current !== null) window.clearTimeout(feedbackTimeout.current)
@@ -693,5 +761,5 @@ export function useBrewingData() {
   const dismissLiveBrew = () => setLiveBrew((current) => current.active ? current : { ...current, visible: false })
   const favoriteProfileIds = favoriteProfileSlots.filter((id): id is string => Boolean(id))
 
-  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, previousShotStatus, heatingSeconds, connection, machineConnection, scale, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, dismissLiveBrew, searchForScale, updateMachineSetting, updateProfileSetting, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
+  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, previousShotStatus, heatingSeconds, connection, machineConnection, scale, scaleTarePending, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, dismissLiveBrew, searchForScale, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
 }
