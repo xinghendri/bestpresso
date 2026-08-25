@@ -93,7 +93,7 @@ export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, o
       </header>
 
       <section className={`live-pull-chart-panel history-pull-chart${loadingId ? ' history-pull-chart--loading' : ''}`} aria-label={activeShot ? `Shot history: ${activeShot.profileName}` : 'Shot history chart'}>
-        {activeShot && <LiveShotChart points={chartPoints} elapsedMs={chartElapsedMs} fitDuration={Boolean(selectedStage)} startMs={chartStartMs} targetYield={targetYield} />}
+        {activeShot && <LiveShotChart points={chartPoints} contextPoints={selectedStage ? points : undefined} elapsedMs={chartElapsedMs} fitDuration={Boolean(selectedStage)} startMs={chartStartMs} targetYield={targetYield} />}
         {loadError && <p className="history-pull-error">That pull couldn’t be loaded. Try selecting it again.</p>}
       </section>
       <LiveBrewStages points={points} elapsedMs={elapsedMs} selectedStageKey={selectedStage?.key} onStageSelect={(stage) => setStageSelection(stage ? { shotId: activeId, stage } : null)} />
