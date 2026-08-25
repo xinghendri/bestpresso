@@ -99,6 +99,8 @@ export function useBrewingData() {
   const feedbackTimeout = useRef<number | null>(null)
   const actionErrorTimeout = useRef<number | null>(null)
   const scaleSearchTimeout = useRef<number | null>(null)
+  const manualScaleSearchInFlight = useRef(false)
+  const backgroundScaleScanLeaseUntil = useRef(0)
   const connectedScale = useRef(false)
   const scaleTareInFlight = useRef(false)
   const brewStopRequestInFlight = useRef(false)
@@ -188,7 +190,6 @@ export function useBrewingData() {
     let timeToReadyEstimate: { deadline: number; receivedAt: number } | null = null
     let latestShotRefreshTimeout: number | null = null
     let preferredScaleId: string | null = null
-    let backgroundScaleScanInFlight = false
 
     const updateMachineConnection = (next: DataConnection) => {
       const previous = machineConnectionRef.current
@@ -501,11 +502,9 @@ export function useBrewingData() {
     }, 30000)
 
     const backgroundScaleSearch = window.setInterval(() => {
-      if (!preferredScaleId || connectedScale.current || backgroundScaleScanInFlight) return
-      backgroundScaleScanInFlight = true
-      scanForDevices()
-        .catch(() => undefined)
-        .finally(() => { backgroundScaleScanInFlight = false })
+      if (!preferredScaleId || connectedScale.current || manualScaleSearchInFlight.current || Date.now() < backgroundScaleScanLeaseUntil.current) return
+      backgroundScaleScanLeaseUntil.current = Date.now() + 20_000
+      scanForDevices({ quick: true }).catch(() => undefined)
     }, 5000)
 
     return () => {
@@ -595,6 +594,9 @@ export function useBrewingData() {
   }
 
   const searchForScale = async () => {
+    if (manualScaleSearchInFlight.current) return
+    manualScaleSearchInFlight.current = true
+    backgroundScaleScanLeaseUntil.current = Date.now() + 30_000
     showMachineActionError(null)
     setScale((current) => ({ ...current, status: 'searching' }))
     if (scaleSearchTimeout.current !== null) window.clearTimeout(scaleSearchTimeout.current)
@@ -604,11 +606,19 @@ export function useBrewingData() {
     }, 20000)
     try {
       await scanForDevices()
+      const devices = await getDevices()
+      const activeScale = devices.find((device) => device.type === 'scale' && device.state === 'connected')
+      connectedScale.current = Boolean(activeScale)
+      if (scaleSearchTimeout.current !== null) window.clearTimeout(scaleSearchTimeout.current)
+      scaleSearchTimeout.current = null
+      setScale(activeScale ? { status: 'connected', name: activeScale.name || 'Scale' } : { status: 'disconnected' })
     } catch {
       if (scaleSearchTimeout.current !== null) window.clearTimeout(scaleSearchTimeout.current)
       scaleSearchTimeout.current = null
       setScale({ status: 'disconnected' })
       showMachineActionError('Decaid could not start a scale search.')
+    } finally {
+      manualScaleSearchInFlight.current = false
     }
   }
 
