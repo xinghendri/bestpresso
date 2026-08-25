@@ -1,13 +1,13 @@
 import type { MachineReadiness } from '../../domain/brewing'
 import type { MachineSnapshot } from './types'
 
-const READY_TARGET_DEFICIT_C = 8
 const NOT_HEATING_BELOW_C = 70
+const READY_TARGET_TOLERANCE_C = 8
 const TEMPERATURE_RISE_C = 0.3
 const RISING_MEMORY_MS = 5_000
 const NOT_HEATING_OBSERVATION_MS = 10_000
 
-const EXPLICIT_HEATING_STATES = new Set(['booting', 'heating', 'preheating'])
+const EXPLICIT_HEATING_STATES = new Set(['booting', 'busy', 'heating', 'preheating'])
 const READY_MACHINE_STATES = new Set(['idle', 'schedidle', 'ready'])
 const OPERATION_STATES = new Set(['espresso', 'hotwater', 'flush', 'steam', 'steamrinse', 'cleaning', 'descaling', 'calibration', 'selftest', 'airpurge'])
 const EXPLICIT_NOT_HEATING_STATES = new Set(['notheating', 'noheat', 'poweredoff'])
@@ -54,6 +54,20 @@ export function readinessTemperatureSample(snapshot: MachineSnapshot) {
   return temperatureReadings(snapshot)
     .filter((reading): reading is TemperatureReading & { target: number; gap: number } => reading.target !== undefined && reading.gap !== undefined)
     .sort((left, right) => right.gap - left.gap)[0]
+}
+
+const isWithinReadyTemperature = (snapshot: MachineSnapshot) => {
+  const targetedReadings = temperatureReadings(snapshot).filter(
+    (reading): reading is TemperatureReading & { target: number; gap: number } =>
+      reading.target !== undefined && reading.target > 0 && reading.gap !== undefined,
+  )
+
+  if (targetedReadings.length > 0) {
+    return targetedReadings.every((reading) => reading.gap <= READY_TARGET_TOLERANCE_C)
+  }
+
+  const readings = temperatureReadings(snapshot)
+  return readings.length > 0 && readings.every((reading) => reading.current >= NOT_HEATING_BELOW_C)
 }
 
 export function createMachineReadinessTracker() {
@@ -115,10 +129,7 @@ export function createMachineReadinessTracker() {
 
   const evaluate = (snapshot: MachineSnapshot, now = Date.now()): MachineReadiness => {
     const { state, substate } = normalizedMachineState(snapshot)
-    const temperature = observeTemperature(snapshot, now)
-    const sample = readinessTemperatureSample(snapshot)
-    const withinReadyRange = sample ? sample.gap <= READY_TARGET_DEFICIT_C : false
-    const machineSignalsReady = state !== undefined && READY_MACHINE_STATES.has(state)
+    const machineSignalsReady = state !== undefined && READY_MACHINE_STATES.has(state) && substate !== 'preparingforshot'
     const machineSignalsHeating = (state !== undefined && EXPLICIT_HEATING_STATES.has(state)) || substate === 'preparingforshot'
     const machineSignalsNotHeating = (state !== undefined && EXPLICIT_NOT_HEATING_STATES.has(state)) || (substate !== undefined && EXPLICIT_NOT_HEATING_SUBSTATES.has(substate))
 
@@ -130,6 +141,7 @@ export function createMachineReadinessTracker() {
       operationState = null
       return 'thirsty'
     }
+
     if (machineSignalsNotHeating) {
       operationState = null
       return commit('notHeating')
@@ -140,21 +152,36 @@ export function createMachineReadinessTracker() {
     }
 
     if (state !== undefined && OPERATION_STATES.has(state)) {
-      operationState ??= thermalState === 'ready' ? 'ready' : thermalState === 'heating' ? 'heating' : withinReadyRange ? 'ready' : 'heating'
+      operationState ??= thermalState === 'ready' ? 'ready' : 'heating'
       return commit(operationState)
     }
     operationState = null
 
-    if (temperature.stalledCold) return commit('notHeating')
-    if (machineSignalsHeating) return commit('heating')
+    // Decaid exposes the machine state and brew-path temperatures in the
+    // snapshot, but no separate physical-power/safety flag. An idle machine can
+    // therefore still be cold with its physical power button off. Treat idle as
+    // ready only when the brew path is within the same 8 C recovery allowance
+    // used after a shot or flush.
+    const temperature = observeTemperature(snapshot, now)
 
-    // Once usable, an operation-related dip of up to 8 °C must not demote the
-    // machine. A genuinely cold start still begins in Heating and remains there
-    // while either temperature sensor is making measurable progress.
-    if (thermalState === 'ready' && withinReadyRange) return commit('ready')
-    if (temperature.rising) return commit('heating')
-    if (withinReadyRange || (sample === undefined && machineSignalsReady)) return commit('ready')
-    if (sample && sample.gap > READY_TARGET_DEFICIT_C) return commit('heating')
+    if (machineSignalsReady && isWithinReadyTemperature(snapshot)) {
+      operationState = null
+      sensorProgress = {}
+      lastRiseAt = null
+      coldStallStartedAt = null
+      return commit('ready')
+    }
+
+    if (temperature.stalledCold) return commit('notHeating')
+    if (machineSignalsHeating || temperature.rising) return commit('heating')
+
+    // A nominally idle machine outside the ready band is not ready. Keep it in
+    // heating while the cold-stall observation runs instead of carrying a stale
+    // Ready state forward from before a disconnect, flush, or power-off.
+    if (machineSignalsReady) return commit('heating')
+
+    // Unknown future states retain the last trustworthy thermal state. Known
+    // non-ready states without enough history begin as Heating.
     return thermalState ?? commit('heating')
   }
 

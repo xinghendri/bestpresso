@@ -8,7 +8,7 @@ import { Metric } from '../../components/Metric/Metric'
 import { WATER_TANK_CAPACITY_ML, WATER_TANK_LOW_LEVEL_ML } from '../../domain/brewing'
 import type { EditableMachineSetting, MachineUtility, ScaleConnection } from '../../domain/brewing'
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
-import { scalePresentationForName } from './scaleArtwork'
+import { scalePresentationForDevice } from './scaleArtwork'
 
 const icons = { water: hotWaterIcon, steam: steamIcon, scale: scaleIcon }
 
@@ -23,6 +23,8 @@ interface MachineUtilityCardProps {
   scale?: ScaleConnection
   onExpand?: () => void
   onSearchScale?: () => void
+  onTareScale?: () => void
+  scaleTarePending?: boolean
   settingsDisabled?: boolean
   onUpdateSetting?: (setting: EditableMachineSetting, value: number) => void
 }
@@ -56,7 +58,7 @@ const editForMetric = (utility: MachineUtility, label: string, onSave?: (setting
   }
 }
 
-export function MachineUtilityCard({ utility, compact = false, scale, onExpand, onSearchScale, settingsDisabled, onUpdateSetting }: MachineUtilityCardProps) {
+export function MachineUtilityCard({ utility, compact = false, scale, onExpand, onSearchScale, onTareScale, scaleTarePending = false, settingsDisabled, onUpdateSetting }: MachineUtilityCardProps) {
   if (utility.id === 'tank') {
     const metric = utility.metrics[0]
     const volume = Number(metric?.value.replaceAll(',', ''))
@@ -83,7 +85,9 @@ export function MachineUtilityCard({ utility, compact = false, scale, onExpand, 
   const isScale = utility.id === 'scale'
   const scaleConnected = isScale && scale?.status === 'connected'
   const connectedScaleName = scaleConnected ? scale.name || 'Scale' : undefined
-  const scalePresentation = scaleConnected ? scalePresentationForName(connectedScaleName) : undefined
+  const scalePresentation = scaleConnected ? scalePresentationForDevice(connectedScaleName, scale.id) : undefined
+  const scaleWeight = Number(utility.metrics[0]?.value)
+  const scaleCanTare = scaleConnected && Number.isFinite(scaleWeight) && Math.abs(scaleWeight) >= 0.05 && Boolean(onTareScale)
   const title = scaleConnected ? scalePresentation?.displayName ?? withoutGenericScaleSuffix(connectedScaleName) : utility.label
   const cardClassName = `utility-card utility-card--${utility.id}${compact ? ' utility-card--compact' : ''}${scalePresentation?.imageSrc ? ' utility-card--scale-with-art' : ''}`
   const expandLabel = `Expand utility panels to view ${title}`
@@ -99,7 +103,12 @@ export function MachineUtilityCard({ utility, compact = false, scale, onExpand, 
     <header><img src={icons[utility.id]} alt="" /><span>{title}</span></header>
     {isScale && !scaleConnected
       ? <button className={compact ? 'scale-search scale-compact-summary' : 'scale-search'} type="button" onClick={onSearchScale} disabled={scale?.status === 'searching'}>{scale?.status === 'searching' ? 'Searching…' : 'Search'}</button>
-      : <div className="utility-card__metrics">{utility.metrics.map((metric) => <Metric key={metric.label} metric={metric} compact edit={compact ? undefined : editForMetric(utility, metric.label, onUpdateSetting, settingsDisabled)} />)}</div>}
+      : <div className="utility-card__metrics">{utility.metrics.map((metric) => scaleCanTare
+        ? <button className={`scale-tare-control${scaleTarePending ? ' scale-tare-control--pending' : ''}`} key={metric.label} type="button" aria-label={`Tare scale, current weight ${metric.value}${metric.unit ?? ''}`} title="Tare scale" disabled={scaleTarePending} onClick={onTareScale}>
+          <Metric metric={metric} compact />
+          <svg className="scale-tare-control__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5M4 18v-5h5M6.1 9a7 7 0 0 1 11.6-2.6L20 8.8M4 15.2l2.3 2.4A7 7 0 0 0 17.9 15" /></svg>
+        </button>
+        : <Metric key={metric.label} metric={metric} compact edit={compact ? undefined : editForMetric(utility, metric.label, onUpdateSetting, settingsDisabled)} />)}</div>}
     {compact && utility.id === 'steam' && <span className="utility-card__steam-connector" aria-hidden="true"><img src={steamCompactConnector} alt="" /></span>}
     {scalePresentation?.imageSrc && <span className="scale-device-art" aria-hidden="true"><img src={scalePresentation.imageSrc} alt="" /></span>}
   </section>

@@ -1,39 +1,52 @@
-import logo from '../../assets/figma/decent-logo.png'
-import brewingIcon from '../../assets/figma/ready.svg'
-import { Metric } from '../../components/Metric/Metric'
 import type { BrewingScreenModel, LiveBrewState } from '../../domain/brewing'
+import { LiveBrewStages } from './LiveBrewStages'
 import { LiveShotChart } from './LiveShotChart'
 
 interface LiveBrewingScreenProps {
   model: BrewingScreenModel
   liveBrew: LiveBrewState
+  stopPending: boolean
+  actionError: string | null
+  onStop: () => void
   onDismiss: () => void
 }
 
-export function LiveBrewingScreen({ model, liveBrew, onDismiss }: LiveBrewingScreenProps) {
+const timedLabel = (milliseconds: number) => {
+  const seconds = Math.max(0, Math.floor(milliseconds / 1000))
+  return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
+}
+
+const latestWeight = (liveBrew: LiveBrewState) => {
+  for (let index = liveBrew.points.length - 1; index >= 0; index -= 1) {
+    const weight = liveBrew.points[index].weight
+    if (typeof weight === 'number' && Number.isFinite(weight)) return Math.max(0, weight)
+  }
+  return undefined
+}
+
+export function LiveBrewingScreen({ model, liveBrew, stopPending, actionError, onStop, onDismiss }: LiveBrewingScreenProps) {
   const profile = model.profiles.find((candidate) => candidate.id === model.activeProfileId) ?? model.profiles[0]
   if (!profile) return null
 
-  const metrics = [
-    { label: 'Temperature', value: profile.temperature, unit: '°' },
-    { label: 'Grind setting', value: profile.grindSetting },
-    { label: 'Dose', value: profile.dose, unit: 'g' },
-    { label: 'Yield', value: profile.targetYield, unit: 'g' },
-  ]
+  const targetYield = Number(profile.targetYield) || 36
+  const weight = latestWeight(liveBrew)
 
   return <main className="live-brew-screen">
-    <header className="live-brew-header">
-      <img className="logo" src={logo} alt="decent" />
+    {actionError && <div className="system-messages"><div className="system-message system-message--error" role="alert">{actionError}</div></div>}
+    <header className="live-pull-header">
+      <h1>{profile.name}</h1>
+      <div className="live-pull-header__metrics" aria-live="polite">
+        <div><span>Timer</span><strong>{timedLabel(liveBrew.elapsedMs)}</strong></div>
+        <i aria-hidden="true" />
+        <div><span>Yield</span><strong>{weight?.toFixed(1) ?? '—'}<small>g</small> <em>/</em> {targetYield.toFixed(Number.isInteger(targetYield) ? 0 : 1)}<small>g</small></strong></div>
+      </div>
       {liveBrew.active
-        ? <div className="live-brew-status" role="status"><img src={brewingIcon} alt="" /><strong>Brewing</strong></div>
-        : <button className="live-brew-status live-brew-status--close" type="button" onClick={onDismiss} aria-label="Close completed pull"><span aria-hidden="true">×</span><strong>Close</strong></button>}
+        ? <button className="live-pull-action live-pull-action--stop" type="button" disabled={stopPending} onClick={onStop}>{stopPending ? 'Stopping…' : 'Stop'}</button>
+        : <button className="live-pull-action live-pull-action--close" type="button" onClick={onDismiss} aria-label="Close completed pull">Close</button>}
     </header>
-    <section className="live-brew-panel" aria-label={`Brewing ${profile.name}`}>
-      <article className="live-brew-card">
-        <h1>{profile.name}</h1>
-        <LiveShotChart points={liveBrew.points} elapsedMs={liveBrew.elapsedMs} targetYield={Number(profile.targetYield) || 36} />
-      </article>
-      <div className="live-brew-metrics">{metrics.map((metric) => <Metric key={metric.label} metric={metric} />)}</div>
+    <section className="live-pull-chart-panel" aria-label={`Brewing ${profile.name}`}>
+      <LiveShotChart points={liveBrew.points} elapsedMs={liveBrew.elapsedMs} targetYield={targetYield} />
     </section>
+    <LiveBrewStages points={liveBrew.points} elapsedMs={liveBrew.elapsedMs} active={liveBrew.active} />
   </main>
 }

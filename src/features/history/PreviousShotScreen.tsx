@@ -1,34 +1,140 @@
-import logo from '../../assets/figma/decent-logo.png'
-import { Metric } from '../../components/Metric/Metric'
-import type { LiveShotPoint, PreviousShot } from '../../domain/brewing'
+import { useEffect, useRef, useState } from 'react'
+import type { LiveShotPoint, PreviousShot, PreviousShotStatus } from '../../domain/brewing'
+import { LiveBrewStages } from '../brew/LiveBrewStages'
+import type { BrewStageSelection } from '../brew/LiveBrewStages'
 import { LiveShotChart } from '../brew/LiveShotChart'
 
-const maximumValue = (points: LiveShotPoint[], key: 'pressure' | 'flow') => {
-  const values = points.flatMap((point) => typeof point[key] === 'number' ? [point[key]] : [])
-  return values.length ? Math.max(...values).toFixed(1) : '—'
+interface PreviousShotScreenProps {
+  shots: PreviousShot[]
+  initialShot: PreviousShot | null
+  status: PreviousShotStatus
+  onSelectShot: (shotId: string) => Promise<PreviousShot | null>
+  onDismiss: () => void
 }
 
-export function PreviousShotScreen({ shot, onDismiss }: { shot: PreviousShot; onDismiss: () => void }) {
-  const points = shot.points ?? []
-  const elapsedMs = points.at(-1)?.elapsedMs ?? (Number(shot.totalTime) || 0) * 1000
-  const metrics = [
-    { label: 'Total yield', value: shot.totalYield, unit: shot.totalYield === '—' ? undefined : 'g' },
-    { label: 'Total time', value: shot.totalTime, unit: shot.totalTime === '—' ? undefined : 's' },
-    { label: 'Peak pressure', value: maximumValue(points, 'pressure'), unit: 'bar' },
-    { label: 'Peak flow', value: maximumValue(points, 'flow'), unit: 'ml/s' },
-  ]
+interface HistoryChartView {
+  key: string
+  points: LiveShotPoint[]
+  contextPoints?: LiveShotPoint[]
+  elapsedMs: number
+  startMs: number
+  fitDuration: boolean
+}
 
-  return <main className="live-brew-screen previous-shot-screen">
-    <header className="live-brew-header">
-      <img className="logo" src={logo} alt="decent" />
-      <button className="live-brew-status live-brew-status--close" type="button" onClick={onDismiss} aria-label="Close previous pull"><span aria-hidden="true">×</span><strong>Close</strong></button>
-    </header>
-    <section className="live-brew-panel" aria-label={`Previous pull: ${shot.profileName}`}>
-      <article className="live-brew-card">
-        <h1>{shot.profileName}</h1>
-        <LiveShotChart points={points} elapsedMs={elapsedMs} targetYield={shot.targetYield ?? (Number(shot.totalYield) || 36)} />
-      </article>
-      <div className="live-brew-metrics">{metrics.map((metric) => <Metric key={metric.label} metric={metric} />)}</div>
+function AnimatedHistoryShotChart({ view, targetYield }: { view: HistoryChartView; targetYield: number }) {
+  const previousView = useRef(view)
+  const [leavingView, setLeavingView] = useState<HistoryChartView | null>(null)
+
+  useEffect(() => {
+    const previous = previousView.current
+    previousView.current = view
+    if (previous.key === view.key) return
+    setLeavingView(previous)
+    const timeout = window.setTimeout(() => setLeavingView((current) => current?.key === previous.key ? null : current), 400)
+    return () => window.clearTimeout(timeout)
+  }, [view])
+
+  const chart = (chartView: HistoryChartView) => <LiveShotChart points={chartView.points} contextPoints={chartView.contextPoints} elapsedMs={chartView.elapsedMs} fitDuration={chartView.fitDuration} startMs={chartView.startMs} targetYield={targetYield} />
+
+  return <>
+    {leavingView && <div className="history-chart-layer history-chart-layer--leaving" aria-hidden="true" key={`leaving:${leavingView.key}`}>{chart(leavingView)}</div>}
+    <div className="history-chart-layer history-chart-layer--entering" key={`current:${view.key}`}>{chart(view)}</div>
+  </>
+}
+
+const pullTime = (timestamp: string | undefined) => {
+  if (!timestamp) return 'Date unavailable'
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return 'Date unavailable'
+  return new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date)
+}
+
+const timerLabel = (shot: PreviousShot) => {
+  const seconds = Math.max(0, Math.round(Number(shot.totalTime) || (shot.points?.at(-1)?.elapsedMs ?? 0) / 1000))
+  return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
+}
+
+export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, onDismiss }: PreviousShotScreenProps) {
+  const firstShot = initialShot ?? shots[0] ?? null
+  const [selectedId, setSelectedId] = useState(firstShot?.id)
+  const [selectedShot, setSelectedShot] = useState<PreviousShot | null>(firstShot)
+  const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState(false)
+  const [stageSelection, setStageSelection] = useState<{ shotId: string | undefined; stage: BrewStageSelection } | null>(null)
+
+  const activeId = selectedId && shots.some((shot) => shot.id === selectedId) ? selectedId : firstShot?.id
+  const activeShot = selectedShot?.id === activeId ? selectedShot : initialShot?.id === activeId ? initialShot : shots.find((shot) => shot.id === activeId) ?? null
+  const selectedStage = stageSelection && stageSelection.shotId === activeId ? stageSelection.stage : null
+
+  const selectShot = async (shot: PreviousShot) => {
+    if (!shot.id || loadingId === shot.id) return
+    setLoadError(false)
+    if (shot.points?.length) {
+      setSelectedId(shot.id)
+      setSelectedShot(shot)
+      return
+    }
+    setLoadingId(shot.id)
+    try {
+      const detailedShot = await onSelectShot(shot.id)
+      if (detailedShot) {
+        setSelectedId(shot.id)
+        setSelectedShot(detailedShot)
+      }
+      else setLoadError(true)
+    } catch {
+      setLoadError(true)
+    } finally {
+      setLoadingId(null)
+    }
+  }
+
+  const points = activeShot?.points ?? []
+  const elapsedMs = points.at(-1)?.elapsedMs ?? (Number(activeShot?.totalTime) || 0) * 1000
+  const targetYield = activeShot?.targetYield ?? (Number(activeShot?.totalYield) || 36)
+  const chartPoints = selectedStage?.points ?? points
+  const chartElapsedMs = selectedStage ? Math.max(1, selectedStage.endedAt - selectedStage.startedAt) : elapsedMs
+  const chartStartMs = selectedStage?.startedAt ?? 0
+  const chartView: HistoryChartView = {
+    key: `${activeId ?? 'empty'}:${selectedStage?.key ?? 'full'}:${points.length}`,
+    points: chartPoints,
+    contextPoints: selectedStage ? points : undefined,
+    elapsedMs: chartElapsedMs,
+    startMs: chartStartMs,
+    fitDuration: Boolean(selectedStage),
+  }
+
+  return <main className="history-browser-screen">
+    <aside className="history-browser-rail">
+      <header><h1>Shot history</h1><span>{shots.length}</span></header>
+      <div className="history-browser-list" role="listbox" aria-label="Shot history">
+        {shots.map((shot, index) => <button className={`history-browser-item${shot.id === activeId ? ' history-browser-item--selected' : ''}`} type="button" role="option" aria-selected={shot.id === activeId} aria-busy={loadingId === shot.id} key={shot.id ?? `${shot.timestamp}:${index}`} onClick={() => void selectShot(shot)}>
+          <strong>{shot.profileName}</strong>
+          <time dateTime={shot.timestamp}>{pullTime(shot.timestamp)}</time>
+        </button>)}
+        {!shots.length && <p className="history-browser-empty">{status === 'loading' ? 'Finding your pulls…' : "You haven't filled any cups yet."}</p>}
+      </div>
+    </aside>
+
+    <section className="history-browser-detail" aria-live="polite">
+      <header className="live-pull-header">
+        <div className="history-pull-title">
+          <h1>{activeShot?.profileName ?? 'Pull history'}</h1>
+          {activeShot && <time dateTime={activeShot.timestamp}>{pullTime(activeShot.timestamp)}</time>}
+        </div>
+        <div className="live-pull-header__metrics">
+          <div><span>Duration</span><strong>{activeShot ? timerLabel(activeShot) : '—'}</strong></div>
+          <i aria-hidden="true" />
+          <div><span>Yield</span><strong>{activeShot?.totalYield ?? '—'}{activeShot?.totalYield !== '—' && <small>g</small>}</strong></div>
+        </div>
+        <button className="live-pull-action live-pull-action--close" type="button" onClick={onDismiss}>Close</button>
+      </header>
+
+      <section className={`live-pull-chart-panel history-pull-chart${loadingId ? ' history-pull-chart--loading' : ''}`} aria-label={activeShot ? `Shot history: ${activeShot.profileName}` : 'Shot history chart'}>
+        {activeShot && <AnimatedHistoryShotChart view={chartView} targetYield={targetYield} />}
+        {loadError && <p className="history-pull-error">That pull couldn’t be loaded. Try selecting it again.</p>}
+      </section>
+      <LiveBrewStages points={points} elapsedMs={elapsedMs} selectedStageKey={selectedStage?.key} onStageSelect={(stage) => setStageSelection(stage ? { shotId: activeId, stage } : null)} />
     </section>
   </main>
 }

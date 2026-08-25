@@ -4,21 +4,26 @@ interface LiveShotChartProps {
   points: LiveShotPoint[]
   elapsedMs: number
   targetYield: number
+  startMs?: number
+  fitDuration?: boolean
+  contextPoints?: LiveShotPoint[]
 }
 
 const VIEW_WIDTH = 1000
 const VIEW_HEIGHT = 376
-const PLOT = { left: 54, right: 946, top: 62, bottom: 326 }
+const PLOT = { left: 42, right: 978, top: 38, bottom: 340 }
+const PLOT_BOTTOM_STROKE_ALLOWANCE = 4
 
-const latestValue = (points: LiveShotPoint[], key: keyof LiveShotPoint) => {
-  for (let index = points.length - 1; index >= 0; index -= 1) {
-    const value = points[index][key]
-    if (typeof value === 'number') return value
-  }
-  return undefined
-}
+const chartLegend = [
+  { label: 'Flow', className: 'chart-legend__sample--flow' },
+  { label: 'Target', accessibleLabel: 'Target flow', className: 'chart-legend__sample--target-flow' },
+  { label: 'Pressure', className: 'chart-legend__sample--pressure' },
+  { label: 'Target', accessibleLabel: 'Target pressure', className: 'chart-legend__sample--target-pressure' },
+  { label: 'Temperature', className: 'chart-legend__sample--temperature' },
+  { label: 'Weight', className: 'chart-legend__sample--weight' },
+]
 
-const linePath = (points: LiveShotPoint[], key: keyof LiveShotPoint, durationMs: number, minimum: number, maximum: number) => {
+const linePath = (points: LiveShotPoint[], key: keyof LiveShotPoint, xForElapsedMs: (elapsedMs: number) => number, minimum: number, maximum: number) => {
   let path = ''
   let drawing = false
   for (const point of points) {
@@ -27,7 +32,7 @@ const linePath = (points: LiveShotPoint[], key: keyof LiveShotPoint, durationMs:
       drawing = false
       continue
     }
-    const x = PLOT.left + Math.min(1, point.elapsedMs / durationMs) * (PLOT.right - PLOT.left)
+    const x = xForElapsedMs(point.elapsedMs)
     const ratio = Math.max(0, Math.min(1, (value - minimum) / (maximum - minimum)))
     const y = PLOT.bottom - ratio * (PLOT.bottom - PLOT.top)
     path += `${drawing ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`
@@ -36,53 +41,68 @@ const linePath = (points: LiveShotPoint[], key: keyof LiveShotPoint, durationMs:
   return path
 }
 
-const secondsLabel = (milliseconds: number) => {
-  const seconds = Math.max(0, Math.floor(milliseconds / 1000))
-  return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
-}
-
-export function LiveShotChart({ points, elapsedMs, targetYield }: LiveShotChartProps) {
-  const durationMs = Math.max(30_000, Math.ceil(Math.max(elapsedMs, 1) / 10_000) * 10_000)
-  const observedWeight = Math.max(0, ...points.map((point) => point.weight ?? 0))
+export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fitDuration = false, contextPoints }: LiveShotChartProps) {
+  const durationMs = fitDuration ? Math.max(elapsedMs, 1) : Math.max(10_000, Math.ceil(Math.max(elapsedMs, 1) / 5_000) * 5_000)
+  const plottedPoints = contextPoints ?? points
+  const observedWeight = Math.max(0, ...plottedPoints.map((point) => point.weight ?? 0))
   const weightMax = Math.max(50, targetYield * 1.2, observedWeight * 1.12)
-  const currentPressure = latestValue(points, 'pressure')
-  const currentFlow = latestValue(points, 'flow')
-  const currentWeight = latestValue(points, 'weight')
-  const currentTemperature = latestValue(points, 'temperature')
-  const timeTicks = Array.from({ length: 7 }, (_, index) => index / 6)
+  const plotWidth = PLOT.right - PLOT.left
+  const focusEndMs = startMs + durationMs
+  const contextStartMs = plottedPoints[0]?.elapsedMs ?? startMs
+  const contextEndMs = plottedPoints.at(-1)?.elapsedMs ?? focusEndMs
+  const domainStartMs = contextPoints ? Math.min(contextStartMs, startMs) : startMs
+  const domainEndMs = contextPoints ? Math.max(contextEndMs, focusEndMs) : focusEndMs
+  const domainDurationMs = Math.max(1, domainEndMs - domainStartMs)
+  const xForElapsedMs = (pointElapsedMs: number) => {
+    const ratio = Math.max(0, Math.min(1, (pointElapsedMs - domainStartMs) / domainDurationMs))
+    return PLOT.left + ratio * plotWidth
+  }
+  const intervalTicks = Array.from({ length: Math.floor(durationMs / 5_000) }, (_, index) => (index + 1) * 5_000)
+  const timeTicks = fitDuration
+    ? [0, ...intervalTicks, ...(durationMs % 5_000 ? [durationMs] : [])]
+    : intervalTicks
   const gridTicks = Array.from({ length: 5 }, (_, index) => index / 4)
+  const timeLabel = (tick: number) => {
+    const seconds = (startMs + tick) / 1000
+    return `${Number.isInteger(seconds) ? seconds : seconds.toFixed(1)}s`
+  }
 
   return <div className="live-shot-chart">
-    <div className="live-shot-chart__summary" aria-live="polite">
-      <span className="chart-reading chart-reading--pressure"><i />{currentPressure?.toFixed(1) ?? '—'} <small>bar</small></span>
-      <span className="chart-reading chart-reading--flow"><i />{currentFlow?.toFixed(1) ?? '—'} <small>ml/s</small></span>
-      <span className="chart-reading chart-reading--weight"><i />{currentWeight?.toFixed(1) ?? '—'} <small>g</small></span>
-      <span className="chart-reading chart-reading--temperature"><i />{currentTemperature?.toFixed(1) ?? '—'} <small>°C</small></span>
-      <strong>{secondsLabel(elapsedMs)}</strong>
+    <div className="chart-legend" aria-label="Chart legend">
+      {chartLegend.map((item) => <span className="chart-legend__item" aria-label={item.accessibleLabel} key={`${item.label}:${item.className}`}>
+        <small>{item.label}</small>
+        <i className={`chart-legend__sample ${item.className}`} aria-hidden="true" />
+      </span>)}
     </div>
     <svg viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`} role="img" aria-label="Live espresso pressure, flow, yield weight, and temperature chart" preserveAspectRatio="none">
-      <defs><clipPath id="live-shot-plot"><rect x={PLOT.left} y={PLOT.top} width={PLOT.right - PLOT.left} height={PLOT.bottom - PLOT.top} /></clipPath></defs>
+      <defs><clipPath id="live-shot-plot"><rect x={PLOT.left} y={PLOT.top} width={PLOT.right - PLOT.left} height={PLOT.bottom - PLOT.top + PLOT_BOTTOM_STROKE_ALLOWANCE} /></clipPath></defs>
       {gridTicks.map((ratio) => {
         const y = PLOT.top + ratio * (PLOT.bottom - PLOT.top)
-        return <line key={`horizontal-${ratio}`} className="chart-grid" x1={PLOT.left} x2={PLOT.right} y1={y} y2={y} />
+        return <line key={`horizontal-${ratio}`} className="chart-grid chart-grid--tick" x1={PLOT.left} x2={PLOT.left + 10} y1={y} y2={y} />
       })}
-      {timeTicks.map((ratio) => {
-        const x = PLOT.left + ratio * (PLOT.right - PLOT.left)
-        return <g key={`time-${ratio}`}><line className="chart-grid chart-grid--vertical" x1={x} x2={x} y1={PLOT.top} y2={PLOT.bottom} /><text className="chart-axis-label" x={x} y={PLOT.bottom + 29} textAnchor="middle">{Math.round(durationMs * ratio / 1000)}s</text></g>
+      {timeTicks.map((tick) => {
+        const x = xForElapsedMs(startMs + tick)
+        return <g key={`time-${tick}`}><line className="chart-grid chart-grid--vertical" x1={x} x2={x} y1={PLOT.top} y2={PLOT.bottom} /><text className="chart-axis-label" x={x} y={PLOT.bottom + 25} textAnchor="middle">{timeLabel(tick)}</text></g>
       })}
       {gridTicks.map((ratio) => <g key={`axis-${ratio}`}>
         <text className="chart-axis-label" x={PLOT.left - 13} y={PLOT.bottom - ratio * (PLOT.bottom - PLOT.top) + 4} textAnchor="end">{Math.round(12 * ratio)}</text>
-        <text className="chart-axis-label" x={PLOT.right + 13} y={PLOT.bottom - ratio * (PLOT.bottom - PLOT.top) + 4}>{Math.round(weightMax * ratio)}</text>
       </g>)}
-      <text className="chart-axis-title" x={PLOT.left} y={PLOT.top - 13}>bar / ml/s</text>
-      <text className="chart-axis-title" x={PLOT.right} y={PLOT.top - 13} textAnchor="end">yield (g)</text>
+      <text className="chart-axis-title" x={PLOT.left - 13} y={PLOT.top - 14}>bar / ml/s</text>
       <g clipPath="url(#live-shot-plot)">
-        <path className="chart-line chart-line--target-pressure" d={linePath(points, 'targetPressure', durationMs, 0, 12)} />
-        <path className="chart-line chart-line--target-flow" d={linePath(points, 'targetFlow', durationMs, 0, 12)} />
-        <path className="chart-line chart-line--temperature" d={linePath(points, 'temperature', durationMs, 70, 100)} />
-        <path className="chart-line chart-line--pressure" d={linePath(points, 'pressure', durationMs, 0, 12)} />
-        <path className="chart-line chart-line--flow" d={linePath(points, 'flow', durationMs, 0, 12)} />
-        <path className="chart-line chart-line--weight" d={linePath(points, 'weight', durationMs, 0, weightMax)} />
+        {contextPoints && <g opacity="0.15" aria-hidden="true">
+          <path className="chart-line chart-line--target-pressure" d={linePath(contextPoints, 'targetPressure', xForElapsedMs, 0, 12)} />
+          <path className="chart-line chart-line--target-flow" d={linePath(contextPoints, 'targetFlow', xForElapsedMs, 0, 12)} />
+          <path className="chart-line chart-line--temperature" d={linePath(contextPoints, 'temperature', xForElapsedMs, 70, 100)} />
+          <path className="chart-line chart-line--pressure" d={linePath(contextPoints, 'pressure', xForElapsedMs, 0, 12)} />
+          <path className="chart-line chart-line--flow" d={linePath(contextPoints, 'flow', xForElapsedMs, 0, 12)} />
+          <path className="chart-line chart-line--weight" d={linePath(contextPoints, 'weight', xForElapsedMs, 0, weightMax)} />
+        </g>}
+        <path className="chart-line chart-line--target-pressure" d={linePath(points, 'targetPressure', xForElapsedMs, 0, 12)} />
+        <path className="chart-line chart-line--target-flow" d={linePath(points, 'targetFlow', xForElapsedMs, 0, 12)} />
+        <path className="chart-line chart-line--temperature" d={linePath(points, 'temperature', xForElapsedMs, 70, 100)} />
+        <path className="chart-line chart-line--pressure" d={linePath(points, 'pressure', xForElapsedMs, 0, 12)} />
+        <path className="chart-line chart-line--flow" d={linePath(points, 'flow', xForElapsedMs, 0, 12)} />
+        <path className="chart-line chart-line--weight" d={linePath(points, 'weight', xForElapsedMs, 0, weightMax)} />
       </g>
     </svg>
     {points.length === 0 && <p className="live-shot-chart__empty">Waiting for brewing telemetry…</p>}

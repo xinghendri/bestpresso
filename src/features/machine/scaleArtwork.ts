@@ -1,9 +1,9 @@
-import { supportedScaleForName } from '../../domain/scales'
+import { supportedScaleForDevice } from '../../domain/scales'
 
 const scaleImageSources = import.meta.glob('../../assets/figma/**/*.png', { eager: true, import: 'default' }) as Record<string, string>
 
-export function scalePresentationForName(name: string | undefined) {
-  const scale = supportedScaleForName(name)
+export function scalePresentationForDevice(name: string | undefined, identifier: string | undefined) {
+  const scale = supportedScaleForDevice(name, identifier)
   if (!scale) return undefined
   const imagePath = Object.keys(scaleImageSources).find((path) => path.endsWith(`/${scale.imageName}`))
   return { ...scale, imageSrc: imagePath ? scaleImageSources[imagePath] : undefined }

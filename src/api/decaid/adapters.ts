@@ -17,6 +17,24 @@ export function isEspressoExtractionSnapshot(snapshot: Pick<MachineSnapshot, 'st
   return state === 'espresso'
 }
 
+export function shotStage(profileFrame: number | undefined, substate: string | undefined, stepNames: string[] | undefined) {
+  const frame = typeof profileFrame === 'number' && Number.isFinite(profileFrame)
+    ? Math.max(0, Math.floor(profileFrame))
+    : undefined
+  const configuredName = frame === undefined ? undefined : stepNames?.[frame]?.trim()
+  if (configuredName) return { stageIndex: frame, stageName: configuredName.replaceAll('_', ' ') }
+
+  const normalizedSubstate = substate?.toLowerCase()
+  const stageName = normalizedSubstate === 'preinfusion'
+    ? 'Pre-infusion'
+    : normalizedSubstate === 'pouringdone'
+      ? 'Cooling'
+      : normalizedSubstate === 'pouring'
+        ? 'Extraction'
+        : frame === undefined ? 'Extraction' : `Stage ${frame + 1}`
+  return { stageIndex: frame, stageName }
+}
+
 const transitionProgress = (type: string, progress: number) => {
   if (type === 'ease-in') return progress * progress
   if (type === 'ease-out') return 1 - (1 - progress) ** 2
@@ -108,6 +126,7 @@ export function profileRecordsToDomain(records: DecaidProfileRecord[], workflow:
       dose: numberString(isActive ? workflow.context?.targetDoseWeight : metadata.targetDoseWeight ?? profile.dose_weight, '18'),
       targetYield: numberString(isActive ? workflow.context?.targetYield : metadata.targetYield ?? profile.target_weight, '—'),
       targetPoints: profileStepsToTargetPoints(isActive ? workflow.profile?.steps : profile.steps),
+      stepNames: (isActive ? workflow.profile?.steps : profile.steps)?.map((step, index) => textValue(step.name) ?? `Stage ${index + 1}`),
     }
   })
 }
@@ -190,6 +209,7 @@ export function shotToDomain(shot: ShotRecord): PreviousShot {
   const duration = firstTimestamp && lastTimestamp ? Math.max(0, Math.round((Date.parse(lastTimestamp) - Date.parse(firstTimestamp)) / 1000)) : undefined
   const lastWeight = [...extraction].reverse().find((entry) => entry.scale?.weight !== undefined)?.scale?.weight
   const startedAt = firstTimestamp ? Date.parse(firstTimestamp) : Number.NaN
+  const stepNames = shot.workflow?.profile?.steps?.map((step, index) => textValue(step.name) ?? `Stage ${index + 1}`)
   const points = Number.isFinite(startedAt) ? extraction.flatMap((entry) => {
     const timestamp = entry.machine?.timestamp ? Date.parse(entry.machine.timestamp) : Number.NaN
     if (!Number.isFinite(timestamp)) return []
@@ -202,10 +222,12 @@ export function shotToDomain(shot: ShotRecord): PreviousShot {
       temperature: entry.machine?.mixTemperature ?? entry.machine?.groupTemperature,
       weight: entry.scale?.weight,
       weightFlow: entry.scale?.weightFlow,
+      ...shotStage(entry.machine?.profileFrame, entry.machine?.state?.substate, stepNames),
     }]
   }) : []
   const shotProfileTitle = shot.workflow?.profile?.title || shot.workflow?.name || 'Previous pull'
   return {
+    id: shot.id,
     profileName: parseProfileTitle(shotProfileTitle).name,
     timestamp: shot.timestamp ?? firstTimestamp ?? lastTimestamp,
     totalYield: numberString(shot.annotations?.actualYield ?? lastWeight, '—'),

@@ -17,13 +17,22 @@ const currentPage = (): AppPage => {
 
 export default function App() {
   const data = useBrewingData()
-  const [page, setPage] = useState(currentPage)
+  const [, setPage] = useState(currentPage)
+  const page = data.utilityOperation ? 'home' : currentPage()
+  const utilityOperationKind = data.utilityOperation?.kind
 
   useEffect(() => {
     const handlePopState = () => setPage(currentPage())
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
+
+  useEffect(() => {
+    if (!utilityOperationKind || currentPage() === 'home') return
+    const url = new URL(window.location.href)
+    url.searchParams.delete('page')
+    window.history.replaceState({ page: 'home' }, '', url)
+  }, [utilityOperationKind])
 
   const navigate = (nextPage: AppPage) => {
     const url = new URL(window.location.href)
@@ -36,8 +45,8 @@ export default function App() {
 
   let screen
   if (page === 'profiles' && !data.liveBrew.visible) screen = <ProfilesPanel profiles={data.allProfiles} favoriteProfileSlots={data.favoriteProfileSlots} activeProfileId={data.model.activeProfileId} feedback={data.settingFeedback} onSelectProfile={async (profileId) => { const selected = await data.selectProfile(profileId); if (selected) navigate('home'); return selected }} onSetFavoriteSlot={data.setFavoriteProfileSlot} onRemoveFavorite={data.removeFavoriteProfile} onClose={() => navigate('home')} />
-  else if (page === 'previous-pull' && !data.liveBrew.visible && data.model.previousShot) screen = <PreviousShotScreen shot={data.model.previousShot} onDismiss={() => navigate('home')} />
-  else screen = <AppShell {...data} onSleep={data.toggleSleep} onWake={data.wakeMachine} onDismissLiveBrew={data.dismissLiveBrew} onSearchScale={data.searchForScale} onUpdateMachineSetting={data.updateMachineSetting} onUpdateProfileSetting={data.updateProfileSetting} onSelectProfile={data.selectProfile} onOpenSettings={() => window.location.assign(getDecaidSettingsUrl())} onManageProfiles={() => navigate('profiles')} onOpenPreviousShot={() => navigate('previous-pull')} />
+  else if (page === 'previous-pull' && !data.liveBrew.visible) screen = <PreviousShotScreen shots={data.shotHistory} initialShot={data.model.previousShot} status={data.previousShotStatus} onSelectShot={data.loadHistoryShot} onDismiss={() => navigate('home')} />
+  else screen = <AppShell {...data} onSleep={data.toggleSleep} onWake={data.wakeMachine} onStopEspresso={data.stopEspresso} onDismissLiveBrew={data.dismissLiveBrew} onSearchScale={data.searchForScale} onConnectScale={data.connectToScale} onDismissScalePicker={data.dismissScalePicker} onTareScale={data.tareConnectedScale} onUpdateMachineSetting={data.updateMachineSetting} onUpdateProfileSetting={data.updateProfileSetting} onSelectProfile={data.selectProfile} onOpenSettings={() => window.location.assign(getDecaidSettingsUrl())} onManageProfiles={() => navigate('profiles')} onOpenPreviousShot={() => navigate('previous-pull')} />
 
   return <ValueAdjustmentProvider><InteractionSound />{screen}</ValueAdjustmentProvider>
 }

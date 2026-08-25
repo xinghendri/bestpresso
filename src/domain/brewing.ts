@@ -12,7 +12,13 @@ export const WATER_TANK_WARNING_OFFSET_CLICKS = 5
 
 export interface ScaleConnection {
   status: ScaleConnectionStatus
+  id?: string
   name?: string
+}
+
+export interface AvailableScale {
+  id: string
+  name: string
 }
 
 export interface DisplayMetric {
@@ -49,9 +55,11 @@ export interface BrewProfile {
   dose: string
   targetYield: string
   targetPoints?: ProfileTargetPoint[]
+  stepNames?: string[]
 }
 
 export interface PreviousShot {
+  id?: string
   profileName: string
   timestamp?: string
   totalYield: string
@@ -82,6 +90,8 @@ export interface LiveShotPoint {
   temperature?: number
   weight?: number
   weightFlow?: number
+  stageIndex?: number
+  stageName?: string
 }
 
 export interface LiveBrewState {
@@ -89,4 +99,16 @@ export interface LiveBrewState {
   visible: boolean
   elapsedMs: number
   points: LiveShotPoint[]
+}
+
+export type UtilityOperationKind = 'hotWater' | 'steam' | 'flush'
+
+export interface LiveUtilityOperation {
+  kind: UtilityOperationKind
+  elapsedMs: number
+  flow: number
+  temperature?: number
+  volumeMl: number
+  targetDuration?: number
+  targetVolume?: number
 }

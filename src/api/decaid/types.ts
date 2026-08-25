@@ -1,4 +1,5 @@
 export interface DecaidProfileStep {
+  name?: string
   temperature?: number
   seconds?: number
   duration?: number
@@ -17,9 +18,10 @@ export interface DecaidWorkflow {
   profile?: DecaidProfile
   context?: DecaidWorkflowContext
   steamSettings?: { targetTemperature?: number; duration?: number; flow?: number }
-  hotWaterData?: { targetTemperature?: number; volume?: number }
+  hotWaterData?: { targetTemperature?: number; duration?: number; volume?: number; flow?: number }
+  rinseData?: { targetTemperature?: number; duration?: number; flow?: number }
 }
-export type DecaidWorkflowPatch = Partial<Pick<DecaidWorkflow, 'profile' | 'context' | 'steamSettings' | 'hotWaterData'>>
+export type DecaidWorkflowPatch = Partial<Pick<DecaidWorkflow, 'profile' | 'context' | 'steamSettings' | 'hotWaterData' | 'rinseData'>>
 export interface MachineSnapshot {
   timestamp?: string
   state?: string | { state?: string; substate?: string }
@@ -36,6 +38,7 @@ export interface MachineSnapshot {
 }
 export interface ScaleSnapshot { status?: 'connected' | 'disconnected'; timestamp?: string; weight?: number; weightFlow?: number; timerValue?: number | null }
 export interface DecaidDevice { id?: string; name?: string; state?: 'connected' | 'disconnected'; type?: 'machine' | 'scale' | 'sensor'; available?: boolean }
+export interface DecaidSettings { preferredScaleId?: string | null; blockTareDuringShot?: boolean }
 export interface DisplayState { brightness?: number; requestedBrightness?: number; platformSupported?: { brightness?: boolean; wakeLock?: boolean } }
 export interface WaterLevels { currentLevel?: number; refillLevel?: number }
 export interface TimeToReadyFrame { status?: string; remainingTimeMs?: number; currentTemp?: number; targetTemp?: number }
@@ -43,6 +46,7 @@ export interface ShotMeasurement {
   machine?: {
     timestamp?: string
     state?: { substate?: string }
+    profileFrame?: number
     pressure?: number
     flow?: number
     targetPressure?: number
@@ -53,3 +57,4 @@ export interface ShotMeasurement {
   scale?: { weight?: number; weightFlow?: number }
 }
 export interface ShotRecord { id?: string; timestamp?: string; workflow?: DecaidWorkflow; measurements?: ShotMeasurement[]; annotations?: { actualYield?: number }; stopReason?: string | null }
+export interface PaginatedShots { items: ShotRecord[]; total: number; limit: number; offset: number }
