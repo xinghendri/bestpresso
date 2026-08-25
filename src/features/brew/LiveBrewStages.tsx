@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import type { CSSProperties } from 'react'
 import type { LiveShotPoint } from '../../domain/brewing'
 
 interface StageSummary {
@@ -9,10 +10,10 @@ interface StageSummary {
   yield: number | undefined
   minimumTemperature: number | undefined
   maximumTemperature: number | undefined
-  firstPressure: number | undefined
-  peakPressure: number | undefined
-  finalPressure: number | undefined
+  pressureMovements: number[]
 }
+
+const PRESSURE_REVERSAL_THRESHOLD_BAR = 0.4
 
 const timedLabel = (milliseconds: number) => {
   const seconds = Math.max(0, Math.round(milliseconds / 1000))
@@ -22,6 +23,39 @@ const timedLabel = (milliseconds: number) => {
 const finiteValues = (points: LiveShotPoint[], key: 'temperature' | 'pressure' | 'weight') => points
   .map((point) => point[key])
   .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+
+function pressureMovementReadings(pressures: number[]) {
+  if (pressures.length < 2) return pressures
+
+  const movements = [pressures[0]]
+  let direction = 0
+  let extreme = pressures[0]
+
+  for (const pressure of pressures.slice(1)) {
+    const fromExtreme = pressure - extreme
+    if (direction === 0) {
+      const fromStart = pressure - movements[0]
+      if (Math.abs(fromStart) >= PRESSURE_REVERSAL_THRESHOLD_BAR) direction = Math.sign(fromStart)
+      extreme = pressure
+      continue
+    }
+
+    if (fromExtreme * direction >= 0) {
+      extreme = pressure
+      continue
+    }
+
+    if (Math.abs(fromExtreme) >= PRESSURE_REVERSAL_THRESHOLD_BAR) {
+      movements.push(extreme)
+      direction = Math.sign(fromExtreme)
+      extreme = pressure
+    }
+  }
+
+  const finalPressure = pressures.at(-1)!
+  if (Math.abs(finalPressure - movements.at(-1)!) >= 0.05) movements.push(finalPressure)
+  return movements
+}
 
 function summarizeLiveBrewStages(points: LiveShotPoint[], elapsedMs: number): StageSummary[] {
   const groups: Array<{ key: string; name: string; points: LiveShotPoint[] }> = []
@@ -47,9 +81,7 @@ function summarizeLiveBrewStages(points: LiveShotPoint[], elapsedMs: number): St
       yield: weights.at(-1),
       minimumTemperature: temperatures.length ? Math.min(...temperatures) : undefined,
       maximumTemperature: temperatures.length ? Math.max(...temperatures) : undefined,
-      firstPressure: pressures[0],
-      peakPressure: pressures.length ? Math.max(...pressures) : undefined,
-      finalPressure: pressures.at(-1),
+      pressureMovements: pressureMovementReadings(pressures),
     }
   })
 }
@@ -75,12 +107,14 @@ export function LiveBrewStages({ points, elapsedMs, active = false }: { points: 
     <div className="live-brew-stages__track">
     {stages.map((stage, index) => {
       const isActive = active && index === stages.length - 1
-      return <article className={`live-brew-stage${isActive ? ' live-brew-stage--active' : ''}`} aria-current={isActive ? 'step' : undefined} key={stage.key}>
+      const pressureWidth = Math.min(760, 460 + Math.max(0, stage.pressureMovements.length - 2) * 58)
+      const cardStyle = { '--stage-card-width': `${pressureWidth}px` } as CSSProperties
+      return <article className={`live-brew-stage${isActive ? ' live-brew-stage--active' : ''}`} aria-current={isActive ? 'step' : undefined} key={stage.key} style={cardStyle}>
       <header><h2>{stage.name}</h2><time>{timedLabel(stage.endedAt - stage.startedAt)}</time></header>
       <dl>
         <div><dt>Yield</dt><dd>{reading(stage.yield)}<small>g</small></dd></div>
         <div><dt>Temperature range</dt><dd>{reading(stage.minimumTemperature, 0)}° – {reading(stage.maximumTemperature, 0)}°</dd></div>
-        <div><dt>Pressure</dt><dd>{reading(stage.firstPressure)} → {reading(stage.peakPressure)} → {reading(stage.finalPressure)}</dd></div>
+        <div><dt>Pressure</dt><dd>{stage.pressureMovements.length ? stage.pressureMovements.map((pressure) => reading(pressure)).join(' → ') : '—'}</dd></div>
       </dl>
     </article>})}
     </div>
