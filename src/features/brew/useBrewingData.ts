@@ -5,7 +5,7 @@ import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, DecaidWorkflowPatch, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
 import { WATER_TANK_LOW_LEVEL_ML, WATER_TANK_SENSOR_FULL_MM, WATER_TANK_WARNING_OFFSET_CLICKS } from '../../domain/brewing'
-import type { BrewProfile, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, MachineReadiness, PreviousShot, PreviousShotStatus, ScaleConnection, SettingFeedback } from '../../domain/brewing'
+import type { BrewProfile, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, LiveUtilityOperation, MachineReadiness, PreviousShot, PreviousShotStatus, ScaleConnection, SettingFeedback, UtilityOperationKind } from '../../domain/brewing'
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { brewingFixture } from '../../fixtures/brewingFixture'
 
@@ -13,6 +13,8 @@ const MAX_LIVE_SHOT_POINTS = 900
 const MIN_SUCCESSFUL_SHOT_MS = 5_000
 const MINIMUM_SCALE_SCAN_MS = 10_000
 const SCALE_SCAN_RETRY_DELAY_MS = 5_000
+const FLUSH_DURATION_SECONDS = 5
+const flushDurationDefaultStorageKey = 'bestpresso.flush-duration-default.v1'
 const fixtureProfiles = profilesWithParsedTitles(brewingFixture.profiles)
 
 interface LiveShotSession {
@@ -22,9 +24,30 @@ interface LiveShotSession {
   points: LiveShotPoint[]
 }
 
+interface UtilityOperationSession {
+  kind: UtilityOperationKind
+  startedAt: number
+  lastAt: number
+  previousFlow: number
+  volumeMl: number
+}
+
 const snapshotTime = (timestamp?: string) => {
   const parsed = timestamp ? Date.parse(timestamp) : Number.NaN
   return Number.isFinite(parsed) ? parsed : Date.now()
+}
+
+const operationKindForSnapshot = (snapshot: MachineSnapshot): UtilityOperationKind | null => {
+  const state = (typeof snapshot.state === 'string' ? snapshot.state : snapshot.state?.state)?.toLowerCase()
+  if (state === 'hotwater') return 'hotWater'
+  if (state === 'steam') return 'steam'
+  if (state === 'flush') return 'flush'
+  return null
+}
+
+const metricNumber = (model: BrewingScreenModel, utilityId: 'water' | 'steam', label: string) => {
+  const value = Number(model.utilities.find((utility) => utility.id === utilityId)?.metrics.find((metric) => metric.label === label)?.value)
+  return Number.isFinite(value) ? value : undefined
 }
 
 const localFavoriteStorageKey = 'bestpresso.favorite-profile-ids.v1'
@@ -90,6 +113,7 @@ export function useBrewingData() {
   const [previousShotStatus, setPreviousShotStatus] = useState<PreviousShotStatus>('loading')
   const [shotHistory, setShotHistory] = useState<PreviousShot[]>(() => brewingFixture.previousShot ? [{ ...brewingFixture.previousShot, id: 'fixture-latest' }] : [])
   const [liveBrew, setLiveBrew] = useState<LiveBrewState>({ active: false, visible: false, elapsedMs: 0, points: [] })
+  const [utilityOperation, setUtilityOperation] = useState<LiveUtilityOperation | null>(null)
   const sleepRequestInFlight = useRef(false)
   const wakeScreenDismissed = useRef(false)
   const previousReadiness = useRef<MachineReadiness | null>(null)
@@ -110,9 +134,11 @@ export function useBrewingData() {
   const machineNeedsWater = useRef(false)
   const machineConnectionRef = useRef<DataConnection>('connecting')
   const liveShotSession = useRef<LiveShotSession | null>(null)
+  const utilityOperationSession = useRef<UtilityOperationSession | null>(null)
   const allProfilesRef = useRef(allProfiles)
   const retainedAdHocProfileId = useRef<string | null>(null)
   const latestModel = useRef(model)
+  const latestFlushDuration = useRef(FLUSH_DURATION_SECONDS)
   const shotHistoryCache = useRef(new Map<string, NonNullable<BrewingScreenModel['previousShot']>>())
 
   useEffect(() => { allProfilesRef.current = allProfiles }, [allProfiles])
@@ -129,6 +155,27 @@ export function useBrewingData() {
     request.then(clearRequest, clearRequest)
     return request
   }
+
+  const rememberFlushDuration = (workflow: Awaited<ReturnType<typeof getWorkflow>>) => {
+    const duration = workflow.rinseData?.duration
+    if (typeof duration === 'number' && Number.isFinite(duration)) latestFlushDuration.current = duration
+    return workflow
+  }
+
+  const getWorkflowWithFlushDurationDefault = () => getWorkflow().then(async (workflow) => {
+    try {
+      if (window.localStorage.getItem(flushDurationDefaultStorageKey) === 'applied') return rememberFlushDuration(workflow)
+      const rinse = workflow.rinseData
+      if (rinse?.targetTemperature === undefined || rinse.flow === undefined) return rememberFlushDuration(workflow)
+      const updated = rinse.duration === FLUSH_DURATION_SECONDS
+        ? workflow
+        : await updateWorkflow({ rinseData: { ...rinse, duration: FLUSH_DURATION_SECONDS } })
+      window.localStorage.setItem(flushDurationDefaultStorageKey, 'applied')
+      return rememberFlushDuration(updated)
+    } catch {
+      return rememberFlushDuration(workflow)
+    }
+  })
 
   const dimDisplay = async () => {
     if (displayDimmed.current) return
@@ -311,7 +358,7 @@ export function useBrewingData() {
       .then((history) => ({ history, failed: false }))
       .catch(() => ({ history: null, failed: true }))
 
-    Promise.all([getWorkflow(), getProfiles(), getFavoriteAssignments().catch(() => null), latestShotRequest, shotHistoryRequest])
+    Promise.all([getWorkflowWithFlushDurationDefault(), getProfiles(), getFavoriteAssignments().catch(() => null), latestShotRequest, shotHistoryRequest])
       .then(([workflow, records, assignments, latestShot, historyResult]) => {
         if (disposed) return
         profileRecords.current = records
@@ -363,6 +410,35 @@ export function useBrewingData() {
       if (machineConnectionRef.current !== 'connected') return
       const machineState = (typeof snapshot.state === 'string' ? snapshot.state : snapshot.state?.state)?.toLowerCase()
       machineNeedsWater.current = machineState === 'needswater'
+      const operationKind = operationKindForSnapshot(snapshot)
+      if (operationKind) {
+        const now = snapshotTime(snapshot.timestamp)
+        let session = utilityOperationSession.current
+        if (!session || session.kind !== operationKind) {
+          session = { kind: operationKind, startedAt: now, lastAt: now, previousFlow: Math.max(0, snapshot.flow ?? 0), volumeMl: 0 }
+          utilityOperationSession.current = session
+          setLiveBrew((current) => current.active ? current : { ...current, visible: false })
+        } else {
+          const flow = Math.max(0, snapshot.flow ?? 0)
+          const elapsedSeconds = Math.max(0, Math.min(2, (now - session.lastAt) / 1000))
+          if (operationKind === 'hotWater') session.volumeMl += (session.previousFlow + flow) / 2 * elapsedSeconds
+          session.lastAt = Math.max(session.lastAt, now)
+          session.previousFlow = flow
+        }
+        const model = latestModel.current
+        setUtilityOperation({
+          kind: operationKind,
+          elapsedMs: Math.max(0, now - session.startedAt),
+          flow: Math.max(0, snapshot.flow ?? 0),
+          temperature: operationKind === 'steam' ? snapshot.steamTemperature : snapshot.mixTemperature ?? snapshot.groupTemperature,
+          volumeMl: session.volumeMl,
+          targetDuration: operationKind === 'flush' ? latestFlushDuration.current : operationKind === 'steam' ? metricNumber(model, 'steam', 'Duration') : undefined,
+          targetVolume: operationKind === 'hotWater' ? metricNumber(model, 'water', 'Volume') : undefined,
+        })
+      } else if (utilityOperationSession.current) {
+        utilityOperationSession.current = null
+        setUtilityOperation(null)
+      }
       if (isEspressoExtractionSnapshot(snapshot)) {
         const now = snapshotTime(snapshot.timestamp)
         const currentModel = latestModel.current
@@ -426,6 +502,8 @@ export function useBrewingData() {
       if (!connected) {
         readinessTracker.current.reset()
         completeLiveShot()
+        utilityOperationSession.current = null
+        setUtilityOperation(null)
       } else if (machineConnectionRef.current === 'fixture') {
         updateMachineConnection('connecting')
       }
@@ -501,7 +579,7 @@ export function useBrewingData() {
     }, 1000)
 
     const refreshWorkflow = window.setInterval(() => {
-      getWorkflow().then((workflow) => { if (!disposed) setModel((current) => applyWorkflow(current, workflow, profileRecords.current, favoriteAssignments.current, retainedAdHocProfileId.current)) }).catch(() => undefined)
+      getWorkflow().then((workflow) => { if (!disposed) setModel((current) => applyWorkflow(current, rememberFlushDuration(workflow), profileRecords.current, favoriteAssignments.current, retainedAdHocProfileId.current)) }).catch(() => undefined)
     }, 15000)
 
     const refreshDeviceConnections = window.setInterval(() => {
@@ -838,5 +916,5 @@ export function useBrewingData() {
   const dismissLiveBrew = () => setLiveBrew((current) => current.active ? current : { ...current, visible: false })
   const favoriteProfileIds = favoriteProfileSlots.filter((id): id is string => Boolean(id))
 
-  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, previousShotStatus, shotHistory, loadHistoryShot, heatingSeconds, connection, machineConnection, scale, scaleTarePending, brewStopPending, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, dismissLiveBrew, searchForScale, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
+  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, utilityOperation, previousShotStatus, shotHistory, loadHistoryShot, heatingSeconds, connection, machineConnection, scale, scaleTarePending, brewStopPending, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, dismissLiveBrew, searchForScale, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
 }

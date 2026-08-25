@@ -94,3 +94,15 @@ export interface LiveBrewState {
   elapsedMs: number
   points: LiveShotPoint[]
 }
+
+export type UtilityOperationKind = 'hotWater' | 'steam' | 'flush'
+
+export interface LiveUtilityOperation {
+  kind: UtilityOperationKind
+  elapsedMs: number
+  flow: number
+  temperature?: number
+  volumeMl: number
+  targetDuration?: number
+  targetVolume?: number
+}

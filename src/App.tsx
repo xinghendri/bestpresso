@@ -17,13 +17,22 @@ const currentPage = (): AppPage => {
 
 export default function App() {
   const data = useBrewingData()
-  const [page, setPage] = useState(currentPage)
+  const [, setPage] = useState(currentPage)
+  const page = data.utilityOperation ? 'home' : currentPage()
+  const utilityOperationKind = data.utilityOperation?.kind
 
   useEffect(() => {
     const handlePopState = () => setPage(currentPage())
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
+
+  useEffect(() => {
+    if (!utilityOperationKind || currentPage() === 'home') return
+    const url = new URL(window.location.href)
+    url.searchParams.delete('page')
+    window.history.replaceState({ page: 'home' }, '', url)
+  }, [utilityOperationKind])
 
   const navigate = (nextPage: AppPage) => {
     const url = new URL(window.location.href)

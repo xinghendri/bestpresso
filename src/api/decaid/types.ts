@@ -18,9 +18,10 @@ export interface DecaidWorkflow {
   profile?: DecaidProfile
   context?: DecaidWorkflowContext
   steamSettings?: { targetTemperature?: number; duration?: number; flow?: number }
-  hotWaterData?: { targetTemperature?: number; volume?: number }
+  hotWaterData?: { targetTemperature?: number; duration?: number; volume?: number; flow?: number }
+  rinseData?: { targetTemperature?: number; duration?: number; flow?: number }
 }
-export type DecaidWorkflowPatch = Partial<Pick<DecaidWorkflow, 'profile' | 'context' | 'steamSettings' | 'hotWaterData'>>
+export type DecaidWorkflowPatch = Partial<Pick<DecaidWorkflow, 'profile' | 'context' | 'steamSettings' | 'hotWaterData' | 'rinseData'>>
 export interface MachineSnapshot {
   timestamp?: string
   state?: string | { state?: string; substate?: string }
