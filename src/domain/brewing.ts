@@ -12,6 +12,7 @@ export const WATER_TANK_WARNING_OFFSET_CLICKS = 5
 
 export interface ScaleConnection {
   status: ScaleConnectionStatus
+  id?: string
   name?: string
 }
 

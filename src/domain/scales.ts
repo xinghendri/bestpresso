@@ -3,14 +3,16 @@ export interface SupportedScaleDefinition {
   displayName: string
   imageName: string
   aliases: readonly RegExp[]
+  identifierAliases?: readonly RegExp[]
 }
 
-// Mirrors Decaid's scale implementations and advertised-name aliases. The
-// devices API exposes only the device name, so matching must remain name-based.
+// Mirrors Decaid's scale implementations and advertised-name aliases. Device
+// identifiers take priority where Decaid's older names are ambiguous.
 export const supportedScales = [
-  { id: 'bengle-scale', displayName: 'Bengle', imageName: 'bengle-scale.png', aliases: [/^bengle.*scale$/i] },
-  { id: 'half-decent-scale-usb', displayName: 'Half Decent Scale', imageName: 'half-decent-scale-usb.png', aliases: [/^half\s+decent\s+scale(?:\s*\(usb\))?$/i, /^hds\s*serial$/i] },
-  { id: 'half-decent-scale-wifi', displayName: 'Half Decent Scale', imageName: 'half-decent-scale-wifi.png', aliases: [/^half\s+decent\s+scale\s*\(wi-?fi\)$/i] },
+  { id: 'bengle-scale', displayName: 'Bengle', imageName: 'bengle-scale.png', aliases: [/^bengle.*scale$/i], identifierAliases: [/^bengle-internal-/i] },
+  { id: 'half-decent-scale-usb', displayName: 'Half Decent', imageName: 'half-decent-scale-usb.png', aliases: [/^half\s+decent(?:\s+scale)?(?:\s*\(usb\))?$/i, /^hds\s*serial$/i], identifierAliases: [/^(?:serial|usb)-/i, /\/dev\//i] },
+  { id: 'half-decent-scale-wifi', displayName: 'Half Decent', imageName: 'half-decent-scale-usb.png', aliases: [/^half\s+decent(?:\s+scale)?\s*\(wi-?fi\)$/i], identifierAliases: [/^wifi:/i] },
+  { id: 'decent-scale', displayName: 'Decent', imageName: 'half-decent-scale-wifi.png', aliases: [/^decent(?:\s+scale)?$/i] },
   { id: 'skale2', displayName: 'Atomax Skale', imageName: 'skale2.png', aliases: [/^skale/i, /atomax.*skale/i] },
   { id: 'acaia-lunar', displayName: 'Acaia Lunar', imageName: 'acaia-lunar.png', aliases: [/\blunar\b/i] },
   { id: 'acaia-pearl', displayName: 'Acaia Pearl', imageName: 'acaia-pearl.png', aliases: [/\bpearl\b/i] },
@@ -38,4 +40,12 @@ export function supportedScaleForName(name: string | undefined) {
   const candidate = name?.trim()
   if (!candidate) return undefined
   return supportedScales.find((scale) => scale.aliases.some((alias) => alias.test(candidate)))
+}
+
+export function supportedScaleForDevice(name: string | undefined, identifier: string | undefined) {
+  const candidateIdentifier = identifier?.trim()
+  const identifierMatch = candidateIdentifier
+    ? supportedScales.find((scale) => 'identifierAliases' in scale && scale.identifierAliases.some((alias) => alias.test(candidateIdentifier)))
+    : undefined
+  return identifierMatch ?? supportedScaleForName(name)
 }

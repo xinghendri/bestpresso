@@ -275,7 +275,7 @@ export function useBrewingData() {
       setScale((current) => current.status === 'searching'
         ? current
         : activeScale
-          ? { status: 'connected', name: activeScale.name || 'Scale' }
+          ? { status: 'connected', id: activeScale.id, name: activeScale.name || 'Scale' }
           : { status: 'disconnected' })
     }
 
@@ -340,7 +340,7 @@ export function useBrewingData() {
       refreshConnectedDevices().then((devices) => {
         if (disposed) return
         const connectedScale = devices.find((device) => device.type === 'scale' && device.state === 'connected')
-        setScale({ status: 'connected', name: connectedScale?.name || 'Scale' })
+        setScale({ status: 'connected', id: connectedScale?.id, name: connectedScale?.name || 'Scale' })
       }).catch(() => undefined)
     }
 
@@ -711,7 +711,7 @@ export function useBrewingData() {
       const devices = await runScaleScan()
       const activeScale = devices.find((device) => device.type === 'scale' && device.state === 'connected')
       connectedScale.current = Boolean(activeScale)
-      setScale(activeScale ? { status: 'connected', name: activeScale.name || 'Scale' } : { status: 'disconnected' })
+      setScale(activeScale ? { status: 'connected', id: activeScale.id, name: activeScale.name || 'Scale' } : { status: 'disconnected' })
     } catch {
       setScale({ status: 'disconnected' })
       showMachineActionError('Decaid could not start a scale search.')
