@@ -9,6 +9,7 @@ interface LiveShotChartProps {
 const VIEW_WIDTH = 1000
 const VIEW_HEIGHT = 376
 const PLOT = { left: 42, right: 978, top: 38, bottom: 340 }
+const PLOT_BOTTOM_STROKE_ALLOWANCE = 4
 
 const linePath = (points: LiveShotPoint[], key: keyof LiveShotPoint, durationMs: number, minimum: number, maximum: number) => {
   let path = ''
@@ -37,7 +38,7 @@ export function LiveShotChart({ points, elapsedMs, targetYield }: LiveShotChartP
 
   return <div className="live-shot-chart">
     <svg viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`} role="img" aria-label="Live espresso pressure, flow, yield weight, and temperature chart" preserveAspectRatio="none">
-      <defs><clipPath id="live-shot-plot"><rect x={PLOT.left} y={PLOT.top} width={PLOT.right - PLOT.left} height={PLOT.bottom - PLOT.top} /></clipPath></defs>
+      <defs><clipPath id="live-shot-plot"><rect x={PLOT.left} y={PLOT.top} width={PLOT.right - PLOT.left} height={PLOT.bottom - PLOT.top + PLOT_BOTTOM_STROKE_ALLOWANCE} /></clipPath></defs>
       {gridTicks.map((ratio) => {
         const y = PLOT.top + ratio * (PLOT.bottom - PLOT.top)
         return <line key={`horizontal-${ratio}`} className="chart-grid chart-grid--tick" x1={PLOT.left} x2={PLOT.left + 10} y1={y} y2={y} />
