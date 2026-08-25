@@ -4,6 +4,7 @@ interface LiveShotChartProps {
   points: LiveShotPoint[]
   elapsedMs: number
   targetYield: number
+  startMs?: number
 }
 
 const VIEW_WIDTH = 1000
@@ -11,7 +12,7 @@ const VIEW_HEIGHT = 376
 const PLOT = { left: 42, right: 978, top: 38, bottom: 340 }
 const PLOT_BOTTOM_STROKE_ALLOWANCE = 4
 
-const linePath = (points: LiveShotPoint[], key: keyof LiveShotPoint, durationMs: number, minimum: number, maximum: number) => {
+const linePath = (points: LiveShotPoint[], key: keyof LiveShotPoint, startMs: number, durationMs: number, minimum: number, maximum: number) => {
   let path = ''
   let drawing = false
   for (const point of points) {
@@ -20,7 +21,7 @@ const linePath = (points: LiveShotPoint[], key: keyof LiveShotPoint, durationMs:
       drawing = false
       continue
     }
-    const x = PLOT.left + Math.min(1, point.elapsedMs / durationMs) * (PLOT.right - PLOT.left)
+    const x = PLOT.left + Math.max(0, Math.min(1, (point.elapsedMs - startMs) / durationMs)) * (PLOT.right - PLOT.left)
     const ratio = Math.max(0, Math.min(1, (value - minimum) / (maximum - minimum)))
     const y = PLOT.bottom - ratio * (PLOT.bottom - PLOT.top)
     path += `${drawing ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`
@@ -29,7 +30,7 @@ const linePath = (points: LiveShotPoint[], key: keyof LiveShotPoint, durationMs:
   return path
 }
 
-export function LiveShotChart({ points, elapsedMs, targetYield }: LiveShotChartProps) {
+export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0 }: LiveShotChartProps) {
   const durationMs = Math.max(10_000, Math.ceil(Math.max(elapsedMs, 1) / 5_000) * 5_000)
   const observedWeight = Math.max(0, ...points.map((point) => point.weight ?? 0))
   const weightMax = Math.max(50, targetYield * 1.2, observedWeight * 1.12)
@@ -52,12 +53,12 @@ export function LiveShotChart({ points, elapsedMs, targetYield }: LiveShotChartP
       </g>)}
       <text className="chart-axis-title" x={PLOT.left - 13} y={PLOT.top - 14}>bar / ml/s</text>
       <g clipPath="url(#live-shot-plot)">
-        <path className="chart-line chart-line--target-pressure" d={linePath(points, 'targetPressure', durationMs, 0, 12)} />
-        <path className="chart-line chart-line--target-flow" d={linePath(points, 'targetFlow', durationMs, 0, 12)} />
-        <path className="chart-line chart-line--temperature" d={linePath(points, 'temperature', durationMs, 70, 100)} />
-        <path className="chart-line chart-line--pressure" d={linePath(points, 'pressure', durationMs, 0, 12)} />
-        <path className="chart-line chart-line--flow" d={linePath(points, 'flow', durationMs, 0, 12)} />
-        <path className="chart-line chart-line--weight" d={linePath(points, 'weight', durationMs, 0, weightMax)} />
+        <path className="chart-line chart-line--target-pressure" d={linePath(points, 'targetPressure', startMs, durationMs, 0, 12)} />
+        <path className="chart-line chart-line--target-flow" d={linePath(points, 'targetFlow', startMs, durationMs, 0, 12)} />
+        <path className="chart-line chart-line--temperature" d={linePath(points, 'temperature', startMs, durationMs, 70, 100)} />
+        <path className="chart-line chart-line--pressure" d={linePath(points, 'pressure', startMs, durationMs, 0, 12)} />
+        <path className="chart-line chart-line--flow" d={linePath(points, 'flow', startMs, durationMs, 0, 12)} />
+        <path className="chart-line chart-line--weight" d={linePath(points, 'weight', startMs, durationMs, 0, weightMax)} />
       </g>
     </svg>
     {points.length === 0 && <p className="live-shot-chart__empty">Waiting for brewing telemetry…</p>}

@@ -11,6 +11,15 @@ interface StageSummary {
   minimumTemperature: number | undefined
   maximumTemperature: number | undefined
   pressureMovements: number[]
+  points: LiveShotPoint[]
+}
+
+export interface BrewStageSelection {
+  key: string
+  name: string
+  startedAt: number
+  endedAt: number
+  points: LiveShotPoint[]
 }
 
 const PRESSURE_REVERSAL_THRESHOLD_BAR = 0.4
@@ -82,13 +91,14 @@ function summarizeLiveBrewStages(points: LiveShotPoint[], elapsedMs: number): St
       minimumTemperature: temperatures.length ? Math.min(...temperatures) : undefined,
       maximumTemperature: temperatures.length ? Math.max(...temperatures) : undefined,
       pressureMovements: pressureMovementReadings(pressures),
+      points: group.points,
     }
   })
 }
 
 const reading = (value: number | undefined, digits = 1) => value === undefined ? '—' : value.toFixed(digits)
 
-export function LiveBrewStages({ points, elapsedMs, active = false }: { points: LiveShotPoint[]; elapsedMs: number; active?: boolean }) {
+export function LiveBrewStages({ points, elapsedMs, active = false, selectedStageKey, onStageSelect }: { points: LiveShotPoint[]; elapsedMs: number; active?: boolean; selectedStageKey?: string; onStageSelect?: (stage: BrewStageSelection | null) => void }) {
   const stages = summarizeLiveBrewStages(points, elapsedMs)
   const stripRef = useRef<HTMLElement>(null)
 
@@ -107,9 +117,16 @@ export function LiveBrewStages({ points, elapsedMs, active = false }: { points: 
     <div className="live-brew-stages__track">
     {stages.map((stage, index) => {
       const isActive = active && index === stages.length - 1
+      const isSelected = selectedStageKey === stage.key
+      const selectable = Boolean(onStageSelect)
       const pressureWidth = Math.min(760, 460 + Math.max(0, stage.pressureMovements.length - 2) * 58)
       const cardStyle = { '--stage-card-width': `${pressureWidth}px` } as CSSProperties
-      return <article className={`live-brew-stage${isActive ? ' live-brew-stage--active' : ''}`} aria-current={isActive ? 'step' : undefined} key={stage.key} style={cardStyle}>
+      const toggleSelection = () => onStageSelect?.(isSelected ? null : { key: stage.key, name: stage.name, startedAt: stage.startedAt, endedAt: stage.endedAt, points: stage.points })
+      return <article className={`live-brew-stage${isActive ? ' live-brew-stage--active' : ''}${isSelected ? ' live-brew-stage--selected' : ''}`} aria-current={isActive ? 'step' : undefined} aria-pressed={selectable ? isSelected : undefined} key={stage.key} onClick={selectable ? toggleSelection : undefined} onKeyDown={selectable ? (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        toggleSelection()
+      } : undefined} role={selectable ? 'button' : undefined} style={cardStyle} tabIndex={selectable ? 0 : undefined}>
       <header><h2>{stage.name}</h2><time>{timedLabel(stage.endedAt - stage.startedAt)}</time></header>
       <dl>
         <div><dt>Yield</dt><dd>{reading(stage.yield)}<small>g</small></dd></div>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { PreviousShot, PreviousShotStatus } from '../../domain/brewing'
 import { LiveBrewStages } from '../brew/LiveBrewStages'
+import type { BrewStageSelection } from '../brew/LiveBrewStages'
 import { LiveShotChart } from '../brew/LiveShotChart'
 
 interface PreviousShotScreenProps {
@@ -29,9 +30,11 @@ export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, o
   const [selectedShot, setSelectedShot] = useState<PreviousShot | null>(firstShot)
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [loadError, setLoadError] = useState(false)
+  const [stageSelection, setStageSelection] = useState<{ shotId: string | undefined; stage: BrewStageSelection } | null>(null)
 
   const activeId = selectedId && shots.some((shot) => shot.id === selectedId) ? selectedId : firstShot?.id
   const activeShot = selectedShot?.id === activeId ? selectedShot : initialShot?.id === activeId ? initialShot : shots.find((shot) => shot.id === activeId) ?? null
+  const selectedStage = stageSelection && stageSelection.shotId === activeId ? stageSelection.stage : null
 
   const selectShot = async (shot: PreviousShot) => {
     if (!shot.id || loadingId === shot.id) return
@@ -59,6 +62,9 @@ export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, o
   const points = activeShot?.points ?? []
   const elapsedMs = points.at(-1)?.elapsedMs ?? (Number(activeShot?.totalTime) || 0) * 1000
   const targetYield = activeShot?.targetYield ?? (Number(activeShot?.totalYield) || 36)
+  const chartPoints = selectedStage?.points ?? points
+  const chartElapsedMs = selectedStage ? Math.max(1, selectedStage.endedAt - selectedStage.startedAt) : elapsedMs
+  const chartStartMs = selectedStage?.startedAt ?? 0
 
   return <main className="history-browser-screen">
     <aside className="history-browser-rail">
@@ -87,10 +93,10 @@ export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, o
       </header>
 
       <section className={`live-pull-chart-panel history-pull-chart${loadingId ? ' history-pull-chart--loading' : ''}`} aria-label={activeShot ? `Shot history: ${activeShot.profileName}` : 'Shot history chart'}>
-        {activeShot && <LiveShotChart points={points} elapsedMs={elapsedMs} targetYield={targetYield} />}
+        {activeShot && <LiveShotChart points={chartPoints} elapsedMs={chartElapsedMs} startMs={chartStartMs} targetYield={targetYield} />}
         {loadError && <p className="history-pull-error">That pull couldn’t be loaded. Try selecting it again.</p>}
       </section>
-      <LiveBrewStages points={points} elapsedMs={elapsedMs} />
+      <LiveBrewStages points={points} elapsedMs={elapsedMs} selectedStageKey={selectedStage?.key} onStageSelect={(stage) => setStageSelection(stage ? { shotId: activeId, stage } : null)} />
     </section>
   </main>
 }
