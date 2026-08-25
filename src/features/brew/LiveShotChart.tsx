@@ -5,6 +5,7 @@ interface LiveShotChartProps {
   elapsedMs: number
   targetYield: number
   startMs?: number
+  fitDuration?: boolean
 }
 
 const VIEW_WIDTH = 1000
@@ -30,8 +31,8 @@ const linePath = (points: LiveShotPoint[], key: keyof LiveShotPoint, startMs: nu
   return path
 }
 
-export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0 }: LiveShotChartProps) {
-  const durationMs = Math.max(10_000, Math.ceil(Math.max(elapsedMs, 1) / 5_000) * 5_000)
+export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fitDuration = false }: LiveShotChartProps) {
+  const durationMs = fitDuration ? Math.max(elapsedMs, 1) : Math.max(10_000, Math.ceil(Math.max(elapsedMs, 1) / 5_000) * 5_000)
   const observedWeight = Math.max(0, ...points.map((point) => point.weight ?? 0))
   const weightMax = Math.max(50, targetYield * 1.2, observedWeight * 1.12)
   const timeTicks = Array.from({ length: durationMs / 5_000 }, (_, index) => (index + 1) * 5_000)
