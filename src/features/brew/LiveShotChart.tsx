@@ -84,7 +84,7 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
       </g>)}
       <text className="chart-axis-title" x={PLOT.left - 13} y={PLOT.top - 14}>bar / ml/s</text>
       <g clipPath="url(#live-shot-plot)">
-        {contextPoints && <g opacity="0.4" aria-hidden="true">
+        {contextPoints && <g opacity="0.15" aria-hidden="true">
           <path className="chart-line chart-line--target-pressure" d={linePath(contextPoints, 'targetPressure', xForElapsedMs, 0, 12)} />
           <path className="chart-line chart-line--target-flow" d={linePath(contextPoints, 'targetFlow', xForElapsedMs, 0, 12)} />
           <path className="chart-line chart-line--temperature" d={linePath(contextPoints, 'temperature', xForElapsedMs, 70, 100)} />
