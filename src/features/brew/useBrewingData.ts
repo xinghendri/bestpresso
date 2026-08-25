@@ -488,7 +488,10 @@ export function useBrewingData() {
         setSleepScreenActive(false)
       }
       previousReadiness.current = readiness
-      if (readiness !== 'heating') setHeatingSeconds(null)
+      if (readiness !== 'heating') {
+        timeToReadyEstimate = null
+        setHeatingSeconds(null)
+      }
       setModel((current) => ({
         ...current,
         readiness,
@@ -559,14 +562,22 @@ export function useBrewingData() {
     }, () => undefined)
 
     const timeToReady = subscribe<TimeToReadyFrame>('/plugins/time-to-ready.reaplugin/timeToReady', (frame) => {
-      if (machineConnectionRef.current !== 'connected' || frame.status !== 'heating' || !frame.remainingTimeMs || frame.remainingTimeMs <= 0) {
+      const remainingTimeMs = frame.remainingTimeMs
+      if (
+        machineConnectionRef.current !== 'connected'
+        || previousReadiness.current !== 'heating'
+        || frame.status !== 'heating'
+        || typeof remainingTimeMs !== 'number'
+        || !Number.isFinite(remainingTimeMs)
+        || remainingTimeMs <= 0
+      ) {
         timeToReadyEstimate = null
         setHeatingSeconds(null)
         return
       }
       const now = Date.now()
-      timeToReadyEstimate = { deadline: now + frame.remainingTimeMs, receivedAt: now }
-      setHeatingSeconds(Math.min(300, Math.round(frame.remainingTimeMs / 1000)))
+      timeToReadyEstimate = { deadline: now + remainingTimeMs, receivedAt: now }
+      setHeatingSeconds(Math.min(300, Math.ceil(remainingTimeMs / 1000)))
     }, () => undefined)
 
     const heatingCountdown = window.setInterval(() => {
