@@ -11,6 +11,8 @@ import { brewingFixture } from '../../fixtures/brewingFixture'
 
 const MAX_LIVE_SHOT_POINTS = 900
 const MIN_SUCCESSFUL_SHOT_MS = 5_000
+const MINIMUM_SCALE_SCAN_MS = 10_000
+const SCALE_SCAN_RETRY_DELAY_MS = 5_000
 const fixtureProfiles = profilesWithParsedTitles(brewingFixture.profiles)
 
 interface LiveShotSession {
@@ -98,9 +100,8 @@ export function useBrewingData() {
   const favoriteAssignments = useRef<FavoriteAssignments | null>(null)
   const feedbackTimeout = useRef<number | null>(null)
   const actionErrorTimeout = useRef<number | null>(null)
-  const scaleSearchTimeout = useRef<number | null>(null)
   const manualScaleSearchInFlight = useRef(false)
-  const backgroundScaleScanLeaseUntil = useRef(0)
+  const activeScaleScan = useRef<Promise<Awaited<ReturnType<typeof getDevices>>> | null>(null)
   const connectedScale = useRef(false)
   const scaleTareInFlight = useRef(false)
   const brewStopRequestInFlight = useRef(false)
@@ -116,6 +117,18 @@ export function useBrewingData() {
 
   useEffect(() => { allProfilesRef.current = allProfiles }, [allProfiles])
   useEffect(() => { latestModel.current = model }, [model])
+
+  const runScaleScan = () => {
+    if (activeScaleScan.current) return activeScaleScan.current
+    const minimumDuration = new Promise<void>((resolve) => window.setTimeout(resolve, MINIMUM_SCALE_SCAN_MS))
+    const request = Promise.all([scanForDevices(), minimumDuration]).then(() => getDevices())
+    activeScaleScan.current = request
+    const clearRequest = () => {
+      if (activeScaleScan.current === request) activeScaleScan.current = null
+    }
+    request.then(clearRequest, clearRequest)
+    return request
+  }
 
   const dimDisplay = async () => {
     if (displayDimmed.current) return
@@ -277,8 +290,6 @@ export function useBrewingData() {
     const refreshConnectedScale = () => {
       connectedScale.current = true
       setScale((current) => ({ ...current, status: 'connected' }))
-      if (scaleSearchTimeout.current !== null) window.clearTimeout(scaleSearchTimeout.current)
-      scaleSearchTimeout.current = null
       refreshConnectedDevices().then((devices) => {
         if (disposed) return
         const connectedScale = devices.find((device) => device.type === 'scale' && device.state === 'connected')
@@ -501,23 +512,32 @@ export function useBrewingData() {
       void refreshPreferredScale()
     }, 30000)
 
-    const backgroundScaleSearch = window.setInterval(() => {
-      if (!preferredScaleId || connectedScale.current || manualScaleSearchInFlight.current || Date.now() < backgroundScaleScanLeaseUntil.current) return
-      backgroundScaleScanLeaseUntil.current = Date.now() + 20_000
-      scanForDevices({ quick: true }).catch(() => undefined)
-    }, 5000)
+    let backgroundScaleSearchTimeout: number | null = null
+    const scheduleBackgroundScaleSearch = () => {
+      backgroundScaleSearchTimeout = window.setTimeout(async () => {
+        backgroundScaleSearchTimeout = null
+        if (disposed) return
+        if (preferredScaleId && !connectedScale.current) {
+          try {
+            const devices = await runScaleScan()
+            if (devices.some((device) => device.type === 'scale' && device.state === 'connected')) connectedScale.current = true
+          } catch { /* the next scheduled scan can retry */ }
+        }
+        if (!disposed) scheduleBackgroundScaleSearch()
+      }, SCALE_SCAN_RETRY_DELAY_MS)
+    }
+    scheduleBackgroundScaleSearch()
 
     return () => {
       disposed = true
       window.clearInterval(refreshWorkflow)
       window.clearInterval(refreshDeviceConnections)
       window.clearInterval(refreshPreferredScaleSetting)
-      window.clearInterval(backgroundScaleSearch)
+      if (backgroundScaleSearchTimeout !== null) window.clearTimeout(backgroundScaleSearchTimeout)
       window.clearInterval(heatingCountdown)
       if (latestShotRefreshTimeout !== null) window.clearTimeout(latestShotRefreshTimeout)
       if (feedbackTimeout.current !== null) window.clearTimeout(feedbackTimeout.current)
       if (actionErrorTimeout.current !== null) window.clearTimeout(actionErrorTimeout.current)
-      if (scaleSearchTimeout.current !== null) window.clearTimeout(scaleSearchTimeout.current)
       machine.close(); scale.close(); water.close(); timeToReady.close()
     }
   }, [])
@@ -596,25 +616,14 @@ export function useBrewingData() {
   const searchForScale = async () => {
     if (manualScaleSearchInFlight.current) return
     manualScaleSearchInFlight.current = true
-    backgroundScaleScanLeaseUntil.current = Date.now() + 30_000
     showMachineActionError(null)
     setScale((current) => ({ ...current, status: 'searching' }))
-    if (scaleSearchTimeout.current !== null) window.clearTimeout(scaleSearchTimeout.current)
-    scaleSearchTimeout.current = window.setTimeout(() => {
-      setScale((current) => current.status === 'searching' ? { status: 'disconnected' } : current)
-      scaleSearchTimeout.current = null
-    }, 20000)
     try {
-      await scanForDevices()
-      const devices = await getDevices()
+      const devices = await runScaleScan()
       const activeScale = devices.find((device) => device.type === 'scale' && device.state === 'connected')
       connectedScale.current = Boolean(activeScale)
-      if (scaleSearchTimeout.current !== null) window.clearTimeout(scaleSearchTimeout.current)
-      scaleSearchTimeout.current = null
       setScale(activeScale ? { status: 'connected', name: activeScale.name || 'Scale' } : { status: 'disconnected' })
     } catch {
-      if (scaleSearchTimeout.current !== null) window.clearTimeout(scaleSearchTimeout.current)
-      scaleSearchTimeout.current = null
       setScale({ status: 'disconnected' })
       showMachineActionError('Decaid could not start a scale search.')
     } finally {

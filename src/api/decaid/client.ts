@@ -29,7 +29,7 @@ export const getWorkflow = () => getJson<DecaidWorkflow>('/workflow')
 export const getProfiles = () => getJson<DecaidProfileRecord[]>('/profiles')
 export const getFavoriteAssignments = () => getJson<FavoriteAssignments>('/store/streamline-app/favorite-profiles')
 export const getDevices = () => getJson<DecaidDevice[]>('/devices')
-export const scanForDevices = ({ quick = false }: { quick?: boolean } = {}) => getJson<unknown[]>(`/devices/scan${quick ? '?quick=true' : ''}`, quick ? 4500 : 30000)
+export const scanForDevices = () => getJson<unknown[]>('/devices/scan', 30000)
 export const getDisplayState = () => getJson<DisplayState>('/display')
 export const getSettings = () => getJson<DecaidSettings>('/settings')
 
