@@ -47,6 +47,6 @@ export function LiveBrewingScreen({ model, liveBrew, stopPending, actionError, o
     <section className="live-pull-chart-panel" aria-label={`Brewing ${profile.name}`}>
       <LiveShotChart points={liveBrew.points} elapsedMs={liveBrew.elapsedMs} targetYield={targetYield} />
     </section>
-    <LiveBrewStages points={liveBrew.points} elapsedMs={liveBrew.elapsedMs} />
+    <LiveBrewStages points={liveBrew.points} elapsedMs={liveBrew.elapsedMs} active={liveBrew.active} />
   </main>
 }

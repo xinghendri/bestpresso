@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import type { LiveShotPoint } from '../../domain/brewing'
 
 interface StageSummary {
@@ -55,18 +56,33 @@ function summarizeLiveBrewStages(points: LiveShotPoint[], elapsedMs: number): St
 
 const reading = (value: number | undefined, digits = 1) => value === undefined ? '—' : value.toFixed(digits)
 
-export function LiveBrewStages({ points, elapsedMs }: { points: LiveShotPoint[]; elapsedMs: number }) {
+export function LiveBrewStages({ points, elapsedMs, active = false }: { points: LiveShotPoint[]; elapsedMs: number; active?: boolean }) {
   const stages = summarizeLiveBrewStages(points, elapsedMs)
+  const stripRef = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    if (!active || !stripRef.current) return
+    const animationFrame = window.requestAnimationFrame(() => {
+      const strip = stripRef.current
+      if (strip) strip.scrollTo({ left: strip.scrollWidth - strip.clientWidth, behavior: 'smooth' })
+    })
+    return () => window.cancelAnimationFrame(animationFrame)
+  }, [active, stages.length])
+
   if (!stages.length) return <section className="live-brew-stages live-brew-stages--empty" aria-label="Pull stages"><p>Waiting for the first stage…</p></section>
 
-  return <section className="live-brew-stages" aria-label="Pull stages">
-    {stages.map((stage) => <article className="live-brew-stage" key={stage.key}>
+  return <section className={`live-brew-stages${active ? ' live-brew-stages--active' : ''}`} aria-label="Pull stages" ref={stripRef}>
+    <div className="live-brew-stages__track">
+    {stages.map((stage, index) => {
+      const isActive = active && index === stages.length - 1
+      return <article className={`live-brew-stage${isActive ? ' live-brew-stage--active' : ''}`} aria-current={isActive ? 'step' : undefined} key={stage.key}>
       <header><h2>{stage.name}</h2><time>{timedLabel(stage.endedAt - stage.startedAt)}</time></header>
       <dl>
         <div><dt>Yield</dt><dd>{reading(stage.yield)}<small>g</small></dd></div>
         <div><dt>Temperature range</dt><dd>{reading(stage.minimumTemperature, 0)}° – {reading(stage.maximumTemperature, 0)}°</dd></div>
         <div><dt>Pressure</dt><dd>{reading(stage.firstPressure)} → {reading(stage.peakPressure)} → {reading(stage.finalPressure)}</dd></div>
       </dl>
-    </article>)}
+    </article>})}
+    </div>
   </section>
 }
