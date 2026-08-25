@@ -117,7 +117,6 @@ export function LiveBrewStages({ points, elapsedMs, active = false, selectedStag
     const strip = stripRef.current
     let scrollFrame = 0
     const centerSelectedStage = () => {
-      strip.style.setProperty('--stage-center-gutter', `${strip.clientWidth / 2}px`)
       window.cancelAnimationFrame(scrollFrame)
       scrollFrame = window.requestAnimationFrame(() => {
         const selectedStage = stageRefs.current.get(selectedStageKey)
@@ -135,13 +134,12 @@ export function LiveBrewStages({ points, elapsedMs, active = false, selectedStag
       window.cancelAnimationFrame(animationFrame)
       window.cancelAnimationFrame(scrollFrame)
       window.removeEventListener('resize', centerSelectedStage)
-      strip.style.removeProperty('--stage-center-gutter')
     }
   }, [active, selectedStageKey, stages.length])
 
   if (!stages.length) return <section className="live-brew-stages live-brew-stages--empty" aria-label="Pull stages"><p>Waiting for the first stage…</p></section>
 
-  return <section className={`live-brew-stages${active ? ' live-brew-stages--active' : ''}${onStageSelect ? ' live-brew-stages--history' : ''}`} aria-label="Pull stages" ref={stripRef}>
+  return <section className={`live-brew-stages${active ? ' live-brew-stages--active' : ''}`} aria-label="Pull stages" ref={stripRef}>
     <div className="live-brew-stages__track">
     {stages.map((stage, index) => {
       const isActive = active && index === stages.length - 1
