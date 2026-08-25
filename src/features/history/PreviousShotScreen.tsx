@@ -79,9 +79,9 @@ export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, o
           {activeShot && <time dateTime={activeShot.timestamp}>{pullTime(activeShot.timestamp)}</time>}
         </div>
         <div className="live-pull-header__metrics">
-          <div><span>Timer</span><strong>{activeShot ? timerLabel(activeShot) : '—'}</strong></div>
+          <div><span>Duration</span><strong>{activeShot ? timerLabel(activeShot) : '—'}</strong></div>
           <i aria-hidden="true" />
-          <div><span>Total yield</span><strong>{activeShot?.totalYield ?? '—'}{activeShot?.totalYield !== '—' && <small>g</small>}</strong></div>
+          <div><span>Yield</span><strong>{activeShot?.totalYield ?? '—'}{activeShot?.totalYield !== '—' && <small>g</small>}</strong></div>
         </div>
         <button className="live-pull-action live-pull-action--close" type="button" onClick={onDismiss}>Close</button>
       </header>
