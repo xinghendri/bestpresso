@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import type { PreviousShot, PreviousShotStatus } from '../../domain/brewing'
+import { useEffect, useRef, useState } from 'react'
+import type { LiveShotPoint, PreviousShot, PreviousShotStatus } from '../../domain/brewing'
 import { LiveBrewStages } from '../brew/LiveBrewStages'
 import type { BrewStageSelection } from '../brew/LiveBrewStages'
 import { LiveShotChart } from '../brew/LiveShotChart'
@@ -10,6 +10,36 @@ interface PreviousShotScreenProps {
   status: PreviousShotStatus
   onSelectShot: (shotId: string) => Promise<PreviousShot | null>
   onDismiss: () => void
+}
+
+interface HistoryChartView {
+  key: string
+  points: LiveShotPoint[]
+  contextPoints?: LiveShotPoint[]
+  elapsedMs: number
+  startMs: number
+  fitDuration: boolean
+}
+
+function AnimatedHistoryShotChart({ view, targetYield }: { view: HistoryChartView; targetYield: number }) {
+  const previousView = useRef(view)
+  const [leavingView, setLeavingView] = useState<HistoryChartView | null>(null)
+
+  useEffect(() => {
+    const previous = previousView.current
+    previousView.current = view
+    if (previous.key === view.key) return
+    setLeavingView(previous)
+    const timeout = window.setTimeout(() => setLeavingView((current) => current?.key === previous.key ? null : current), 400)
+    return () => window.clearTimeout(timeout)
+  }, [view])
+
+  const chart = (chartView: HistoryChartView) => <LiveShotChart points={chartView.points} contextPoints={chartView.contextPoints} elapsedMs={chartView.elapsedMs} fitDuration={chartView.fitDuration} startMs={chartView.startMs} targetYield={targetYield} />
+
+  return <>
+    {leavingView && <div className="history-chart-layer history-chart-layer--leaving" aria-hidden="true" key={`leaving:${leavingView.key}`}>{chart(leavingView)}</div>}
+    <div className="history-chart-layer history-chart-layer--entering" key={`current:${view.key}`}>{chart(view)}</div>
+  </>
 }
 
 const pullTime = (timestamp: string | undefined) => {
@@ -65,6 +95,14 @@ export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, o
   const chartPoints = selectedStage?.points ?? points
   const chartElapsedMs = selectedStage ? Math.max(1, selectedStage.endedAt - selectedStage.startedAt) : elapsedMs
   const chartStartMs = selectedStage?.startedAt ?? 0
+  const chartView: HistoryChartView = {
+    key: `${activeId ?? 'empty'}:${selectedStage?.key ?? 'full'}:${points.length}`,
+    points: chartPoints,
+    contextPoints: selectedStage ? points : undefined,
+    elapsedMs: chartElapsedMs,
+    startMs: chartStartMs,
+    fitDuration: Boolean(selectedStage),
+  }
 
   return <main className="history-browser-screen">
     <aside className="history-browser-rail">
@@ -93,7 +131,7 @@ export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, o
       </header>
 
       <section className={`live-pull-chart-panel history-pull-chart${loadingId ? ' history-pull-chart--loading' : ''}`} aria-label={activeShot ? `Shot history: ${activeShot.profileName}` : 'Shot history chart'}>
-        {activeShot && <LiveShotChart points={chartPoints} contextPoints={selectedStage ? points : undefined} elapsedMs={chartElapsedMs} fitDuration={Boolean(selectedStage)} startMs={chartStartMs} targetYield={targetYield} />}
+        {activeShot && <AnimatedHistoryShotChart view={chartView} targetYield={targetYield} />}
         {loadError && <p className="history-pull-error">That pull couldn’t be loaded. Try selecting it again.</p>}
       </section>
       <LiveBrewStages points={points} elapsedMs={elapsedMs} selectedStageKey={selectedStage?.key} onStageSelect={(stage) => setStageSelection(stage ? { shotId: activeId, stage } : null)} />
