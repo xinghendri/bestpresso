@@ -41,22 +41,12 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
   const focusEndMs = startMs + durationMs
   const contextStartMs = plottedPoints[0]?.elapsedMs ?? startMs
   const contextEndMs = plottedPoints.at(-1)?.elapsedMs ?? focusEndMs
-  const hasLeadingContext = Boolean(contextPoints && contextStartMs < startMs)
-  const hasTrailingContext = Boolean(contextPoints && contextEndMs > focusEndMs)
-  const contextBand = 0.08
-  const focusLeft = PLOT.left + (hasLeadingContext ? plotWidth * contextBand : 0)
-  const focusRight = PLOT.right - (hasTrailingContext ? plotWidth * contextBand : 0)
+  const domainStartMs = contextPoints ? Math.min(contextStartMs, startMs) : startMs
+  const domainEndMs = contextPoints ? Math.max(contextEndMs, focusEndMs) : focusEndMs
+  const domainDurationMs = Math.max(1, domainEndMs - domainStartMs)
   const xForElapsedMs = (pointElapsedMs: number) => {
-    if (hasLeadingContext && pointElapsedMs < startMs) {
-      const ratio = Math.max(0, Math.min(1, (pointElapsedMs - contextStartMs) / Math.max(1, startMs - contextStartMs)))
-      return PLOT.left + ratio * (focusLeft - PLOT.left)
-    }
-    if (hasTrailingContext && pointElapsedMs > focusEndMs) {
-      const ratio = Math.max(0, Math.min(1, (pointElapsedMs - focusEndMs) / Math.max(1, contextEndMs - focusEndMs)))
-      return focusRight + ratio * (PLOT.right - focusRight)
-    }
-    const ratio = Math.max(0, Math.min(1, (pointElapsedMs - startMs) / durationMs))
-    return focusLeft + ratio * (focusRight - focusLeft)
+    const ratio = Math.max(0, Math.min(1, (pointElapsedMs - domainStartMs) / domainDurationMs))
+    return PLOT.left + ratio * plotWidth
   }
   const intervalTicks = Array.from({ length: Math.floor(durationMs / 5_000) }, (_, index) => (index + 1) * 5_000)
   const timeTicks = fitDuration
