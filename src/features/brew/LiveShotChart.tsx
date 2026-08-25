@@ -35,8 +35,15 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
   const durationMs = fitDuration ? Math.max(elapsedMs, 1) : Math.max(10_000, Math.ceil(Math.max(elapsedMs, 1) / 5_000) * 5_000)
   const observedWeight = Math.max(0, ...points.map((point) => point.weight ?? 0))
   const weightMax = Math.max(50, targetYield * 1.2, observedWeight * 1.12)
-  const timeTicks = Array.from({ length: durationMs / 5_000 }, (_, index) => (index + 1) * 5_000)
+  const intervalTicks = Array.from({ length: Math.floor(durationMs / 5_000) }, (_, index) => (index + 1) * 5_000)
+  const timeTicks = fitDuration
+    ? [0, ...intervalTicks, ...(durationMs % 5_000 ? [durationMs] : [])]
+    : intervalTicks
   const gridTicks = Array.from({ length: 5 }, (_, index) => index / 4)
+  const timeLabel = (tick: number) => {
+    const seconds = (startMs + tick) / 1000
+    return `${Number.isInteger(seconds) ? seconds : seconds.toFixed(1)}s`
+  }
 
   return <div className="live-shot-chart">
     <svg viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`} role="img" aria-label="Live espresso pressure, flow, yield weight, and temperature chart" preserveAspectRatio="none">
@@ -47,7 +54,7 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
       })}
       {timeTicks.map((tick) => {
         const x = PLOT.left + tick / durationMs * (PLOT.right - PLOT.left)
-        return <g key={`time-${tick}`}><line className="chart-grid chart-grid--vertical" x1={x} x2={x} y1={PLOT.top} y2={PLOT.bottom} /><text className="chart-axis-label" x={x} y={PLOT.bottom + 25} textAnchor="middle">{tick / 1000}s</text></g>
+        return <g key={`time-${tick}`}><line className="chart-grid chart-grid--vertical" x1={x} x2={x} y1={PLOT.top} y2={PLOT.bottom} /><text className="chart-axis-label" x={x} y={PLOT.bottom + 25} textAnchor="middle">{timeLabel(tick)}</text></g>
       })}
       {gridTicks.map((ratio) => <g key={`axis-${ratio}`}>
         <text className="chart-axis-label" x={PLOT.left - 13} y={PLOT.bottom - ratio * (PLOT.bottom - PLOT.top) + 4} textAnchor="end">{Math.round(12 * ratio)}</text>
