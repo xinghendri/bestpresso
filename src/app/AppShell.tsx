@@ -5,12 +5,13 @@ import sleep from '../assets/figma/sleep.svg'
 import utilityCollapse from '../assets/figma/utility-collapse.svg'
 import utilityExpand from '../assets/figma/utility-expand.svg'
 import { StatusPill } from '../components/StatusPill/StatusPill'
-import type { BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveUtilityOperation, PreviousShotStatus, ScaleConnection, SettingFeedback } from '../domain/brewing'
+import type { AvailableScale, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveUtilityOperation, PreviousShotStatus, ScaleConnection, SettingFeedback } from '../domain/brewing'
 import { BrewingPanel } from '../features/brew/BrewingPanel'
 import { LiveBrewingScreen } from '../features/brew/LiveBrewingScreen'
 import { HistoryPanel } from '../features/history/HistoryPanel'
 import { MachineUtilityCard } from '../features/machine/MachineUtilityCard'
 import { LiveUtilityOperationOverlay } from '../features/machine/LiveUtilityOperationOverlay'
+import { ScaleDevicePicker } from '../features/machine/ScaleDevicePicker'
 
 interface AppShellProps {
   model: BrewingScreenModel
@@ -26,6 +27,8 @@ interface AppShellProps {
   settingFeedback: SettingFeedback | null
   settingsDisabled: boolean
   scale: ScaleConnection
+  availableScales: AvailableScale[]
+  scaleConnectPendingId: string | null
   scaleTarePending: boolean
   brewStopPending: boolean
   onSleep: () => void
@@ -33,6 +36,8 @@ interface AppShellProps {
   onStopEspresso: () => void
   onDismissLiveBrew: () => void
   onSearchScale: () => void
+  onConnectScale: (deviceId: string) => void
+  onDismissScalePicker: () => void
   onTareScale: () => void
   onUpdateMachineSetting: (setting: EditableMachineSetting, value: number) => void
   onUpdateProfileSetting: (profileId: string, setting: EditableProfileSetting, value: number) => void
@@ -52,7 +57,7 @@ const initialUtilityLayout = () => {
   }
 }
 
-export function AppShell({ model, liveBrew, utilityOperation, previousShotStatus, connection, machineConnection, heatingSeconds, sleepPending, sleepScreenActive, machineActionError, settingFeedback, settingsDisabled, scale, scaleTarePending, brewStopPending, onSleep, onWake, onStopEspresso, onDismissLiveBrew, onSearchScale, onTareScale, onUpdateMachineSetting, onUpdateProfileSetting, onSelectProfile, onOpenSettings, onManageProfiles, onOpenPreviousShot }: AppShellProps) {
+export function AppShell({ model, liveBrew, utilityOperation, previousShotStatus, connection, machineConnection, heatingSeconds, sleepPending, sleepScreenActive, machineActionError, settingFeedback, settingsDisabled, scale, availableScales, scaleConnectPendingId, scaleTarePending, brewStopPending, onSleep, onWake, onStopEspresso, onDismissLiveBrew, onSearchScale, onConnectScale, onDismissScalePicker, onTareScale, onUpdateMachineSetting, onUpdateProfileSetting, onSelectProfile, onOpenSettings, onManageProfiles, onOpenPreviousShot }: AppShellProps) {
   const [utilitiesCollapsed, setUtilitiesCollapsed] = useState(initialUtilityLayout)
   const [utilityLayoutHasChanged, setUtilityLayoutHasChanged] = useState(false)
   const sleepLabel = model.readiness === 'sleeping' ? 'Wake' : 'Sleep'
@@ -79,5 +84,6 @@ export function AppShell({ model, liveBrew, utilityOperation, previousShotStatus
     </div>}
     <div className="dashboard"><aside className="utilities" id="machine-utilities">{model.utilities.map((utility) => <MachineUtilityCard key={utility.id} utility={utility} compact={utilitiesCollapsed} scale={utility.id === 'scale' ? scale : undefined} scaleTarePending={utility.id === 'scale' && scaleTarePending} onExpand={utility.id === 'tank' ? undefined : toggleUtilityLayout} onSearchScale={utility.id === 'scale' ? onSearchScale : undefined} onTareScale={utility.id === 'scale' ? onTareScale : undefined} settingsDisabled={settingsDisabled} onUpdateSetting={onUpdateMachineSetting} />)}</aside><div className="primary"><BrewingPanel profiles={model.profiles} activeProfileId={model.activeProfileId} settingsDisabled={settingsDisabled} onUpdateProfile={onUpdateProfileSetting} onSelectProfile={onSelectProfile} onManageProfiles={onManageProfiles} /><HistoryPanel shot={model.previousShot} status={previousShotStatus} onOpen={onOpenPreviousShot} /></div></div>
     {utilityOperation && <LiveUtilityOperationOverlay operation={utilityOperation} />}
+    <ScaleDevicePicker devices={availableScales} pendingDeviceId={scaleConnectPendingId} onSelect={onConnectScale} onDismiss={onDismissScalePicker} />
   </main>
 }

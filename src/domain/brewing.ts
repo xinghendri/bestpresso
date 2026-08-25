@@ -16,6 +16,11 @@ export interface ScaleConnection {
   name?: string
 }
 
+export interface AvailableScale {
+  id: string
+  name: string
+}
+
 export interface DisplayMetric {
   label: string
   value: string

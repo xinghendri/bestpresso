@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isEspressoExtractionSnapshot, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotStage, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres, tankSensorLevelForMillilitres } from '../../api/decaid/adapters'
-import { DecaidApiError, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getSettings, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineState, setSharedSetting, tareScale, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
+import { connectDevice, DecaidApiError, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getSettings, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineState, setSharedSetting, tareScale, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, DecaidWorkflowPatch, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
 import { WATER_TANK_LOW_LEVEL_ML, WATER_TANK_SENSOR_FULL_MM, WATER_TANK_WARNING_OFFSET_CLICKS } from '../../domain/brewing'
-import type { BrewProfile, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, LiveUtilityOperation, MachineReadiness, PreviousShot, PreviousShotStatus, ScaleConnection, SettingFeedback, UtilityOperationKind } from '../../domain/brewing'
+import type { AvailableScale, BrewProfile, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, LiveUtilityOperation, MachineReadiness, PreviousShot, PreviousShotStatus, ScaleConnection, SettingFeedback, UtilityOperationKind } from '../../domain/brewing'
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { brewingFixture } from '../../fixtures/brewingFixture'
 
@@ -53,6 +53,15 @@ const metricNumber = (model: BrewingScreenModel, utilityId: 'water' | 'steam', l
 const localFavoriteStorageKey = 'bestpresso.favorite-profile-ids.v1'
 
 const favoriteAssignmentsForSlots = (slots: Array<string | null>): FavoriteAssignments => Object.fromEntries(Array.from({ length: 5 }, (_, slot) => [String(slot), slots[slot] ?? null]))
+
+const availableScaleCandidates = (devices: Awaited<ReturnType<typeof getDevices>>): AvailableScale[] => {
+  const candidates = new Map<string, AvailableScale>()
+  devices.forEach((device) => {
+    if (device.type !== 'scale' || device.state === 'connected' || device.available === false || !device.id) return
+    candidates.set(device.id, { id: device.id, name: device.name?.trim() || 'Unknown scale' })
+  })
+  return [...candidates.values()]
+}
 
 const storedFixtureFavoriteAssignments = () => {
   try {
@@ -103,6 +112,8 @@ export function useBrewingData() {
   const [connection, setConnection] = useState<DataConnection>('connecting')
   const [machineConnection, setMachineConnection] = useState<DataConnection>('connecting')
   const [scale, setScale] = useState<ScaleConnection>({ status: 'disconnected' })
+  const [availableScales, setAvailableScales] = useState<AvailableScale[]>([])
+  const [scaleConnectPendingId, setScaleConnectPendingId] = useState<string | null>(null)
   const [scaleTarePending, setScaleTarePending] = useState(false)
   const [brewStopPending, setBrewStopPending] = useState(false)
   const [sleepPending, setSleepPending] = useState(false)
@@ -271,6 +282,7 @@ export function useBrewingData() {
       const connectedMachine = devices.find((device) => device.type === 'machine' && device.state === 'connected')
       const activeScale = devices.find((device) => device.type === 'scale' && device.state === 'connected')
       connectedScale.current = Boolean(activeScale)
+      if (activeScale) setAvailableScales([])
       updateMachineConnection(connectedMachine ? 'connected' : 'disconnected')
       setScale((current) => current.status === 'searching'
         ? current
@@ -710,7 +722,9 @@ export function useBrewingData() {
     try {
       const devices = await runScaleScan()
       const activeScale = devices.find((device) => device.type === 'scale' && device.state === 'connected')
+      const candidates = activeScale ? [] : availableScaleCandidates(devices)
       connectedScale.current = Boolean(activeScale)
+      setAvailableScales(candidates.length > 1 ? candidates : [])
       setScale(activeScale ? { status: 'connected', id: activeScale.id, name: activeScale.name || 'Scale' } : { status: 'disconnected' })
     } catch {
       setScale({ status: 'disconnected' })
@@ -718,6 +732,31 @@ export function useBrewingData() {
     } finally {
       manualScaleSearchInFlight.current = false
     }
+  }
+
+  const connectToScale = async (deviceId: string) => {
+    if (scaleConnectPendingId) return
+    const selected = availableScales.find((candidate) => candidate.id === deviceId)
+    if (!selected) return
+    setScaleConnectPendingId(deviceId)
+    showMachineActionError(null)
+    try {
+      await connectDevice(deviceId)
+      const devices = await getDevices()
+      const activeScale = devices.find((device) => device.type === 'scale' && device.state === 'connected' && device.id === deviceId)
+      connectedScale.current = true
+      setScale({ status: 'connected', id: deviceId, name: activeScale?.name || selected.name })
+      setAvailableScales([])
+    } catch {
+      showMachineActionError(`Could not connect to ${selected.name}.`)
+    } finally {
+      setScaleConnectPendingId(null)
+    }
+  }
+
+  const dismissScalePicker = () => {
+    if (scaleConnectPendingId) return
+    setAvailableScales([])
   }
 
   const stopEspresso = async () => {
@@ -927,5 +966,5 @@ export function useBrewingData() {
   const dismissLiveBrew = () => setLiveBrew((current) => current.active ? current : { ...current, visible: false })
   const favoriteProfileIds = favoriteProfileSlots.filter((id): id is string => Boolean(id))
 
-  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, utilityOperation, previousShotStatus, shotHistory, loadHistoryShot, heatingSeconds, connection, machineConnection, scale, scaleTarePending, brewStopPending, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, dismissLiveBrew, searchForScale, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
+  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, utilityOperation, previousShotStatus, shotHistory, loadHistoryShot, heatingSeconds, connection, machineConnection, scale, availableScales, scaleConnectPendingId, scaleTarePending, brewStopPending, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, dismissLiveBrew, searchForScale, connectToScale, dismissScalePicker, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
 }

@@ -33,6 +33,18 @@ export const scanForDevices = () => getJson<unknown[]>('/devices/scan', 30000)
 export const getDisplayState = () => getJson<DisplayState>('/display')
 export const getSettings = () => getJson<DecaidSettings>('/settings')
 
+export async function connectDevice(deviceId: string) {
+  const response = await fetch(`${getDecaidEndpoints().apiBase}/devices/connect`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ deviceId }),
+  })
+  if (response.ok) return
+
+  const body = await response.json().catch(() => null) as { message?: string; type?: string } | null
+  throw new DecaidApiError(body?.message || `Decaid device connection returned ${response.status}`, response.status, body?.type)
+}
+
 export async function tareScale() {
   const response = await fetch(`${getDecaidEndpoints().apiBase}/scale/tare`, { method: 'PUT' })
   if (response.ok) return
