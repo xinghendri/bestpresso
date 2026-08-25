@@ -14,6 +14,15 @@ const VIEW_HEIGHT = 376
 const PLOT = { left: 42, right: 978, top: 38, bottom: 340 }
 const PLOT_BOTTOM_STROKE_ALLOWANCE = 4
 
+const chartLegend = [
+  { label: 'Flow', className: 'chart-legend__sample--flow' },
+  { label: 'Target', accessibleLabel: 'Target flow', className: 'chart-legend__sample--target-flow' },
+  { label: 'Pressure', className: 'chart-legend__sample--pressure' },
+  { label: 'Target', accessibleLabel: 'Target pressure', className: 'chart-legend__sample--target-pressure' },
+  { label: 'Temperature', className: 'chart-legend__sample--temperature' },
+  { label: 'Weight', className: 'chart-legend__sample--weight' },
+]
+
 const linePath = (points: LiveShotPoint[], key: keyof LiveShotPoint, xForElapsedMs: (elapsedMs: number) => number, minimum: number, maximum: number) => {
   let path = ''
   let drawing = false
@@ -59,6 +68,12 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
   }
 
   return <div className="live-shot-chart">
+    <div className="chart-legend" aria-label="Chart legend">
+      {chartLegend.map((item) => <span className="chart-legend__item" aria-label={item.accessibleLabel} key={`${item.label}:${item.className}`}>
+        <small>{item.label}</small>
+        <i className={`chart-legend__sample ${item.className}`} aria-hidden="true" />
+      </span>)}
+    </div>
     <svg viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`} role="img" aria-label="Live espresso pressure, flow, yield weight, and temperature chart" preserveAspectRatio="none">
       <defs><clipPath id="live-shot-plot"><rect x={PLOT.left} y={PLOT.top} width={PLOT.right - PLOT.left} height={PLOT.bottom - PLOT.top + PLOT_BOTTOM_STROKE_ALLOWANCE} /></clipPath></defs>
       {gridTicks.map((ratio) => {
