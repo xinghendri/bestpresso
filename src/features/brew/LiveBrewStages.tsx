@@ -101,6 +101,7 @@ const reading = (value: number | undefined, digits = 1) => value === undefined ?
 export function LiveBrewStages({ points, elapsedMs, active = false, selectedStageKey, onStageSelect }: { points: LiveShotPoint[]; elapsedMs: number; active?: boolean; selectedStageKey?: string; onStageSelect?: (stage: BrewStageSelection | null) => void }) {
   const stages = summarizeLiveBrewStages(points, elapsedMs)
   const stripRef = useRef<HTMLElement>(null)
+  const stageRefs = useRef(new Map<string, HTMLElement>())
 
   useEffect(() => {
     if (!active || !stripRef.current) return
@@ -111,9 +112,36 @@ export function LiveBrewStages({ points, elapsedMs, active = false, selectedStag
     return () => window.cancelAnimationFrame(animationFrame)
   }, [active, stages.length])
 
+  useEffect(() => {
+    if (active || !selectedStageKey || !stripRef.current) return
+    const strip = stripRef.current
+    let scrollFrame = 0
+    const centerSelectedStage = () => {
+      strip.style.setProperty('--stage-center-gutter', `${strip.clientWidth / 2}px`)
+      window.cancelAnimationFrame(scrollFrame)
+      scrollFrame = window.requestAnimationFrame(() => {
+        const selectedStage = stageRefs.current.get(selectedStageKey)
+        if (!selectedStage) return
+        const stripBounds = strip.getBoundingClientRect()
+        const stageBounds = selectedStage.getBoundingClientRect()
+        const stageLeftInStrip = stageBounds.left - stripBounds.left + strip.scrollLeft
+        const centeredLeft = stageLeftInStrip + stageBounds.width / 2 - strip.clientWidth / 2
+        strip.scrollTo({ left: centeredLeft, behavior: 'smooth' })
+      })
+    }
+    const animationFrame = window.requestAnimationFrame(centerSelectedStage)
+    window.addEventListener('resize', centerSelectedStage)
+    return () => {
+      window.cancelAnimationFrame(animationFrame)
+      window.cancelAnimationFrame(scrollFrame)
+      window.removeEventListener('resize', centerSelectedStage)
+      strip.style.removeProperty('--stage-center-gutter')
+    }
+  }, [active, selectedStageKey, stages.length])
+
   if (!stages.length) return <section className="live-brew-stages live-brew-stages--empty" aria-label="Pull stages"><p>Waiting for the first stage…</p></section>
 
-  return <section className={`live-brew-stages${active ? ' live-brew-stages--active' : ''}`} aria-label="Pull stages" ref={stripRef}>
+  return <section className={`live-brew-stages${active ? ' live-brew-stages--active' : ''}${onStageSelect ? ' live-brew-stages--history' : ''}`} aria-label="Pull stages" ref={stripRef}>
     <div className="live-brew-stages__track">
     {stages.map((stage, index) => {
       const isActive = active && index === stages.length - 1
@@ -126,7 +154,10 @@ export function LiveBrewStages({ points, elapsedMs, active = false, selectedStag
         if (event.key !== 'Enter' && event.key !== ' ') return
         event.preventDefault()
         toggleSelection()
-      } : undefined} role={selectable ? 'button' : undefined} style={cardStyle} tabIndex={selectable ? 0 : undefined}>
+      } : undefined} ref={(node) => {
+        if (node) stageRefs.current.set(stage.key, node)
+        else stageRefs.current.delete(stage.key)
+      }} role={selectable ? 'button' : undefined} style={cardStyle} tabIndex={selectable ? 0 : undefined}>
       <header><h2>{stage.name}</h2><time>{timedLabel(stage.endedAt - stage.startedAt)}</time></header>
       <dl>
         <div><dt>Yield</dt><dd>{reading(stage.yield)}<small>g</small></dd></div>
