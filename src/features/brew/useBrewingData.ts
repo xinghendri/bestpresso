@@ -3,7 +3,7 @@ import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProf
 import { connectDevice, DecaidApiError, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getSettings, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineState, setSharedSetting, tareScale, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
-import type { DecaidProfileRecord, DecaidWorkflowPatch, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
+import type { DecaidProfileRecord, DecaidWorkflow, DecaidWorkflowPatch, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
 import { WATER_TANK_LOW_LEVEL_ML, WATER_TANK_SENSOR_FULL_MM, WATER_TANK_WARNING_OFFSET_CLICKS } from '../../domain/brewing'
 import type { AvailableScale, BrewProfile, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, LiveUtilityOperation, MachineReadiness, PreviousShot, PreviousShotStatus, ScaleConnection, SettingFeedback, UtilityOperationKind } from '../../domain/brewing'
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
@@ -18,10 +18,18 @@ const flushDurationDefaultStorageKey = 'bestpresso.flush-duration-default.v1'
 const fixtureProfiles = profilesWithParsedTitles(brewingFixture.profiles)
 
 interface LiveShotSession {
+  kind: 'espresso' | 'cleaning'
   startedAt: number
   profileName: string
   targetYield: number
+  stepNames?: string[]
   points: LiveShotPoint[]
+}
+
+interface PendingCleaningSequence {
+  profileId: string
+  profileName: string
+  stepNames?: string[]
 }
 
 interface UtilityOperationSession {
@@ -44,6 +52,16 @@ const operationKindForSnapshot = (snapshot: MachineSnapshot): UtilityOperationKi
   if (state === 'flush') return 'flush'
   return null
 }
+
+const machineStateForSnapshot = (snapshot: MachineSnapshot) => (typeof snapshot.state === 'string' ? snapshot.state : snapshot.state?.state)?.toLowerCase()
+
+const workflowPatch = (workflow: DecaidWorkflow): DecaidWorkflowPatch => ({
+  profile: workflow.profile,
+  context: workflow.context,
+  steamSettings: workflow.steamSettings,
+  hotWaterData: workflow.hotWaterData,
+  rinseData: workflow.rinseData,
+})
 
 const metricNumber = (model: BrewingScreenModel, utilityId: 'water' | 'steam', label: string) => {
   const value = Number(model.utilities.find((utility) => utility.id === utilityId)?.metrics.find((metric) => metric.label === label)?.value)
@@ -116,6 +134,7 @@ export function useBrewingData() {
   const [scaleConnectPendingId, setScaleConnectPendingId] = useState<string | null>(null)
   const [scaleTarePending, setScaleTarePending] = useState(false)
   const [brewStopPending, setBrewStopPending] = useState(false)
+  const [cleaningStartPending, setCleaningStartPending] = useState(false)
   const [sleepPending, setSleepPending] = useState(false)
   const [sleepScreenActive, setSleepScreenActive] = useState(false)
   const [machineActionError, setMachineActionError] = useState<string | null>(null)
@@ -140,6 +159,9 @@ export function useBrewingData() {
   const connectedScale = useRef(false)
   const scaleTareInFlight = useRef(false)
   const brewStopRequestInFlight = useRef(false)
+  const cleaningStartInFlight = useRef(false)
+  const pendingCleaningSequence = useRef<PendingCleaningSequence | null>(null)
+  const cleaningRestoreWorkflow = useRef<DecaidWorkflowPatch | null>(null)
   const latestScaleSnapshot = useRef<Pick<LiveShotPoint, 'weight' | 'weightFlow'>>({})
   const latestTankVolume = useRef<number | null>(null)
   const machineNeedsWater = useRef(false)
@@ -322,7 +344,22 @@ export function useBrewingData() {
       setBrewStopPending(false)
       const points = [...session.points]
       const elapsedMs = points.at(-1)?.elapsedMs ?? 0
-      setLiveBrew({ active: false, visible: true, elapsedMs, points })
+      if (session.kind === 'cleaning') {
+        setLiveBrew({ active: false, visible: false, kind: 'cleaning', profileName: session.profileName, elapsedMs, points })
+        pendingCleaningSequence.current = null
+        const restorePatch = cleaningRestoreWorkflow.current
+        if (restorePatch) {
+          updateWorkflow(restorePatch).then((workflow) => {
+            if (disposed) return
+            cleaningRestoreWorkflow.current = null
+            setModel((current) => applyWorkflow(current, workflow, profileRecords.current, favoriteAssignments.current, retainedAdHocProfileId.current))
+          }).catch(() => {
+            if (!disposed) showMachineActionError('Cleaning finished, but the previous brew profile could not be restored.')
+          })
+        }
+        return
+      }
+      setLiveBrew({ active: false, visible: true, kind: 'espresso', profileName: session.profileName, targetYield: session.targetYield, elapsedMs, points })
 
       const hasExtraction = points.some((point) => (point.pressure ?? 0) > 0.5 || (point.flow ?? 0) > 0.1)
       if (elapsedMs < MIN_SUCCESSFUL_SHOT_MS || !hasExtraction) return
@@ -451,27 +488,41 @@ export function useBrewingData() {
         utilityOperationSession.current = null
         setUtilityOperation(null)
       }
-      if (isEspressoExtractionSnapshot(snapshot)) {
+      const isEspressoExtraction = isEspressoExtractionSnapshot(snapshot)
+      const isCleaning = machineStateForSnapshot(snapshot) === 'cleaning'
+      if (isEspressoExtraction || isCleaning) {
         const now = snapshotTime(snapshot.timestamp)
         const currentModel = latestModel.current
-        const profile = currentModel.profiles.find((candidate) => candidate.id === currentModel.activeProfileId) ?? currentModel.profiles[0]
+        const cleaningSequence = pendingCleaningSequence.current
+        const profile = isCleaning && cleaningSequence
+          ? allProfilesRef.current.find((candidate) => candidate.id === cleaningSequence.profileId)
+          : currentModel.profiles.find((candidate) => candidate.id === currentModel.activeProfileId) ?? currentModel.profiles[0]
         if (!liveShotSession.current) {
-          liveShotSession.current = { startedAt: now, profileName: profile?.name ?? 'Espresso', targetYield: Number(profile?.targetYield) || 36, points: [] }
-          void requestScaleTare(true)
-          const adHocProfileAtBrewStart = retainedAdHocProfileAtBrewStart(currentModel.activeProfileId, retainedAdHocProfileId.current)
-          if (adHocProfileAtBrewStart !== retainedAdHocProfileId.current) {
-            retainedAdHocProfileId.current = adHocProfileAtBrewStart
-            setModel((current) => ({
-              ...current,
-              profiles: carouselProfiles(allProfilesRef.current, favoriteAssignments.current, current.activeProfileId, adHocProfileAtBrewStart),
-            }))
+          liveShotSession.current = {
+            kind: isCleaning ? 'cleaning' : 'espresso',
+            startedAt: now,
+            profileName: isCleaning ? cleaningSequence?.profileName ?? 'Cleaning' : profile?.name ?? 'Espresso',
+            targetYield: Number(profile?.targetYield) || 36,
+            stepNames: isCleaning ? cleaningSequence?.stepNames : profile?.stepNames,
+            points: [],
+          }
+          if (!isCleaning) {
+            void requestScaleTare(true)
+            const adHocProfileAtBrewStart = retainedAdHocProfileAtBrewStart(currentModel.activeProfileId, retainedAdHocProfileId.current)
+            if (adHocProfileAtBrewStart !== retainedAdHocProfileId.current) {
+              retainedAdHocProfileId.current = adHocProfileAtBrewStart
+              setModel((current) => ({
+                ...current,
+                profiles: carouselProfiles(allProfilesRef.current, favoriteAssignments.current, current.activeProfileId, adHocProfileAtBrewStart),
+              }))
+            }
           }
         }
         const session = liveShotSession.current
         const elapsedMs = Math.max(0, now - session.startedAt)
         const lastPoint = session.points.at(-1)
         if (!lastPoint || elapsedMs > lastPoint.elapsedMs) {
-          const stage = shotStage(snapshot.profileFrame, typeof snapshot.state === 'object' ? snapshot.state.substate : undefined, profile?.stepNames)
+          const stage = shotStage(snapshot.profileFrame, typeof snapshot.state === 'object' ? snapshot.state.substate : undefined, session.stepNames)
           session.points.push({
             elapsedMs,
             pressure: snapshot.pressure,
@@ -485,7 +536,7 @@ export function useBrewingData() {
           })
           if (session.points.length > MAX_LIVE_SHOT_POINTS) session.points.shift()
         }
-        setLiveBrew({ active: true, visible: true, elapsedMs, points: [...session.points] })
+        setLiveBrew({ active: true, visible: true, kind: session.kind, profileName: session.profileName, targetYield: session.targetYield, elapsedMs, points: [...session.points] })
       } else if (liveShotSession.current) {
         completeLiveShot()
       }
@@ -602,7 +653,10 @@ export function useBrewingData() {
     }, 1000)
 
     const refreshWorkflow = window.setInterval(() => {
-      getWorkflow().then((workflow) => { if (!disposed) setModel((current) => applyWorkflow(current, rememberFlushDuration(workflow), profileRecords.current, favoriteAssignments.current, retainedAdHocProfileId.current)) }).catch(() => undefined)
+      getWorkflow().then((workflow) => {
+        if (disposed || (workflow.profile?.beverage_type?.toLowerCase() === 'cleaning' && cleaningRestoreWorkflow.current)) return
+        setModel((current) => applyWorkflow(current, rememberFlushDuration(workflow), profileRecords.current, favoriteAssignments.current, retainedAdHocProfileId.current))
+      }).catch(() => undefined)
     }, 15000)
 
     const refreshDeviceConnections = window.setInterval(() => {
@@ -757,6 +811,47 @@ export function useBrewingData() {
   const dismissScalePicker = () => {
     if (scaleConnectPendingId) return
     setAvailableScales([])
+  }
+
+  const startCleaningSequence = async (profileId: string) => {
+    if (cleaningStartInFlight.current || liveShotSession.current) return false
+    const profile = allProfilesRef.current.find((candidate) => candidate.id === profileId && candidate.beverageType?.toLowerCase() === 'cleaning')
+    const record = profileRecords.current.find((candidate) => candidate.id === profileId)
+    if (!profile || !record?.profile?.steps?.length) {
+      showMachineActionError('That cleaning sequence is not available.')
+      return false
+    }
+    if (connection !== 'connected' || machineConnection !== 'connected') {
+      showMachineActionError('Connect to the machine before starting a cleaning sequence.')
+      return false
+    }
+
+    cleaningStartInFlight.current = true
+    setCleaningStartPending(true)
+    showMachineActionError(null)
+    let previousWorkflow: DecaidWorkflow | null = null
+    try {
+      previousWorkflow = await getWorkflow()
+      cleaningRestoreWorkflow.current = workflowPatch(previousWorkflow)
+      pendingCleaningSequence.current = { profileId, profileName: profile.name, stepNames: profile.stepNames }
+      await updateWorkflow(workflowValuesForProfile(record, profile).patch)
+      await setMachineState('cleaning')
+      return true
+    } catch {
+      pendingCleaningSequence.current = null
+      const restorePatch = cleaningRestoreWorkflow.current
+      cleaningRestoreWorkflow.current = null
+      if (previousWorkflow && restorePatch) {
+        updateWorkflow(restorePatch).then((workflow) => {
+          setModel((current) => applyWorkflow(current, workflow, profileRecords.current, favoriteAssignments.current, retainedAdHocProfileId.current))
+        }).catch(() => undefined)
+      }
+      showMachineActionError('The machine did not start the cleaning sequence.')
+      return false
+    } finally {
+      cleaningStartInFlight.current = false
+      setCleaningStartPending(false)
+    }
   }
 
   const stopEspresso = async () => {
@@ -966,5 +1061,5 @@ export function useBrewingData() {
   const dismissLiveBrew = () => setLiveBrew((current) => current.active ? current : { ...current, visible: false })
   const favoriteProfileIds = favoriteProfileSlots.filter((id): id is string => Boolean(id))
 
-  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, utilityOperation, previousShotStatus, shotHistory, loadHistoryShot, heatingSeconds, connection, machineConnection, scale, availableScales, scaleConnectPendingId, scaleTarePending, brewStopPending, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, dismissLiveBrew, searchForScale, connectToScale, dismissScalePicker, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
+  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, utilityOperation, previousShotStatus, shotHistory, loadHistoryShot, heatingSeconds, connection, machineConnection, scale, availableScales, scaleConnectPendingId, scaleTarePending, brewStopPending, cleaningStartPending, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, startCleaningSequence, dismissLiveBrew, searchForScale, connectToScale, dismissScalePicker, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
 }

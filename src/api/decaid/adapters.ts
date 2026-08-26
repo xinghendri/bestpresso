@@ -105,13 +105,22 @@ export function parseProfileTitle(title: string | undefined) {
 }
 
 export function profilesWithParsedTitles(profiles: BrewProfile[]): BrewProfile[] {
-  return profiles.map((profile) => ({ ...profile, ...parseProfileTitle(profile.name) }))
+  return sortProfilesForDirectory(profiles.map((profile) => ({ ...profile, ...parseProfileTitle(profile.name) })))
+}
+
+export const isCleaningProfile = (profile: Pick<BrewProfile, 'beverageType'>) => profile.beverageType?.toLowerCase() === 'cleaning'
+
+export function sortProfilesForDirectory(profiles: BrewProfile[]) {
+  return profiles
+    .map((profile, index) => ({ profile, index }))
+    .sort((left, right) => Number(isCleaningProfile(left.profile)) - Number(isCleaningProfile(right.profile)) || left.index - right.index)
+    .map(({ profile }) => profile)
 }
 
 export function profileRecordsToDomain(records: DecaidProfileRecord[], workflow: DecaidWorkflow, fallback: BrewProfile[]) {
   const visible = records.filter((record) => record.visibility !== 'hidden' && record.visibility !== 'deleted' && record.profile?.title)
   if (!visible.length) return profilesWithParsedTitles(fallback)
-  return visible.map((record): BrewProfile => {
+  return sortProfilesForDirectory(visible.map((record): BrewProfile => {
     const profile = record.profile ?? {}
     const metadata = record.metadata ?? {}
     const isActive = profile.title === workflow.profile?.title
@@ -120,6 +129,7 @@ export function profileRecordsToDomain(records: DecaidProfileRecord[], workflow:
       id: record.id || profile.title || crypto.randomUUID(),
       name: parsedTitle.name,
       category: parsedTitle.category,
+      beverageType: profile.beverage_type,
       description: textValue(metadata.description, metadata.profileDescription, metadata.notes, metadata.profileNotes, metadata.profile_notes, profile.description, profile.notes, profile.profile_notes),
       temperature: numberString(isActive ? workflow.profile?.steps?.[0]?.temperature : metadata.temperature ?? profile.steps?.[0]?.temperature, '—'),
       grindSetting: numberString(isActive ? workflow.context?.grinderSetting : metadata.grinderSetting, '—'),
@@ -128,7 +138,7 @@ export function profileRecordsToDomain(records: DecaidProfileRecord[], workflow:
       targetPoints: profileStepsToTargetPoints(isActive ? workflow.profile?.steps : profile.steps),
       stepNames: (isActive ? workflow.profile?.steps : profile.steps)?.map((step, index) => textValue(step.name) ?? `Stage ${index + 1}`),
     }
-  })
+  }))
 }
 
 export function activeProfileForWorkflow(profiles: BrewProfile[], records: DecaidProfileRecord[], workflow: DecaidWorkflow) {

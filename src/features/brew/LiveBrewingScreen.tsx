@@ -26,15 +26,16 @@ const latestWeight = (liveBrew: LiveBrewState) => {
 
 export function LiveBrewingScreen({ model, liveBrew, stopPending, actionError, onStop, onDismiss }: LiveBrewingScreenProps) {
   const profile = model.profiles.find((candidate) => candidate.id === model.activeProfileId) ?? model.profiles[0]
-  if (!profile) return null
+  if (!profile && !liveBrew.profileName) return null
 
-  const targetYield = Number(profile.targetYield) || 36
+  const profileName = liveBrew.profileName ?? profile?.name ?? 'Espresso'
+  const targetYield = liveBrew.targetYield ?? (Number(profile?.targetYield) || 36)
   const weight = latestWeight(liveBrew)
 
   return <main className="live-brew-screen">
     {actionError && <div className="system-messages"><div className="system-message system-message--error" role="alert">{actionError}</div></div>}
     <header className="live-pull-header">
-      <h1>{profile.name}</h1>
+      <h1>{profileName}</h1>
       <div className="live-pull-header__metrics" aria-live="polite">
         <div><span>Timer</span><strong>{timedLabel(liveBrew.elapsedMs)}</strong></div>
         <i aria-hidden="true" />
@@ -44,7 +45,7 @@ export function LiveBrewingScreen({ model, liveBrew, stopPending, actionError, o
         ? <button className="live-pull-action live-pull-action--stop" type="button" disabled={stopPending} onClick={onStop}>{stopPending ? 'Stopping…' : 'Stop'}</button>
         : <button className="live-pull-action live-pull-action--close" type="button" onClick={onDismiss} aria-label="Close completed pull">Close</button>}
     </header>
-    <section className="live-pull-chart-panel" aria-label={`Brewing ${profile.name}`}>
+    <section className="live-pull-chart-panel" aria-label={`Running ${profileName}`}>
       <LiveShotChart points={liveBrew.points} elapsedMs={liveBrew.elapsedMs} targetYield={targetYield} />
     </section>
     <LiveBrewStages points={liveBrew.points} elapsedMs={liveBrew.elapsedMs} active={liveBrew.active} />

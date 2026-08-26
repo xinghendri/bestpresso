@@ -9,6 +9,7 @@ import profileUseIcon from '../../assets/figma/profile-use.svg'
 import profilesAddIcon from '../../assets/figma/profiles-add.svg'
 import profilesBackIcon from '../../assets/figma/profiles-back.svg'
 import profilesSearchIcon from '../../assets/figma/profiles-search.svg'
+import { isCleaningProfile, sortProfilesForDirectory } from '../../api/decaid/adapters'
 import type { BrewProfile, SettingFeedback } from '../../domain/brewing'
 import { ProfileTargetChart } from '../brew/ProfileTargetChart'
 
@@ -45,14 +46,18 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
     const categories = profiles
       .map((profile) => profile.category)
       .filter((category): category is string => typeof category === 'string' && category.toLowerCase() !== 'popular')
-    return ['All', ...Array.from(new Set(categories))]
+    return ['All', ...Array.from(new Set(categories)).sort((left, right) => {
+      const leftIsCleaning = profiles.some((profile) => profile.category === left && isCleaningProfile(profile))
+      const rightIsCleaning = profiles.some((profile) => profile.category === right && isCleaningProfile(profile))
+      return Number(leftIsCleaning) - Number(rightIsCleaning)
+    })]
   }, [profiles])
   const normalizedQuery = searchQuery.trim().toLowerCase()
-  const visibleProfiles = profiles.filter((profile) => {
+  const visibleProfiles = sortProfilesForDirectory(profiles.filter((profile) => {
     const matchesCategory = activeCategory === 'All' || profile.category === activeCategory
     const searchText = `${profile.name} ${profile.category ?? ''} ${profile.description ?? ''}`.toLowerCase()
     return matchesCategory && (!normalizedQuery || searchText.includes(normalizedQuery))
-  })
+  }))
   const emptyFavoriteSlot = favoriteProfileSlots.findIndex((id) => !id)
   const replacingFavorite = replacementProfileId !== null
 
