@@ -835,8 +835,12 @@ export function useBrewingData() {
       previousWorkflow = await getWorkflow()
       cleaningRestoreWorkflow.current = workflowPatch(previousWorkflow)
       pendingCleaningSequence.current = { profileId, profileName: profile.name, stepNames: profile.stepNames }
+      await setMachineProfile(record.profile)
       const cleaningWorkflow = await updateWorkflow({ profile: record.profile })
-      await setMachineProfile(cleaningWorkflow.profile ?? record.profile)
+      const selectedProfile = cleaningWorkflow.profile
+      if (selectedProfile?.title !== record.profile.title || selectedProfile?.beverage_type?.toLowerCase() !== 'cleaning') {
+        throw new Error('Decaid did not retain the selected cleaning profile')
+      }
       await setMachineState('cleaning')
       return true
     } catch {

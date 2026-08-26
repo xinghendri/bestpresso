@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react'
+import { useRef, useState, type CSSProperties } from 'react'
 import brewAction from '../../assets/figma/brew-action.svg'
 import cleaningProfile from '../../assets/figma/cleaning-profile.svg'
 import cleaningProfileSelected from '../../assets/figma/cleaning-profile-selected.svg'
@@ -14,6 +14,9 @@ interface CleaningSequencePickerProps {
 export function CleaningSequencePicker({ profiles, pending, onStart, onDismiss }: CleaningSequencePickerProps) {
   const visibleProfiles = profiles.slice(0, 8)
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(visibleProfiles.length === 1 ? visibleProfiles[0].id : null)
+  const [starting, setStarting] = useState(false)
+  const startInFlight = useRef(false)
+  const interactionLocked = pending || starting
   const columns = Math.max(1, Math.min(4, visibleProfiles.length || 2))
   const rows = Math.max(1, Math.ceil(visibleProfiles.length / columns))
   const panelStyle = {
@@ -23,20 +26,27 @@ export function CleaningSequencePicker({ profiles, pending, onStart, onDismiss }
   } as CSSProperties
 
   const startSelected = async () => {
-    if (!selectedProfileId || pending) return
-    if (await onStart(selectedProfileId)) onDismiss()
+    if (!selectedProfileId || interactionLocked || startInFlight.current) return
+    startInFlight.current = true
+    setStarting(true)
+    try {
+      if (await onStart(selectedProfileId)) onDismiss()
+    } finally {
+      startInFlight.current = false
+      setStarting(false)
+    }
   }
 
   return <div className="cleaning-picker-overlay" role="presentation" onPointerDown={(event) => {
-    if (event.target === event.currentTarget && !pending) onDismiss()
+    if (event.target === event.currentTarget && !interactionLocked) onDismiss()
   }}>
-    <section className="cleaning-picker" style={panelStyle} role="dialog" aria-modal="true" aria-labelledby="cleaning-picker-title">
+    <section className="cleaning-picker" style={panelStyle} role="dialog" aria-modal="true" aria-labelledby="cleaning-picker-title" aria-busy={interactionLocked}>
       <header className="cleaning-picker__header">
         <div>
           <h2 id="cleaning-picker-title">Cleaning</h2>
-          <p>Select a sequence and press <button className="cleaning-picker__brew" type="button" aria-label="Start selected cleaning sequence" disabled={!selectedProfileId || pending} onClick={() => void startSelected()}><img src={brewAction} alt="" /></button></p>
+          <p>Select a sequence and press <button className="cleaning-picker__brew" type="button" aria-label="Start selected cleaning sequence" disabled={!selectedProfileId || interactionLocked} onClick={() => void startSelected()}><img src={brewAction} alt="" /></button></p>
         </div>
-        <button className="cleaning-picker__close" type="button" disabled={pending} onClick={onDismiss}>Close</button>
+        <button className="cleaning-picker__close" type="button" disabled={interactionLocked} onClick={onDismiss}>Close</button>
       </header>
       <div className="cleaning-picker__profiles">
         {visibleProfiles.map((profile) => {
@@ -45,7 +55,7 @@ export function CleaningSequencePicker({ profiles, pending, onStart, onDismiss }
             className={`cleaning-picker-card${selected ? ' cleaning-picker-card--selected' : ''}`}
             key={profile.id}
             type="button"
-            disabled={pending}
+            disabled={interactionLocked}
             aria-pressed={selected}
             onClick={() => setSelectedProfileId(profile.id)}
           >
@@ -56,5 +66,10 @@ export function CleaningSequencePicker({ profiles, pending, onStart, onDismiss }
         {!visibleProfiles.length && <p className="cleaning-picker__empty">No cleaning sequences are available yet.</p>}
       </div>
     </section>
+    {interactionLocked && <div className="cleaning-start-loader" role="status" aria-live="assertive" aria-label="Loading selected cleaning sequence">
+      <span className="cleaning-start-loader__spinner" aria-hidden="true" />
+      <strong>Loading cleaning sequence…</strong>
+      <small>Please wait while the profile is sent to the machine.</small>
+    </div>}
   </div>
 }
