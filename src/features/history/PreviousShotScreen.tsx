@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import type { LiveShotPoint, PreviousShot, PreviousShotStatus } from '../../domain/brewing'
 import { LiveBrewStages } from '../brew/LiveBrewStages'
 import type { BrewStageSelection } from '../brew/LiveBrewStages'
+import type { ChartSeries } from '../brew/chartSeries'
+import { toggleDimmedChartSeries } from '../brew/chartSeries'
 import { LiveShotChart } from '../brew/LiveShotChart'
 
 interface PreviousShotScreenProps {
@@ -25,6 +27,7 @@ interface HistoryChartView {
 function AnimatedHistoryShotChart({ view, targetYield }: { view: HistoryChartView; targetYield: number }) {
   const previousView = useRef(view)
   const [leavingView, setLeavingView] = useState<HistoryChartView | null>(null)
+  const [dimmedSeries, setDimmedSeries] = useState<ChartSeries[]>([])
 
   useEffect(() => {
     const previous = previousView.current
@@ -35,10 +38,10 @@ function AnimatedHistoryShotChart({ view, targetYield }: { view: HistoryChartVie
     return () => window.clearTimeout(timeout)
   }, [view])
 
-  const chart = (chartView: HistoryChartView) => <LiveShotChart points={chartView.points} contextPoints={chartView.contextPoints} elapsedMs={chartView.elapsedMs} fitDuration={chartView.fitDuration} startMs={chartView.startMs} targetYield={targetYield} showWeight={chartView.showWeight} />
+  const chart = (chartView: HistoryChartView, filterable = true) => <LiveShotChart points={chartView.points} contextPoints={chartView.contextPoints} elapsedMs={chartView.elapsedMs} fitDuration={chartView.fitDuration} startMs={chartView.startMs} targetYield={targetYield} showWeight={chartView.showWeight} legendFilterEnabled={filterable} dimmedSeries={dimmedSeries} onToggleSeries={filterable ? (series) => setDimmedSeries((current) => toggleDimmedChartSeries(current, series)) : undefined} />
 
   return <>
-    {leavingView && <div className="history-chart-layer history-chart-layer--leaving" aria-hidden="true" key={`leaving:${leavingView.key}`}>{chart(leavingView)}</div>}
+    {leavingView && <div className="history-chart-layer history-chart-layer--leaving" aria-hidden="true" key={`leaving:${leavingView.key}`}>{chart(leavingView, false)}</div>}
     <div className="history-chart-layer history-chart-layer--entering" key={`current:${view.key}`}>{chart(view)}</div>
   </>
 }
