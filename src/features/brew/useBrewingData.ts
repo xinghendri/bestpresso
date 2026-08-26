@@ -136,6 +136,7 @@ export function useBrewingData() {
   const [scaleTarePending, setScaleTarePending] = useState(false)
   const [brewStopPending, setBrewStopPending] = useState(false)
   const [cleaningStartPending, setCleaningStartPending] = useState(false)
+  const [cleaningPreparedProfileId, setCleaningPreparedProfileId] = useState<string | null>(null)
   const [sleepPending, setSleepPending] = useState(false)
   const [sleepScreenActive, setSleepScreenActive] = useState(false)
   const [machineActionError, setMachineActionError] = useState<string | null>(null)
@@ -348,6 +349,7 @@ export function useBrewingData() {
       if (session.kind === 'cleaning') {
         setLiveBrew({ active: false, visible: false, kind: 'cleaning', profileName: session.profileName, elapsedMs, points })
         pendingCleaningSequence.current = null
+        setCleaningPreparedProfileId(null)
         const restorePatch = cleaningRestoreWorkflow.current
         if (restorePatch) {
           updateWorkflow(restorePatch).then(async (workflow) => {
@@ -815,7 +817,7 @@ export function useBrewingData() {
     setAvailableScales([])
   }
 
-  const startCleaningSequence = async (profileId: string) => {
+  const prepareCleaningSequence = async (profileId: string) => {
     if (cleaningStartInFlight.current || liveShotSession.current) return false
     const profile = allProfilesRef.current.find((candidate) => candidate.id === profileId && candidate.beverageType?.toLowerCase() === 'cleaning')
     const record = profileRecords.current.find((candidate) => (candidate.id || candidate.profile?.title) === profileId)
@@ -824,35 +826,95 @@ export function useBrewingData() {
       return false
     }
     if (connection !== 'connected' || machineConnection !== 'connected') {
-      showMachineActionError('Connect to the machine before starting a cleaning sequence.')
+      showMachineActionError('Connect to the machine before loading a cleaning sequence.')
       return false
     }
 
     cleaningStartInFlight.current = true
     setCleaningStartPending(true)
+    setCleaningPreparedProfileId(null)
     const loaderStartedAt = performance.now()
     showMachineActionError(null)
-    let previousWorkflow: DecaidWorkflow | null = null
     try {
-      previousWorkflow = await getWorkflow()
-      cleaningRestoreWorkflow.current = workflowPatch(previousWorkflow)
-      pendingCleaningSequence.current = { profileId, profileName: profile.name, stepNames: profile.stepNames }
+      if (!cleaningRestoreWorkflow.current) cleaningRestoreWorkflow.current = workflowPatch(await getWorkflow())
       await setMachineProfile(record.profile)
       const cleaningWorkflow = await updateWorkflow({ profile: record.profile })
       const selectedProfile = cleaningWorkflow.profile
       if (selectedProfile?.title !== record.profile.title || selectedProfile?.beverage_type?.toLowerCase() !== 'cleaning') {
         throw new Error('Decaid did not retain the selected cleaning profile')
       }
-      await setMachineState('cleaning')
+      pendingCleaningSequence.current = { profileId, profileName: profile.name, stepNames: profile.stepNames }
+      setCleaningPreparedProfileId(profileId)
       return true
     } catch {
       pendingCleaningSequence.current = null
       const restorePatch = cleaningRestoreWorkflow.current
       cleaningRestoreWorkflow.current = null
-      if (previousWorkflow && restorePatch) {
-        updateWorkflow(restorePatch).then((workflow) => workflow.profile ? setMachineProfile(workflow.profile) : undefined).catch(() => undefined)
+      if (restorePatch) {
+        try {
+          if (restorePatch.profile) await setMachineProfile(restorePatch.profile)
+          await updateWorkflow(restorePatch)
+        } catch {
+          // The original profile remains the desired recovery target in Decaid.
+        }
       }
+      showMachineActionError('The cleaning sequence could not be loaded onto the machine.')
+      return false
+    } finally {
+      const remainingLoaderTime = MINIMUM_CLEANING_LOADER_MS - (performance.now() - loaderStartedAt)
+      if (remainingLoaderTime > 0) await new Promise<void>((resolve) => window.setTimeout(resolve, remainingLoaderTime))
+      cleaningStartInFlight.current = false
+      setCleaningStartPending(false)
+    }
+  }
+
+  const startCleaningSequence = async (profileId: string) => {
+    if (cleaningStartInFlight.current || liveShotSession.current) return false
+    if (cleaningPreparedProfileId !== profileId || pendingCleaningSequence.current?.profileId !== profileId) {
+      showMachineActionError('Wait for the selected cleaning sequence to finish loading.')
+      return false
+    }
+    if (connection !== 'connected' || machineConnection !== 'connected') {
+      showMachineActionError('Connect to the machine before starting a cleaning sequence.')
+      return false
+    }
+
+    cleaningStartInFlight.current = true
+    showMachineActionError(null)
+    try {
+      await setMachineState('cleaning')
+      return true
+    } catch {
       showMachineActionError('The machine did not start the cleaning sequence.')
+      return false
+    } finally {
+      cleaningStartInFlight.current = false
+    }
+  }
+
+  const cancelCleaningSequence = async () => {
+    if (cleaningStartInFlight.current || liveShotSession.current) return false
+    const restorePatch = cleaningRestoreWorkflow.current
+    if (!restorePatch) {
+      pendingCleaningSequence.current = null
+      setCleaningPreparedProfileId(null)
+      return true
+    }
+
+    cleaningStartInFlight.current = true
+    setCleaningStartPending(true)
+    const loaderStartedAt = performance.now()
+    showMachineActionError(null)
+    try {
+      if (restorePatch.profile) await setMachineProfile(restorePatch.profile)
+      const workflow = await updateWorkflow(restorePatch)
+      cleaningRestoreWorkflow.current = null
+      pendingCleaningSequence.current = null
+      setCleaningPreparedProfileId(null)
+      setModel((current) => applyWorkflow(current, workflow, profileRecords.current, favoriteAssignments.current, retainedAdHocProfileId.current))
+      return true
+    } catch {
+      showMachineActionError('The previous brew profile could not be restored.')
       return false
     } finally {
       const remainingLoaderTime = MINIMUM_CLEANING_LOADER_MS - (performance.now() - loaderStartedAt)
@@ -1069,5 +1131,5 @@ export function useBrewingData() {
   const dismissLiveBrew = () => setLiveBrew((current) => current.active ? current : { ...current, visible: false })
   const favoriteProfileIds = favoriteProfileSlots.filter((id): id is string => Boolean(id))
 
-  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, utilityOperation, previousShotStatus, shotHistory, loadHistoryShot, heatingSeconds, connection, machineConnection, scale, availableScales, scaleConnectPendingId, scaleTarePending, brewStopPending, cleaningStartPending, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, startCleaningSequence, dismissLiveBrew, searchForScale, connectToScale, dismissScalePicker, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
+  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, utilityOperation, previousShotStatus, shotHistory, loadHistoryShot, heatingSeconds, connection, machineConnection, scale, availableScales, scaleConnectPendingId, scaleTarePending, brewStopPending, cleaningStartPending, cleaningPreparedProfileId, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, prepareCleaningSequence, startCleaningSequence, cancelCleaningSequence, dismissLiveBrew, searchForScale, connectToScale, dismissScalePicker, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
 }

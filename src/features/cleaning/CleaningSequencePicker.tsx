@@ -1,4 +1,4 @@
-import { useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import brewAction from '../../assets/figma/brew-action.svg'
 import cleaningProfile from '../../assets/figma/cleaning-profile.svg'
 import cleaningProfileSelected from '../../assets/figma/cleaning-profile-selected.svg'
@@ -7,15 +7,18 @@ import type { BrewProfile } from '../../domain/brewing'
 interface CleaningSequencePickerProps {
   profiles: BrewProfile[]
   pending: boolean
+  preparedProfileId: string | null
+  onPrepare: (profileId: string) => Promise<boolean>
   onStart: (profileId: string) => Promise<boolean>
-  onDismiss: () => void
+  onDismiss: () => Promise<void>
 }
 
-export function CleaningSequencePicker({ profiles, pending, onStart, onDismiss }: CleaningSequencePickerProps) {
+export function CleaningSequencePicker({ profiles, pending, preparedProfileId, onPrepare, onStart, onDismiss }: CleaningSequencePickerProps) {
   const visibleProfiles = profiles.slice(0, 8)
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(visibleProfiles.length === 1 ? visibleProfiles[0].id : null)
   const [starting, setStarting] = useState(false)
   const startInFlight = useRef(false)
+  const autoPrepareRequested = useRef(false)
   const interactionLocked = pending || starting
   const columns = Math.max(1, Math.min(4, visibleProfiles.length || 2))
   const rows = Math.max(1, Math.ceil(visibleProfiles.length / columns))
@@ -25,12 +28,25 @@ export function CleaningSequencePicker({ profiles, pending, onStart, onDismiss }
     height: `${97 + 25 + (rows * 133) + ((rows - 1) * 15) + 26}px`,
   } as CSSProperties
 
+  useEffect(() => {
+    const onlyProfileId = visibleProfiles.length === 1 ? visibleProfiles[0].id : null
+    if (!onlyProfileId || autoPrepareRequested.current) return
+    autoPrepareRequested.current = true
+    void onPrepare(onlyProfileId)
+  }, [onPrepare, visibleProfiles])
+
+  const selectProfile = async (profileId: string) => {
+    if (interactionLocked) return
+    setSelectedProfileId(profileId)
+    if (preparedProfileId !== profileId) await onPrepare(profileId)
+  }
+
   const startSelected = async () => {
     if (!selectedProfileId || interactionLocked || startInFlight.current) return
     startInFlight.current = true
     setStarting(true)
     try {
-      if (await onStart(selectedProfileId)) onDismiss()
+      await onStart(selectedProfileId)
     } finally {
       startInFlight.current = false
       setStarting(false)
@@ -38,15 +54,15 @@ export function CleaningSequencePicker({ profiles, pending, onStart, onDismiss }
   }
 
   return <div className="cleaning-picker-overlay" role="presentation" onPointerDown={(event) => {
-    if (event.target === event.currentTarget && !interactionLocked) onDismiss()
+    if (event.target === event.currentTarget && !interactionLocked) void onDismiss()
   }}>
     <section className="cleaning-picker" style={panelStyle} role="dialog" aria-modal="true" aria-labelledby="cleaning-picker-title" aria-busy={interactionLocked}>
       <header className="cleaning-picker__header">
         <div>
           <h2 id="cleaning-picker-title">Cleaning</h2>
-          <p>Select a sequence and press <button className="cleaning-picker__brew" type="button" aria-label="Start selected cleaning sequence" disabled={!selectedProfileId || interactionLocked} onClick={() => void startSelected()}><img src={brewAction} alt="" /></button></p>
+          <p>Select a sequence and press <button className="cleaning-picker__brew" type="button" aria-label="Start selected cleaning sequence" disabled={!selectedProfileId || preparedProfileId !== selectedProfileId || interactionLocked} onClick={() => void startSelected()}><img src={brewAction} alt="" /></button></p>
         </div>
-        <button className="cleaning-picker__close" type="button" disabled={interactionLocked} onClick={onDismiss}>Close</button>
+        <button className="cleaning-picker__close" type="button" disabled={interactionLocked} onClick={() => void onDismiss()}>Close</button>
       </header>
       <div className="cleaning-picker__profiles">
         {visibleProfiles.map((profile) => {
@@ -57,7 +73,7 @@ export function CleaningSequencePicker({ profiles, pending, onStart, onDismiss }
             type="button"
             disabled={interactionLocked}
             aria-pressed={selected}
-            onClick={() => setSelectedProfileId(profile.id)}
+            onClick={() => void selectProfile(profile.id)}
           >
             <img src={selected ? cleaningProfileSelected : cleaningProfile} alt="" />
             <strong>{profile.name}</strong>
