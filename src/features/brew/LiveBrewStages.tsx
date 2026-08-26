@@ -98,7 +98,7 @@ function summarizeLiveBrewStages(points: LiveShotPoint[], elapsedMs: number): St
 
 const reading = (value: number | undefined, digits = 1) => value === undefined ? '—' : value.toFixed(digits)
 
-export function LiveBrewStages({ points, elapsedMs, active = false, selectedStageKey, onStageSelect }: { points: LiveShotPoint[]; elapsedMs: number; active?: boolean; selectedStageKey?: string; onStageSelect?: (stage: BrewStageSelection | null) => void }) {
+export function LiveBrewStages({ points, elapsedMs, active = false, showYield = true, selectedStageKey, onStageSelect }: { points: LiveShotPoint[]; elapsedMs: number; active?: boolean; showYield?: boolean; selectedStageKey?: string; onStageSelect?: (stage: BrewStageSelection | null) => void }) {
   const stages = summarizeLiveBrewStages(points, elapsedMs)
   const stripRef = useRef<HTMLElement>(null)
   const stageRefs = useRef(new Map<string, HTMLElement>())
@@ -139,7 +139,7 @@ export function LiveBrewStages({ points, elapsedMs, active = false, selectedStag
 
   if (!stages.length) return <section className="live-brew-stages live-brew-stages--empty" aria-label="Pull stages"><p>Waiting for the first stage…</p></section>
 
-  return <section className={`live-brew-stages${active ? ' live-brew-stages--active' : ''}`} aria-label="Pull stages" ref={stripRef}>
+  return <section className={`live-brew-stages${active ? ' live-brew-stages--active' : ''}${showYield ? '' : ' live-brew-stages--no-yield'}`} aria-label="Pull stages" ref={stripRef}>
     <div className="live-brew-stages__track">
     {stages.map((stage, index) => {
       const isActive = active && index === stages.length - 1
@@ -158,7 +158,7 @@ export function LiveBrewStages({ points, elapsedMs, active = false, selectedStag
       }} role={selectable ? 'button' : undefined} style={cardStyle} tabIndex={selectable ? 0 : undefined}>
       <header><h2>{stage.name}</h2><time>{timedLabel(stage.endedAt - stage.startedAt)}</time></header>
       <dl>
-        <div><dt>Yield</dt><dd>{reading(stage.yield)}<small>g</small></dd></div>
+        {showYield && <div><dt>Yield</dt><dd>{reading(stage.yield)}<small>g</small></dd></div>}
         <div><dt>Temperature range</dt><dd>{reading(stage.minimumTemperature, 0)}° – {reading(stage.maximumTemperature, 0)}°</dd></div>
         <div><dt>Pressure</dt><dd>{stage.pressureMovements.length ? stage.pressureMovements.map((pressure) => reading(pressure)).join(' → ') : '—'}</dd></div>
       </dl>

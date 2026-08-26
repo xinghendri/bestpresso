@@ -19,6 +19,7 @@ interface HistoryChartView {
   elapsedMs: number
   startMs: number
   fitDuration: boolean
+  showWeight: boolean
 }
 
 function AnimatedHistoryShotChart({ view, targetYield }: { view: HistoryChartView; targetYield: number }) {
@@ -34,7 +35,7 @@ function AnimatedHistoryShotChart({ view, targetYield }: { view: HistoryChartVie
     return () => window.clearTimeout(timeout)
   }, [view])
 
-  const chart = (chartView: HistoryChartView) => <LiveShotChart points={chartView.points} contextPoints={chartView.contextPoints} elapsedMs={chartView.elapsedMs} fitDuration={chartView.fitDuration} startMs={chartView.startMs} targetYield={targetYield} />
+  const chart = (chartView: HistoryChartView) => <LiveShotChart points={chartView.points} contextPoints={chartView.contextPoints} elapsedMs={chartView.elapsedMs} fitDuration={chartView.fitDuration} startMs={chartView.startMs} targetYield={targetYield} showWeight={chartView.showWeight} />
 
   return <>
     {leavingView && <div className="history-chart-layer history-chart-layer--leaving" aria-hidden="true" key={`leaving:${leavingView.key}`}>{chart(leavingView)}</div>}
@@ -65,6 +66,7 @@ export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, o
   const activeId = selectedId && shots.some((shot) => shot.id === selectedId) ? selectedId : firstShot?.id
   const activeShot = selectedShot?.id === activeId ? selectedShot : initialShot?.id === activeId ? initialShot : shots.find((shot) => shot.id === activeId) ?? null
   const selectedStage = stageSelection && stageSelection.shotId === activeId ? stageSelection.stage : null
+  const isCleaning = activeShot?.beverageType?.toLowerCase() === 'cleaning'
 
   const selectShot = async (shot: PreviousShot) => {
     if (!shot.id || loadingId === shot.id) return
@@ -102,6 +104,7 @@ export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, o
     elapsedMs: chartElapsedMs,
     startMs: chartStartMs,
     fitDuration: Boolean(selectedStage),
+    showWeight: !isCleaning,
   }
 
   return <main className="history-browser-screen">
@@ -122,10 +125,9 @@ export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, o
           <h1>{activeShot?.profileName ?? 'Pull history'}</h1>
           {activeShot && <time dateTime={activeShot.timestamp}>{pullTime(activeShot.timestamp)}</time>}
         </div>
-        <div className="live-pull-header__metrics">
+        <div className={`live-pull-header__metrics${isCleaning ? ' live-pull-header__metrics--single' : ''}`}>
           <div><span>Duration</span><strong>{activeShot ? timerLabel(activeShot) : '—'}</strong></div>
-          <i aria-hidden="true" />
-          <div><span>Yield</span><strong>{activeShot?.totalYield ?? '—'}{activeShot?.totalYield !== '—' && <small>g</small>}</strong></div>
+          {!isCleaning && <><i aria-hidden="true" /><div><span>Yield</span><strong>{activeShot?.totalYield ?? '—'}{activeShot?.totalYield !== '—' && <small>g</small>}</strong></div></>}
         </div>
         <button className="live-pull-action live-pull-action--close" type="button" onClick={onDismiss}>Close</button>
       </header>
@@ -134,7 +136,7 @@ export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, o
         {activeShot && <AnimatedHistoryShotChart view={chartView} targetYield={targetYield} />}
         {loadError && <p className="history-pull-error">That pull couldn’t be loaded. Try selecting it again.</p>}
       </section>
-      <LiveBrewStages points={points} elapsedMs={elapsedMs} selectedStageKey={selectedStage?.key} onStageSelect={(stage) => setStageSelection(stage ? { shotId: activeId, stage } : null)} />
+      <LiveBrewStages points={points} elapsedMs={elapsedMs} showYield={!isCleaning} selectedStageKey={selectedStage?.key} onStageSelect={(stage) => setStageSelection(stage ? { shotId: activeId, stage } : null)} />
     </section>
   </main>
 }

@@ -49,6 +49,7 @@ export interface BrewProfile {
   id: string
   name: string
   category?: string
+  beverageType?: string
   description?: string
   temperature: string
   grindSetting: string
@@ -61,6 +62,7 @@ export interface BrewProfile {
 export interface PreviousShot {
   id?: string
   profileName: string
+  beverageType?: string
   timestamp?: string
   totalYield: string
   totalTime: string
@@ -97,6 +99,9 @@ export interface LiveShotPoint {
 export interface LiveBrewState {
   active: boolean
   visible: boolean
+  kind?: 'espresso' | 'cleaning'
+  profileName?: string
+  targetYield?: number
   elapsedMs: number
   points: LiveShotPoint[]
 }

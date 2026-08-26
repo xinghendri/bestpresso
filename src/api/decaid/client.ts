@@ -1,5 +1,5 @@
 import { getDecaidEndpoints } from './config'
-import type { DecaidDevice, DecaidProfileRecord, DecaidSettings, DecaidWorkflow, DecaidWorkflowPatch, DisplayState, FavoriteAssignments, PaginatedShots, ShotRecord } from './types'
+import type { DecaidDevice, DecaidProfile, DecaidProfileRecord, DecaidSettings, DecaidWorkflow, DecaidWorkflowPatch, DisplayState, FavoriteAssignments, PaginatedShots, ShotRecord } from './types'
 
 export class DecaidApiError extends Error {
   status: number
@@ -92,9 +92,18 @@ export async function setSharedSetting(key: string, value: unknown) {
   if (!response.ok) throw new Error(`Decaid shared setting returned ${response.status}`)
 }
 
-export async function setMachineState(state: 'idle' | 'sleeping') {
+export async function setMachineState(state: 'idle' | 'sleeping' | 'cleaning') {
   const response = await fetch(`${getDecaidEndpoints().apiBase}/machine/state/${state}`, { method: 'PUT' })
   if (!response.ok) throw new Error(`Decaid machine state returned ${response.status}`)
+}
+
+export async function setMachineProfile(profile: DecaidProfile) {
+  const response = await fetch(`${getDecaidEndpoints().apiBase}/machine/profile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(profile),
+  })
+  if (!response.ok) throw new Error(`Decaid machine profile upload returned ${response.status}: ${await response.text()}`)
 }
 
 export async function getLatestShot() {
