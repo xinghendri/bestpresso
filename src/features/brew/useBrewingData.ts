@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isEspressoExtractionSnapshot, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotStage, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres, tankSensorLevelForMillilitres } from '../../api/decaid/adapters'
-import { connectDevice, DecaidApiError, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getSettings, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineState, setSharedSetting, tareScale, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
+import { connectDevice, DecaidApiError, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getSettings, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineProfile, setMachineState, setSharedSetting, tareScale, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, DecaidWorkflow, DecaidWorkflowPatch, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
@@ -349,7 +349,8 @@ export function useBrewingData() {
         pendingCleaningSequence.current = null
         const restorePatch = cleaningRestoreWorkflow.current
         if (restorePatch) {
-          updateWorkflow(restorePatch).then((workflow) => {
+          updateWorkflow(restorePatch).then(async (workflow) => {
+            if (workflow.profile) await setMachineProfile(workflow.profile)
             if (disposed) return
             cleaningRestoreWorkflow.current = null
             setModel((current) => applyWorkflow(current, workflow, profileRecords.current, favoriteAssignments.current, retainedAdHocProfileId.current))
@@ -489,7 +490,7 @@ export function useBrewingData() {
         setUtilityOperation(null)
       }
       const isEspressoExtraction = isEspressoExtractionSnapshot(snapshot)
-      const isCleaning = machineStateForSnapshot(snapshot) === 'cleaning'
+      const isCleaning = machineStateForSnapshot(snapshot) === 'cleaning' || Boolean(pendingCleaningSequence.current && isEspressoExtraction)
       if (isEspressoExtraction || isCleaning) {
         const now = snapshotTime(snapshot.timestamp)
         const currentModel = latestModel.current
@@ -834,7 +835,8 @@ export function useBrewingData() {
       previousWorkflow = await getWorkflow()
       cleaningRestoreWorkflow.current = workflowPatch(previousWorkflow)
       pendingCleaningSequence.current = { profileId, profileName: profile.name, stepNames: profile.stepNames }
-      await updateWorkflow(workflowValuesForProfile(record, profile).patch)
+      const cleaningWorkflow = await updateWorkflow({ profile: record.profile })
+      await setMachineProfile(cleaningWorkflow.profile ?? record.profile)
       await setMachineState('cleaning')
       return true
     } catch {
@@ -842,9 +844,7 @@ export function useBrewingData() {
       const restorePatch = cleaningRestoreWorkflow.current
       cleaningRestoreWorkflow.current = null
       if (previousWorkflow && restorePatch) {
-        updateWorkflow(restorePatch).then((workflow) => {
-          setModel((current) => applyWorkflow(current, workflow, profileRecords.current, favoriteAssignments.current, retainedAdHocProfileId.current))
-        }).catch(() => undefined)
+        updateWorkflow(restorePatch).then((workflow) => workflow.profile ? setMachineProfile(workflow.profile) : undefined).catch(() => undefined)
       }
       showMachineActionError('The machine did not start the cleaning sequence.')
       return false

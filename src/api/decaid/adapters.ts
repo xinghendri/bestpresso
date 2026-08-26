@@ -210,8 +210,10 @@ export function tankSensorLevelForMillilitres(volume: number) {
 
 export function shotToDomain(shot: ShotRecord): PreviousShot {
   const measurements = shot.measurements ?? []
+  const beverageType = shot.workflow?.profile?.beverage_type
+  const isCleaning = beverageType?.toLowerCase() === 'cleaning'
   const hasMachineSubstates = measurements.some((entry) => entry.machine?.state?.substate)
-  const extraction = hasMachineSubstates
+  const extraction = hasMachineSubstates && !isCleaning
     ? measurements.filter((entry) => ESPRESSO_EXTRACTION_SUBSTATES.has(entry.machine?.state?.substate?.toLowerCase() ?? ''))
     : measurements
   const firstTimestamp = extraction[0]?.machine?.timestamp
@@ -239,6 +241,7 @@ export function shotToDomain(shot: ShotRecord): PreviousShot {
   return {
     id: shot.id,
     profileName: parseProfileTitle(shotProfileTitle).name,
+    beverageType,
     timestamp: shot.timestamp ?? firstTimestamp ?? lastTimestamp,
     totalYield: numberString(shot.annotations?.actualYield ?? lastWeight, '—'),
     totalTime: numberString(duration, '—'),

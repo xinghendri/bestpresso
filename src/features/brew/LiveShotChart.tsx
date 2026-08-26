@@ -7,11 +7,13 @@ interface LiveShotChartProps {
   startMs?: number
   fitDuration?: boolean
   contextPoints?: LiveShotPoint[]
+  showWeight?: boolean
 }
 
 const VIEW_WIDTH = 1000
 const VIEW_HEIGHT = 376
 const PLOT = { left: 42, right: 978, top: 38, bottom: 340 }
+const PLOT_TOP_STROKE_ALLOWANCE = 4
 const PLOT_BOTTOM_STROKE_ALLOWANCE = 4
 
 const chartLegend = [
@@ -41,7 +43,7 @@ const linePath = (points: LiveShotPoint[], key: keyof LiveShotPoint, xForElapsed
   return path
 }
 
-export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fitDuration = false, contextPoints }: LiveShotChartProps) {
+export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fitDuration = false, contextPoints, showWeight = true }: LiveShotChartProps) {
   const durationMs = fitDuration ? Math.max(elapsedMs, 1) : Math.max(10_000, Math.ceil(Math.max(elapsedMs, 1) / 5_000) * 5_000)
   const plottedPoints = contextPoints ?? points
   const observedWeight = Math.max(0, ...plottedPoints.map((point) => point.weight ?? 0))
@@ -69,13 +71,13 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
 
   return <div className="live-shot-chart">
     <div className="chart-legend" aria-label="Chart legend">
-      {chartLegend.map((item) => <span className="chart-legend__item" aria-label={item.accessibleLabel} key={`${item.label}:${item.className}`}>
+      {chartLegend.filter((item) => showWeight || item.label !== 'Weight').map((item) => <span className="chart-legend__item" aria-label={item.accessibleLabel} key={`${item.label}:${item.className}`}>
         <small>{item.label}</small>
         <i className={`chart-legend__sample ${item.className}`} aria-hidden="true" />
       </span>)}
     </div>
-    <svg viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`} role="img" aria-label="Live espresso pressure, flow, yield weight, and temperature chart" preserveAspectRatio="none">
-      <defs><clipPath id="live-shot-plot"><rect x={PLOT.left} y={PLOT.top} width={PLOT.right - PLOT.left} height={PLOT.bottom - PLOT.top + PLOT_BOTTOM_STROKE_ALLOWANCE} /></clipPath></defs>
+    <svg viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`} role="img" aria-label={showWeight ? 'Pressure, flow, yield weight, and temperature chart' : 'Pressure, flow, and temperature chart'} preserveAspectRatio="none">
+      <defs><clipPath id="live-shot-plot"><rect x={PLOT.left} y={PLOT.top - PLOT_TOP_STROKE_ALLOWANCE} width={PLOT.right - PLOT.left} height={PLOT.bottom - PLOT.top + PLOT_TOP_STROKE_ALLOWANCE + PLOT_BOTTOM_STROKE_ALLOWANCE} /></clipPath></defs>
       {gridTicks.map((ratio) => {
         const y = PLOT.top + ratio * (PLOT.bottom - PLOT.top)
         return <line key={`horizontal-${ratio}`} className="chart-grid chart-grid--tick" x1={PLOT.left} x2={PLOT.left + 10} y1={y} y2={y} />
@@ -95,14 +97,14 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
           <path className="chart-line chart-line--temperature" d={linePath(contextPoints, 'temperature', xForElapsedMs, 70, 100)} />
           <path className="chart-line chart-line--pressure" d={linePath(contextPoints, 'pressure', xForElapsedMs, 0, 12)} />
           <path className="chart-line chart-line--flow" d={linePath(contextPoints, 'flow', xForElapsedMs, 0, 12)} />
-          <path className="chart-line chart-line--weight" d={linePath(contextPoints, 'weight', xForElapsedMs, 0, weightMax)} />
+          {showWeight && <path className="chart-line chart-line--weight" d={linePath(contextPoints, 'weight', xForElapsedMs, 0, weightMax)} />}
         </g>}
         <path className="chart-line chart-line--target-pressure" d={linePath(points, 'targetPressure', xForElapsedMs, 0, 12)} />
         <path className="chart-line chart-line--target-flow" d={linePath(points, 'targetFlow', xForElapsedMs, 0, 12)} />
         <path className="chart-line chart-line--temperature" d={linePath(points, 'temperature', xForElapsedMs, 70, 100)} />
         <path className="chart-line chart-line--pressure" d={linePath(points, 'pressure', xForElapsedMs, 0, 12)} />
         <path className="chart-line chart-line--flow" d={linePath(points, 'flow', xForElapsedMs, 0, 12)} />
-        <path className="chart-line chart-line--weight" d={linePath(points, 'weight', xForElapsedMs, 0, weightMax)} />
+        {showWeight && <path className="chart-line chart-line--weight" d={linePath(points, 'weight', xForElapsedMs, 0, weightMax)} />}
       </g>
     </svg>
     {points.length === 0 && <p className="live-shot-chart__empty">Waiting for brewing telemetry…</p>}
