@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react'
-import type { CSSProperties } from 'react'
 import type { LiveShotPoint } from '../../domain/brewing'
 
 interface StageSummary {
@@ -101,15 +100,25 @@ const reading = (value: number | undefined, digits = 1) => value === undefined ?
 export function LiveBrewStages({ points, elapsedMs, active = false, showYield = true, selectedStageKey, onStageSelect }: { points: LiveShotPoint[]; elapsedMs: number; active?: boolean; showYield?: boolean; selectedStageKey?: string; onStageSelect?: (stage: BrewStageSelection | null) => void }) {
   const stages = summarizeLiveBrewStages(points, elapsedMs)
   const stripRef = useRef<HTMLElement>(null)
+  const trackRef = useRef<HTMLDivElement>(null)
   const stageRefs = useRef(new Map<string, HTMLElement>())
 
   useEffect(() => {
-    if (!active || !stripRef.current) return
-    const animationFrame = window.requestAnimationFrame(() => {
-      const strip = stripRef.current
-      if (strip) strip.scrollTo({ left: strip.scrollWidth - strip.clientWidth, behavior: 'smooth' })
-    })
-    return () => window.cancelAnimationFrame(animationFrame)
+    const strip = stripRef.current
+    const track = trackRef.current
+    if (!active || !strip || !track) return
+    let animationFrame = 0
+    const revealLatestStage = () => {
+      window.cancelAnimationFrame(animationFrame)
+      animationFrame = window.requestAnimationFrame(() => strip.scrollTo({ left: strip.scrollWidth - strip.clientWidth, behavior: 'smooth' }))
+    }
+    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(revealLatestStage)
+    resizeObserver?.observe(track)
+    revealLatestStage()
+    return () => {
+      resizeObserver?.disconnect()
+      window.cancelAnimationFrame(animationFrame)
+    }
   }, [active, stages.length])
 
   useEffect(() => {
@@ -140,13 +149,11 @@ export function LiveBrewStages({ points, elapsedMs, active = false, showYield = 
   if (!stages.length) return <section className="live-brew-stages live-brew-stages--empty" aria-label="Pull stages"><p>Waiting for the first stage…</p></section>
 
   return <section className={`live-brew-stages${active ? ' live-brew-stages--active' : ''}${showYield ? '' : ' live-brew-stages--no-yield'}`} aria-label="Pull stages" ref={stripRef}>
-    <div className="live-brew-stages__track">
+    <div className="live-brew-stages__track" ref={trackRef}>
     {stages.map((stage, index) => {
       const isActive = active && index === stages.length - 1
       const isSelected = selectedStageKey === stage.key
       const selectable = Boolean(onStageSelect)
-      const pressureWidth = Math.min(760, 460 + Math.max(0, stage.pressureMovements.length - 2) * 58)
-      const cardStyle = { '--stage-card-width': `${pressureWidth}px` } as CSSProperties
       const toggleSelection = () => onStageSelect?.(isSelected ? null : { key: stage.key, name: stage.name, startedAt: stage.startedAt, endedAt: stage.endedAt, points: stage.points })
       return <article className={`live-brew-stage${isActive ? ' live-brew-stage--active' : ''}${isSelected ? ' live-brew-stage--selected' : ''}`} aria-current={isActive ? 'step' : undefined} aria-pressed={selectable ? isSelected : undefined} key={stage.key} onClick={selectable ? toggleSelection : undefined} onKeyDown={selectable ? (event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return
@@ -155,7 +162,7 @@ export function LiveBrewStages({ points, elapsedMs, active = false, showYield = 
       } : undefined} ref={(node) => {
         if (node) stageRefs.current.set(stage.key, node)
         else stageRefs.current.delete(stage.key)
-      }} role={selectable ? 'button' : undefined} style={cardStyle} tabIndex={selectable ? 0 : undefined}>
+      }} role={selectable ? 'button' : undefined} tabIndex={selectable ? 0 : undefined}>
       <header><h2>{stage.name}</h2><time>{timedLabel(stage.endedAt - stage.startedAt)}</time></header>
       <dl>
         {showYield && <div><dt>Yield</dt><dd>{reading(stage.yield)}<small>g</small></dd></div>}

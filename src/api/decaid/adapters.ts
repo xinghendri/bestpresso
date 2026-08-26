@@ -108,7 +108,9 @@ export function profilesWithParsedTitles(profiles: BrewProfile[]): BrewProfile[]
   return sortProfilesForDirectory(profiles.map((profile) => ({ ...profile, ...parseProfileTitle(profile.name) })))
 }
 
-export const isCleaningProfile = (profile: Pick<BrewProfile, 'beverageType'>) => profile.beverageType?.toLowerCase() === 'cleaning'
+export const isCleaningProfile = (profile: Pick<BrewProfile, 'beverageType' | 'category'>) => (
+  profile.beverageType?.trim().toLowerCase() === 'cleaning' || profile.category?.trim().toLowerCase() === 'cleaning'
+)
 
 export function sortProfilesForDirectory(profiles: BrewProfile[]) {
   return profiles
@@ -128,7 +130,7 @@ export function profileRecordsToDomain(records: DecaidProfileRecord[], workflow:
     return {
       id: record.id || profile.title || crypto.randomUUID(),
       name: parsedTitle.name,
-      category: parsedTitle.category,
+      category: parsedTitle.category ?? textValue(profile.category),
       beverageType: profile.beverage_type,
       description: textValue(metadata.description, metadata.profileDescription, metadata.notes, metadata.profileNotes, metadata.profile_notes, profile.description, profile.notes, profile.profile_notes),
       temperature: numberString(isActive ? workflow.profile?.steps?.[0]?.temperature : metadata.temperature ?? profile.steps?.[0]?.temperature, '—'),
@@ -210,8 +212,9 @@ export function tankSensorLevelForMillilitres(volume: number) {
 
 export function shotToDomain(shot: ShotRecord): PreviousShot {
   const measurements = shot.measurements ?? []
-  const beverageType = shot.workflow?.profile?.beverage_type
-  const isCleaning = beverageType?.toLowerCase() === 'cleaning'
+  const rawBeverageType = shot.workflow?.profile?.beverage_type
+  const isCleaning = rawBeverageType?.toLowerCase() === 'cleaning' || shot.workflow?.profile?.category?.trim().toLowerCase() === 'cleaning'
+  const beverageType = isCleaning ? 'cleaning' : rawBeverageType
   const hasMachineSubstates = measurements.some((entry) => entry.machine?.state?.substate)
   const extraction = hasMachineSubstates && !isCleaning
     ? measurements.filter((entry) => ESPRESSO_EXTRACTION_SUBSTATES.has(entry.machine?.state?.substate?.toLowerCase() ?? ''))

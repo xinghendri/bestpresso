@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isEspressoExtractionSnapshot, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotStage, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres, tankSensorLevelForMillilitres } from '../../api/decaid/adapters'
+import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isCleaningProfile, isEspressoExtractionSnapshot, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotStage, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres, tankSensorLevelForMillilitres } from '../../api/decaid/adapters'
 import { connectDevice, DecaidApiError, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getSettings, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineProfile, setMachineState, setSharedSetting, tareScale, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
@@ -327,7 +327,7 @@ export function useBrewingData() {
           const timestamp = shot?.timestamp ? Date.parse(shot.timestamp) : Number.NaN
           const isCompletedSession = shot && (!Number.isFinite(timestamp) || timestamp >= session.startedAt - 2_000)
           if (isCompletedSession) {
-            const domainShot = shotToDomain(shot)
+            const domainShot = { ...shotToDomain(shot), profileName: session.profileName, beverageType: session.kind }
             if (domainShot.id) shotHistoryCache.current.set(domainShot.id, domainShot)
             setModel((current) => ({ ...current, previousShot: domainShot }))
             setShotHistory((current) => [domainShot, ...current.filter((candidate) => candidate.id !== domainShot.id && candidate.id !== `live:${session.startedAt}`)])
@@ -351,8 +351,9 @@ export function useBrewingData() {
         setCleaningPreparedProfileId(null)
         const restorePatch = cleaningRestoreWorkflow.current
         if (restorePatch) {
-          updateWorkflow(restorePatch).then(async (workflow) => {
-            if (workflow.profile) await setMachineProfile(workflow.profile)
+          Promise.resolve().then(async () => {
+            if (restorePatch.profile) await setMachineProfile(restorePatch.profile)
+            const workflow = await updateWorkflow(restorePatch)
             if (disposed) return
             cleaningRestoreWorkflow.current = null
             setModel((current) => applyWorkflow(current, workflow, profileRecords.current, favoriteAssignments.current, retainedAdHocProfileId.current))
@@ -492,7 +493,7 @@ export function useBrewingData() {
         setUtilityOperation(null)
       }
       const isEspressoExtraction = isEspressoExtractionSnapshot(snapshot)
-      const isCleaning = machineStateForSnapshot(snapshot) === 'cleaning' || Boolean(pendingCleaningSequence.current && isEspressoExtraction)
+      const isCleaning = machineStateForSnapshot(snapshot) === 'cleaning'
       if (isEspressoExtraction || isCleaning) {
         const now = snapshotTime(snapshot.timestamp)
         const currentModel = latestModel.current
@@ -818,7 +819,7 @@ export function useBrewingData() {
 
   const prepareCleaningSequence = async (profileId: string) => {
     if (cleaningStartInFlight.current || liveShotSession.current) return false
-    const profile = allProfilesRef.current.find((candidate) => candidate.id === profileId && candidate.beverageType?.toLowerCase() === 'cleaning')
+    const profile = allProfilesRef.current.find((candidate) => candidate.id === profileId && isCleaningProfile(candidate))
     const record = profileRecords.current.find((candidate) => (candidate.id || candidate.profile?.title) === profileId)
     if (!profile || !record?.profile?.steps?.length) {
       showMachineActionError('That cleaning sequence is not available.')
