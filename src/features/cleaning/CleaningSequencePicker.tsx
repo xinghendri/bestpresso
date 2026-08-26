@@ -66,10 +66,13 @@ export function CleaningSequencePicker({ profiles, pending, onStart, onDismiss }
         {!visibleProfiles.length && <p className="cleaning-picker__empty">No cleaning sequences are available yet.</p>}
       </div>
     </section>
-    {interactionLocked && <div className="cleaning-start-loader" role="status" aria-live="assertive" aria-label="Loading selected cleaning sequence">
-      <span className="cleaning-start-loader__spinner" aria-hidden="true" />
-      <strong>Loading cleaning sequence…</strong>
-      <small>Please wait while the profile is sent to the machine.</small>
-    </div>}
+  </div>
+}
+
+export function CleaningStartLoader() {
+  return <div className="cleaning-start-loader" role="status" aria-live="assertive" aria-label="Loading selected cleaning sequence">
+    <span className="cleaning-start-loader__spinner" aria-hidden="true" />
+    <strong>Loading cleaning sequence…</strong>
+    <small>Please wait while the profile is sent to the machine.</small>
   </div>
 }

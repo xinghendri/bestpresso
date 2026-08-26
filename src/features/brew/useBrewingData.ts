@@ -13,6 +13,7 @@ const MAX_LIVE_SHOT_POINTS = 900
 const MIN_SUCCESSFUL_SHOT_MS = 5_000
 const MINIMUM_SCALE_SCAN_MS = 10_000
 const SCALE_SCAN_RETRY_DELAY_MS = 5_000
+const MINIMUM_CLEANING_LOADER_MS = 900
 const FLUSH_DURATION_SECONDS = 5
 const flushDurationDefaultStorageKey = 'bestpresso.flush-duration-default.v1'
 const fixtureProfiles = profilesWithParsedTitles(brewingFixture.profiles)
@@ -817,7 +818,7 @@ export function useBrewingData() {
   const startCleaningSequence = async (profileId: string) => {
     if (cleaningStartInFlight.current || liveShotSession.current) return false
     const profile = allProfilesRef.current.find((candidate) => candidate.id === profileId && candidate.beverageType?.toLowerCase() === 'cleaning')
-    const record = profileRecords.current.find((candidate) => candidate.id === profileId)
+    const record = profileRecords.current.find((candidate) => (candidate.id || candidate.profile?.title) === profileId)
     if (!profile || !record?.profile?.steps?.length) {
       showMachineActionError('That cleaning sequence is not available.')
       return false
@@ -829,6 +830,7 @@ export function useBrewingData() {
 
     cleaningStartInFlight.current = true
     setCleaningStartPending(true)
+    const loaderStartedAt = performance.now()
     showMachineActionError(null)
     let previousWorkflow: DecaidWorkflow | null = null
     try {
@@ -853,6 +855,8 @@ export function useBrewingData() {
       showMachineActionError('The machine did not start the cleaning sequence.')
       return false
     } finally {
+      const remainingLoaderTime = MINIMUM_CLEANING_LOADER_MS - (performance.now() - loaderStartedAt)
+      if (remainingLoaderTime > 0) await new Promise<void>((resolve) => window.setTimeout(resolve, remainingLoaderTime))
       cleaningStartInFlight.current = false
       setCleaningStartPending(false)
     }
