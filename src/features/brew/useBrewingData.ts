@@ -8,6 +8,7 @@ import { WATER_TANK_LOW_LEVEL_ML, WATER_TANK_SENSOR_FULL_MM, WATER_TANK_WARNING_
 import type { AvailableScale, BrewProfile, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, LiveUtilityOperation, MachineReadiness, PreviousShot, PreviousShotStatus, ScaleConnection, SettingFeedback, UtilityOperationKind } from '../../domain/brewing'
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { brewingFixture } from '../../fixtures/brewingFixture'
+import { scaleFixtureForKey } from '../../fixtures/scaleFixtures'
 
 const MAX_LIVE_SHOT_POINTS = 900
 const MIN_SUCCESSFUL_SHOT_MS = 5_000
@@ -16,6 +17,9 @@ const SCALE_SCAN_RETRY_DELAY_MS = 5_000
 const FLUSH_DURATION_SECONDS = 5
 const flushDurationDefaultStorageKey = 'bestpresso.flush-duration-default.v1'
 const fixtureProfiles = profilesWithParsedTitles(brewingFixture.profiles)
+const localScaleFixture = import.meta.env.DEV
+  ? scaleFixtureForKey(new URLSearchParams(window.location.search).get('mockScale'))
+  : undefined
 
 interface LiveShotSession {
   kind: 'espresso' | 'cleaning'
@@ -129,7 +133,7 @@ export function useBrewingData() {
   const [heatingSeconds, setHeatingSeconds] = useState<number | null>(null)
   const [connection, setConnection] = useState<DataConnection>('connecting')
   const [machineConnection, setMachineConnection] = useState<DataConnection>('connecting')
-  const [scale, setScale] = useState<ScaleConnection>({ status: 'disconnected' })
+  const [scale, setScale] = useState<ScaleConnection>(localScaleFixture ?? { status: 'disconnected' })
   const [availableScales, setAvailableScales] = useState<AvailableScale[]>([])
   const [scaleConnectPendingId, setScaleConnectPendingId] = useState<string | null>(null)
   const [scaleTarePending, setScaleTarePending] = useState(false)
@@ -157,7 +161,7 @@ export function useBrewingData() {
   const actionErrorTimeout = useRef<number | null>(null)
   const manualScaleSearchInFlight = useRef(false)
   const activeScaleScan = useRef<Promise<Awaited<ReturnType<typeof getDevices>>> | null>(null)
-  const connectedScale = useRef(false)
+  const connectedScale = useRef(Boolean(localScaleFixture))
   const scaleTareInFlight = useRef(false)
   const brewStopRequestInFlight = useRef(false)
   const cleaningStartInFlight = useRef(false)
@@ -303,7 +307,7 @@ export function useBrewingData() {
 
     const applyConnectedDevices = (devices: Awaited<ReturnType<typeof getDevices>>) => {
       const connectedMachine = devices.find((device) => device.type === 'machine' && device.state === 'connected')
-      const activeScale = devices.find((device) => device.type === 'scale' && device.state === 'connected')
+      const activeScale = localScaleFixture ?? devices.find((device) => device.type === 'scale' && device.state === 'connected')
       connectedScale.current = Boolean(activeScale)
       if (activeScale) setAvailableScales([])
       updateMachineConnection(connectedMachine ? 'connected' : 'disconnected')
@@ -389,6 +393,10 @@ export function useBrewingData() {
 
     const refreshConnectedScale = () => {
       connectedScale.current = true
+      if (localScaleFixture) {
+        setScale(localScaleFixture)
+        return
+      }
       setScale((current) => ({ ...current, status: 'connected' }))
       refreshConnectedDevices().then((devices) => {
         if (disposed) return
@@ -581,6 +589,7 @@ export function useBrewingData() {
     })
 
     const scale = subscribe<ScaleSnapshot>('/scale/snapshot', (snapshot) => {
+      if (localScaleFixture) return
       if (snapshot.weight !== undefined || snapshot.weightFlow !== undefined) {
         latestScaleSnapshot.current = {
           weight: snapshot.weight ?? latestScaleSnapshot.current.weight,
