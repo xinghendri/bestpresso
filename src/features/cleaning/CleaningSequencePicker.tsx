@@ -84,11 +84,3 @@ export function CleaningSequencePicker({ profiles, pending, preparedProfileId, o
     </section>
   </div>
 }
-
-export function CleaningStartLoader() {
-  return <div className="cleaning-start-loader" role="status" aria-live="assertive" aria-label="Loading selected cleaning sequence">
-    <span className="cleaning-start-loader__spinner" aria-hidden="true" />
-    <strong>Loading cleaning sequence…</strong>
-    <small>Please wait while the profile is sent to the machine.</small>
-  </div>
-}

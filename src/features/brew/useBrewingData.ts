@@ -13,7 +13,6 @@ const MAX_LIVE_SHOT_POINTS = 900
 const MIN_SUCCESSFUL_SHOT_MS = 5_000
 const MINIMUM_SCALE_SCAN_MS = 10_000
 const SCALE_SCAN_RETRY_DELAY_MS = 5_000
-const MINIMUM_CLEANING_LOADER_MS = 900
 const FLUSH_DURATION_SECONDS = 5
 const flushDurationDefaultStorageKey = 'bestpresso.flush-duration-default.v1'
 const fixtureProfiles = profilesWithParsedTitles(brewingFixture.profiles)
@@ -833,7 +832,6 @@ export function useBrewingData() {
     cleaningStartInFlight.current = true
     setCleaningStartPending(true)
     setCleaningPreparedProfileId(null)
-    const loaderStartedAt = performance.now()
     showMachineActionError(null)
     try {
       if (!cleaningRestoreWorkflow.current) cleaningRestoreWorkflow.current = workflowPatch(await getWorkflow())
@@ -861,8 +859,6 @@ export function useBrewingData() {
       showMachineActionError('The cleaning sequence could not be loaded onto the machine.')
       return false
     } finally {
-      const remainingLoaderTime = MINIMUM_CLEANING_LOADER_MS - (performance.now() - loaderStartedAt)
-      if (remainingLoaderTime > 0) await new Promise<void>((resolve) => window.setTimeout(resolve, remainingLoaderTime))
       cleaningStartInFlight.current = false
       setCleaningStartPending(false)
     }
@@ -903,7 +899,6 @@ export function useBrewingData() {
 
     cleaningStartInFlight.current = true
     setCleaningStartPending(true)
-    const loaderStartedAt = performance.now()
     showMachineActionError(null)
     try {
       if (restorePatch.profile) await setMachineProfile(restorePatch.profile)
@@ -917,8 +912,6 @@ export function useBrewingData() {
       showMachineActionError('The previous brew profile could not be restored.')
       return false
     } finally {
-      const remainingLoaderTime = MINIMUM_CLEANING_LOADER_MS - (performance.now() - loaderStartedAt)
-      if (remainingLoaderTime > 0) await new Promise<void>((resolve) => window.setTimeout(resolve, remainingLoaderTime))
       cleaningStartInFlight.current = false
       setCleaningStartPending(false)
     }

@@ -10,7 +10,7 @@ import { isCleaningProfile } from '../api/decaid/adapters'
 import type { AvailableScale, BrewProfile, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveUtilityOperation, PreviousShotStatus, ScaleConnection, SettingFeedback } from '../domain/brewing'
 import { BrewingPanel } from '../features/brew/BrewingPanel'
 import { LiveBrewingScreen } from '../features/brew/LiveBrewingScreen'
-import { CleaningSequencePicker, CleaningStartLoader } from '../features/cleaning/CleaningSequencePicker'
+import { CleaningSequencePicker } from '../features/cleaning/CleaningSequencePicker'
 import { HistoryPanel } from '../features/history/HistoryPanel'
 import { MachineUtilityCard } from '../features/machine/MachineUtilityCard'
 import { LiveUtilityOperationOverlay } from '../features/machine/LiveUtilityOperationOverlay'
@@ -93,9 +93,9 @@ export function AppShell({ model, allProfiles, liveBrew, utilityOperation, previ
     return started
   }
 
-  if (sleepScreenActive) return <><button className="sleep-screen" type="button" aria-label="Wake machine" onClick={onWake}><span>Tap to wake</span></button>{cleaningStartPending && <CleaningStartLoader />}</>
-  if (liveBrew.visible && !utilityOperation) return <><LiveBrewingScreen model={model} liveBrew={liveBrew} stopPending={brewStopPending} actionError={machineActionError} onStop={onStopEspresso} onDismiss={onDismissLiveBrew} />{cleaningStartPending && <CleaningStartLoader />}</>
-  return <><main className={`app-shell${utilitiesCollapsed ? ' app-shell--utilities-collapsed' : ''}${utilityLayoutHasChanged ? ' app-shell--utility-layout-transitioned' : ''}`}>
+  if (sleepScreenActive) return <button className="sleep-screen" type="button" aria-label="Wake machine" onClick={onWake}><span>Tap to wake</span></button>
+  if (liveBrew.visible && !utilityOperation) return <LiveBrewingScreen model={model} liveBrew={liveBrew} stopPending={brewStopPending} actionError={machineActionError} onStop={onStopEspresso} onDismiss={onDismissLiveBrew} />
+  return <main className={`app-shell${utilitiesCollapsed ? ' app-shell--utilities-collapsed' : ''}${utilityLayoutHasChanged ? ' app-shell--utility-layout-transitioned' : ''}`}>
     <header className="topbar"><div className="topbar__brand"><button className="utility-layout-toggle" type="button" aria-label={utilitiesCollapsed ? 'Expand utility panels' : 'Minimize utility panels'} aria-controls="machine-utilities" aria-expanded={!utilitiesCollapsed} title={utilitiesCollapsed ? 'Expand utility panels' : 'Minimize utility panels'} onClick={toggleUtilityLayout}><img src={utilitiesCollapsed ? utilityExpand : utilityCollapse} alt="" /></button><img className="logo" src={logo} alt="decent" /></div><nav aria-label="Machine controls"><button className="control-button control-button--cleaning" type="button" aria-label="Cleaning sequences" title="Cleaning" onClick={() => setCleaningPickerOpen(true)}><img src={cleaning} alt="" /></button><button className={sleepPending ? 'control-button control-button--pending' : 'control-button'} type="button" aria-label={sleepPending ? `${sleepLabel} request in progress` : sleepLabel} title={sleepLabel} disabled={sleepPending} onClick={onSleep}><img src={sleep} alt="" /></button><button className="control-button" type="button" aria-label="Settings" title="Settings" onClick={onOpenSettings}><img src={settings} alt="" /></button><StatusPill status={model.readiness} connection={connection} machineConnection={machineConnection} heatingSeconds={heatingSeconds} /></nav></header>
     {(machineActionError || settingFeedback) && <div className="system-messages">
       {machineActionError && <div className="system-message system-message--error" role="alert">{machineActionError}</div>}
@@ -105,5 +105,5 @@ export function AppShell({ model, allProfiles, liveBrew, utilityOperation, previ
     {utilityOperation && <LiveUtilityOperationOverlay operation={utilityOperation} />}
     <ScaleDevicePicker devices={availableScales} pendingDeviceId={scaleConnectPendingId} onSelect={onConnectScale} onDismiss={onDismissScalePicker} />
     {cleaningPickerOpen && <CleaningSequencePicker profiles={cleaningProfiles} pending={cleaningStartPending} preparedProfileId={cleaningPreparedProfileId} onPrepare={onPrepareCleaning} onStart={startCleaning} onDismiss={dismissCleaningPicker} />}
-  </main>{cleaningStartPending && <CleaningStartLoader />}</>
+  </main>
 }
