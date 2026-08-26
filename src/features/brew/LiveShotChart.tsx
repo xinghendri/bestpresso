@@ -1,4 +1,5 @@
 import type { LiveShotPoint } from '../../domain/brewing'
+import { removeOverlappingFocusedTimeTicks } from './chartTimeTicks'
 
 interface LiveShotChartProps {
   points: LiveShotPoint[]
@@ -60,7 +61,7 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
     return PLOT.left + ratio * plotWidth
   }
   const intervalTicks = Array.from({ length: Math.floor(durationMs / 5_000) }, (_, index) => (index + 1) * 5_000)
-  const timeTicks = fitDuration
+  const candidateTimeTicks = fitDuration
     ? [0, ...intervalTicks, ...(durationMs % 5_000 ? [durationMs] : [])]
     : intervalTicks
   const gridTicks = Array.from({ length: 5 }, (_, index) => index / 4)
@@ -68,6 +69,13 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
     const seconds = (startMs + tick) / 1000
     return `${Number.isInteger(seconds) ? seconds : seconds.toFixed(1)}s`
   }
+  const timeTicks = fitDuration
+    ? removeOverlappingFocusedTimeTicks(candidateTimeTicks.map((offsetMs) => ({
+      offsetMs,
+      x: xForElapsedMs(startMs + offsetMs),
+      label: timeLabel(offsetMs),
+    })))
+    : candidateTimeTicks.map((offsetMs) => ({ offsetMs, x: xForElapsedMs(startMs + offsetMs), label: timeLabel(offsetMs) }))
 
   return <div className="live-shot-chart">
     <div className="chart-legend" aria-label="Chart legend">
@@ -83,8 +91,7 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
         return <line key={`horizontal-${ratio}`} className="chart-grid chart-grid--tick" x1={PLOT.left} x2={PLOT.left + 10} y1={y} y2={y} />
       })}
       {timeTicks.map((tick) => {
-        const x = xForElapsedMs(startMs + tick)
-        return <g key={`time-${tick}`}><line className="chart-grid chart-grid--vertical" x1={x} x2={x} y1={PLOT.top} y2={PLOT.bottom} /><text className="chart-axis-label" x={x} y={PLOT.bottom + 25} textAnchor="middle">{timeLabel(tick)}</text></g>
+        return <g key={`time-${tick.offsetMs}`}><line className="chart-grid chart-grid--vertical" x1={tick.x} x2={tick.x} y1={PLOT.top} y2={PLOT.bottom} /><text className="chart-axis-label" x={tick.x} y={PLOT.bottom + 25} textAnchor="middle">{tick.label}</text></g>
       })}
       {gridTicks.map((ratio) => <g key={`axis-${ratio}`}>
         <text className="chart-axis-label" x={PLOT.left - 13} y={PLOT.bottom - ratio * (PLOT.bottom - PLOT.top) + 4} textAnchor="end">{Math.round(12 * ratio)}</text>
