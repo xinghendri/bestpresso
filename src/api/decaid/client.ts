@@ -1,5 +1,5 @@
 import { getDecaidEndpoints } from './config'
-import type { DecaidDevice, DecaidProfile, DecaidProfileRecord, DecaidSettings, DecaidWorkflow, DecaidWorkflowPatch, DisplayState, FavoriteAssignments, PaginatedShots, ShotRecord } from './types'
+import type { DecaidDevice, DecaidProfile, DecaidProfileRecord, DecaidSettings, DecaidWorkflow, DecaidWorkflowPatch, DisplayState, FavoriteAssignments, PaginatedShots, ScalePowerMode, ShotRecord } from './types'
 
 export class DecaidApiError extends Error {
   status: number
@@ -62,6 +62,15 @@ export async function setDisplayBrightness(brightness: number) {
   })
   if (!response.ok) throw new Error(`Decaid display brightness returned ${response.status}`)
   return await response.json() as DisplayState
+}
+
+export async function setScalePowerMode(scalePowerMode: ScalePowerMode) {
+  const response = await fetch(`${getDecaidEndpoints().apiBase}/settings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scalePowerMode }),
+  })
+  if (!response.ok) throw new Error(`Decaid scale power mode returned ${response.status}`)
 }
 
 export async function updateWorkflow(patch: DecaidWorkflowPatch) {
