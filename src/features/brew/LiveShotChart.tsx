@@ -1,6 +1,7 @@
 import type { LiveShotPoint } from '../../domain/brewing'
 import type { ChartSeries } from './chartSeries'
 import { chartSeriesForLine } from './chartSeries'
+import { smoothShotTelemetry } from './chartSmoothing'
 import { removeOverlappingFocusedTimeTicks } from './chartTimeTicks'
 
 interface LiveShotChartProps {
@@ -56,6 +57,13 @@ const linePath = (points: LiveShotPoint[], key: keyof LiveShotPoint, xForElapsed
 export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fitDuration = false, contextPoints, showWeight = true, legendFilterEnabled = false, dimmedSeries = [], onToggleSeries }: LiveShotChartProps) {
   const durationMs = fitDuration ? Math.max(elapsedMs, 1) : Math.max(10_000, Math.ceil(Math.max(elapsedMs, 1) / 5_000) * 5_000)
   const plottedPoints = contextPoints ?? points
+  const displayContextPoints = contextPoints ? smoothShotTelemetry(contextPoints) : undefined
+  const displayPoints = displayContextPoints
+    ? (() => {
+        const smoothedByElapsedMs = new Map(displayContextPoints.map((point) => [point.elapsedMs, point]))
+        return points.map((point) => smoothedByElapsedMs.get(point.elapsedMs) ?? point)
+      })()
+    : smoothShotTelemetry(points)
   const observedWeight = Math.max(0, ...plottedPoints.map((point) => point.weight ?? 0))
   const weightMax = Math.max(50, targetYield * 1.2, observedWeight * 1.12)
   const plotWidth = PLOT.right - PLOT.left
@@ -115,19 +123,19 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
       </g>)}
       <text className="chart-axis-title" x={PLOT.left - 13} y={PLOT.top - 14}>bar / ml/s</text>
       <g clipPath="url(#live-shot-plot)">
-        {contextPoints && <g opacity="0.15" aria-hidden="true">
+        {contextPoints && displayContextPoints && <g opacity="0.15" aria-hidden="true">
           <path className={`chart-line chart-line--target-pressure${lineClass(chartSeriesForLine.targetPressure)}`} d={linePath(contextPoints, 'targetPressure', xForElapsedMs, 0, 12)} />
           <path className={`chart-line chart-line--target-flow${lineClass(chartSeriesForLine.targetFlow)}`} d={linePath(contextPoints, 'targetFlow', xForElapsedMs, 0, 12)} />
-          <path className={`chart-line chart-line--temperature${lineClass(chartSeriesForLine.temperature)}`} d={linePath(contextPoints, 'temperature', xForElapsedMs, 70, 100)} />
-          <path className={`chart-line chart-line--pressure${lineClass(chartSeriesForLine.pressure)}`} d={linePath(contextPoints, 'pressure', xForElapsedMs, 0, 12)} />
-          <path className={`chart-line chart-line--flow${lineClass(chartSeriesForLine.flow)}`} d={linePath(contextPoints, 'flow', xForElapsedMs, 0, 12)} />
+          <path className={`chart-line chart-line--temperature${lineClass(chartSeriesForLine.temperature)}`} d={linePath(displayContextPoints, 'temperature', xForElapsedMs, 70, 100)} />
+          <path className={`chart-line chart-line--pressure${lineClass(chartSeriesForLine.pressure)}`} d={linePath(displayContextPoints, 'pressure', xForElapsedMs, 0, 12)} />
+          <path className={`chart-line chart-line--flow${lineClass(chartSeriesForLine.flow)}`} d={linePath(displayContextPoints, 'flow', xForElapsedMs, 0, 12)} />
           {showWeight && <path className={`chart-line chart-line--weight${lineClass(chartSeriesForLine.weight)}`} d={linePath(contextPoints, 'weight', xForElapsedMs, 0, weightMax)} />}
         </g>}
         <path className={`chart-line chart-line--target-pressure${lineClass(chartSeriesForLine.targetPressure)}`} d={linePath(points, 'targetPressure', xForElapsedMs, 0, 12)} />
         <path className={`chart-line chart-line--target-flow${lineClass(chartSeriesForLine.targetFlow)}`} d={linePath(points, 'targetFlow', xForElapsedMs, 0, 12)} />
-        <path className={`chart-line chart-line--temperature${lineClass(chartSeriesForLine.temperature)}`} d={linePath(points, 'temperature', xForElapsedMs, 70, 100)} />
-        <path className={`chart-line chart-line--pressure${lineClass(chartSeriesForLine.pressure)}`} d={linePath(points, 'pressure', xForElapsedMs, 0, 12)} />
-        <path className={`chart-line chart-line--flow${lineClass(chartSeriesForLine.flow)}`} d={linePath(points, 'flow', xForElapsedMs, 0, 12)} />
+        <path className={`chart-line chart-line--temperature${lineClass(chartSeriesForLine.temperature)}`} d={linePath(displayPoints, 'temperature', xForElapsedMs, 70, 100)} />
+        <path className={`chart-line chart-line--pressure${lineClass(chartSeriesForLine.pressure)}`} d={linePath(displayPoints, 'pressure', xForElapsedMs, 0, 12)} />
+        <path className={`chart-line chart-line--flow${lineClass(chartSeriesForLine.flow)}`} d={linePath(displayPoints, 'flow', xForElapsedMs, 0, 12)} />
         {showWeight && <path className={`chart-line chart-line--weight${lineClass(chartSeriesForLine.weight)}`} d={linePath(points, 'weight', xForElapsedMs, 0, weightMax)} />}
       </g>
     </svg>
