@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isCleaningProfile, isEspressoExtractionSnapshot, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotStage, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres, tankSensorLevelForMillilitres } from '../../api/decaid/adapters'
+import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isCleaningProfile, isEspressoExtractionSnapshot, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotStage, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres } from '../../api/decaid/adapters'
 import { connectDevice, DecaidApiError, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getSettings, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineProfile, setMachineState, setSharedSetting, tareScale, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, DecaidWorkflow, DecaidWorkflowPatch, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
-import { WATER_TANK_LOW_LEVEL_ML, WATER_TANK_SENSOR_FULL_MM, WATER_TANK_WARNING_OFFSET_CLICKS } from '../../domain/brewing'
+import { WATER_TANK_SENSOR_FULL_MM, waterTankLevelState } from '../../domain/brewing'
 import type { AvailableScale, BrewProfile, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, LiveUtilityOperation, MachineReadiness, PreviousShot, PreviousShotStatus, ScaleConnection, SettingFeedback, UtilityOperationKind } from '../../domain/brewing'
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { brewingFixture } from '../../fixtures/brewingFixture'
@@ -573,7 +573,10 @@ export function useBrewingData() {
         readiness,
         utilities: current.utilities.map((utility) => {
           if (utility.id === 'steam') return { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Current' && snapshot.steamTemperature !== undefined ? { ...metric, value: String(Math.round(snapshot.steamTemperature)), highlight: snapshot.steamTemperature < STEAM_HEATER_READY_C } : metric) }
-          if (utility.id === 'tank') return { ...utility, alert: machineNeedsWater.current || (latestTankVolume.current !== null && latestTankVolume.current <= WATER_TANK_LOW_LEVEL_ML) }
+          if (utility.id === 'tank') {
+            const tankState = waterTankLevelState(latestTankVolume.current ?? Number.POSITIVE_INFINITY, machineNeedsWater.current)
+            return { ...utility, alert: tankState === 'needsWater', warning: tankState === 'warning' }
+          }
           return utility
         }),
       }))
@@ -618,20 +621,14 @@ export function useBrewingData() {
       const sensorLevel = levels.currentLevel
       const volume = tankMillilitres(sensorLevel)
       const levelPercent = Math.max(0, Math.min(100, sensorLevel / WATER_TANK_SENSOR_FULL_MM * 100))
-      const calculatedRefillLevel = tankSensorLevelForMillilitres(WATER_TANK_LOW_LEVEL_ML)
-      const configuredRefillLevel = typeof levels.refillLevel === 'number' && Number.isFinite(levels.refillLevel)
-        ? levels.refillLevel
-        : calculatedRefillLevel
-      const refillLevel = Math.max(calculatedRefillLevel, configuredRefillLevel)
-      const needsWater = machineNeedsWater.current || volume <= WATER_TANK_LOW_LEVEL_ML
-      const warnsWater = !needsWater && sensorLevel <= refillLevel + WATER_TANK_WARNING_OFFSET_CLICKS
+      const tankState = waterTankLevelState(volume, machineNeedsWater.current)
       latestTankVolume.current = volume
       setModel((current) => ({
         ...current,
         utilities: current.utilities.map((utility) => utility.id === 'tank' ? {
           ...utility,
-          alert: needsWater,
-          warning: warnsWater,
+          alert: tankState === 'needsWater',
+          warning: tankState === 'warning',
           levelPercent,
           metrics: utility.metrics.map((metric) => ({ ...metric, value: volume.toLocaleString('en-US') })),
         } : utility),
