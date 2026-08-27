@@ -9,6 +9,7 @@ import type { AvailableScale, BrewProfile, BrewingScreenModel, DataConnection, E
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { brewingFixture } from '../../fixtures/brewingFixture'
 import { scaleFixtureForKey } from '../../fixtures/scaleFixtures'
+import { CLEANING_PROFILE_START_STATE, isCleaningSequenceRun } from '../cleaning/cleaningSequence'
 
 const MAX_LIVE_SHOT_POINTS = 900
 const MIN_SUCCESSFUL_SHOT_MS = 5_000
@@ -501,7 +502,7 @@ export function useBrewingData() {
         setUtilityOperation(null)
       }
       const isEspressoExtraction = isEspressoExtractionSnapshot(snapshot)
-      const isCleaning = machineStateForSnapshot(snapshot) === 'cleaning'
+      const isCleaning = isCleaningSequenceRun(machineStateForSnapshot(snapshot), isEspressoExtraction, pendingCleaningSequence.current !== null)
       if (isEspressoExtraction || isCleaning) {
         const now = snapshotTime(snapshot.timestamp)
         const currentModel = latestModel.current
@@ -888,7 +889,7 @@ export function useBrewingData() {
     cleaningStartInFlight.current = true
     showMachineActionError(null)
     try {
-      await setMachineState('cleaning')
+      await setMachineState(CLEANING_PROFILE_START_STATE)
       return true
     } catch {
       showMachineActionError('The machine did not start the cleaning sequence.')
