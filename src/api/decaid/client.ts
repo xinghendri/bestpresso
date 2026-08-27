@@ -28,6 +28,7 @@ async function getJson<T>(path: string, timeoutMs = 4500): Promise<T> {
 export const getWorkflow = () => getJson<DecaidWorkflow>('/workflow')
 export const getProfiles = () => getJson<DecaidProfileRecord[]>('/profiles')
 export const getFavoriteAssignments = () => getJson<FavoriteAssignments>('/store/streamline-app/favorite-profiles')
+export const getSharedSetting = <T>(key: string) => getJson<T>(`/store/streamline-app/${encodeURIComponent(key)}`)
 export const getDevices = () => getJson<DecaidDevice[]>('/devices')
 export const scanForDevices = () => getJson<unknown[]>('/devices/scan', 30000)
 export const getDisplayState = () => getJson<DisplayState>('/display')
