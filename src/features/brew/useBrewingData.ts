@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isCleaningProfile, isEspressoExtractionSnapshot, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotStage, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres } from '../../api/decaid/adapters'
-import { connectDevice, DecaidApiError, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getSettings, getSharedSetting, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineProfile, setMachineState, setSharedSetting, tareScale, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
+import { connectDevice, DecaidApiError, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getSettings, getSharedSetting, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineProfile, setMachineState, setScalePowerMode, setSharedSetting, tareScale, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, DecaidWorkflow, DecaidWorkflowPatch, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
@@ -11,6 +11,7 @@ import { brewingFixture } from '../../fixtures/brewingFixture'
 import { scaleFixtureForKey } from '../../fixtures/scaleFixtures'
 import { CLEANING_PROFILE_START_STATE, isCleaningSequenceRun } from '../cleaning/cleaningSequence'
 import { LAST_SELECTED_PROFILE_LOCAL_KEY, LAST_SELECTED_PROFILE_SHARED_KEY, normalizeRememberedProfileId, resolveRememberedProfileId } from '../profiles/profileSelectionPersistence'
+import { sleepMachineAndConnectedScale } from './sleepControl'
 
 const MAX_LIVE_SHOT_POINTS = 900
 const MIN_SUCCESSFUL_SHOT_MS = 5_000
@@ -765,7 +766,7 @@ export function useBrewingData() {
         void restoreDisplay()
         await setMachineState('idle')
       } else {
-        await setMachineState('sleeping')
+        await sleepMachineAndConnectedScale(connectedScale.current, { getSettings, setScalePowerMode, setMachineState })
         setSleepScreenActive(true)
         void dimDisplay()
       }
@@ -778,7 +779,9 @@ export function useBrewingData() {
         setSleepScreenActive(false)
         void restoreDisplay()
       }
-      showMachineActionError('The machine did not accept the sleep command.')
+      showMachineActionError(connectedScale.current
+        ? 'The machine or connected scale did not accept the sleep command.'
+        : 'The machine did not accept the sleep command.')
     } finally {
       sleepRequestInFlight.current = false
       setSleepPending(false)
