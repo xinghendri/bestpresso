@@ -7,8 +7,14 @@ export type EditableProfileSetting = 'temperature' | 'grindSetting' | 'dose' | '
 export type PreviousShotStatus = 'loading' | 'loaded' | 'empty' | 'error' | 'fixture'
 export const WATER_TANK_CAPACITY_ML = 1207
 export const WATER_TANK_SENSOR_FULL_MM = 43
-export const WATER_TANK_LOW_LEVEL_ML = 450
-export const WATER_TANK_WARNING_OFFSET_CLICKS = 5
+export const WATER_TANK_LOW_LEVEL_ML = 300
+export const WATER_TANK_WARNING_LEVEL_ML = 426
+
+export function waterTankLevelState(volumeMl: number, machineNeedsWater = false) {
+  if (machineNeedsWater || volumeMl <= WATER_TANK_LOW_LEVEL_ML) return 'needsWater'
+  if (volumeMl <= WATER_TANK_WARNING_LEVEL_ML) return 'warning'
+  return 'normal'
+}
 
 export interface ScaleConnection {
   status: ScaleConnectionStatus

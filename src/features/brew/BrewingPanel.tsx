@@ -24,7 +24,9 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
   const selectedIndex = profiles.findIndex((profile) => profile.id === activeProfileId)
   const fallbackIndex = profiles.findIndex((profile) => profile.id === 'adaptive-v2')
   const initialIndex = Math.max(0, selectedIndex >= 0 ? selectedIndex : fallbackIndex)
-  const [activeIndex, setActiveIndex] = useState(initialIndex)
+  const [optimisticProfileId, setOptimisticProfileId] = useState<string | null>(null)
+  const optimisticIndex = profiles.findIndex((profile) => profile.id === optimisticProfileId)
+  const activeIndex = optimisticIndex >= 0 ? optimisticIndex : initialIndex
   const pointerStart = useRef<{ x: number; moved: boolean } | null>(null)
   const suppressClick = useRef(false)
   const selectionRequest = useRef(0)
@@ -63,12 +65,14 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
   const selectIndex = async (index: number) => {
     const profile = profiles[index]
     if (!profile) return
-    const previousIndex = activeIndex
-    setActiveIndex(index)
-    if (profile.id === activeProfileId) return
+    if (profile.id === activeProfileId) {
+      setOptimisticProfileId(null)
+      return
+    }
+    setOptimisticProfileId(profile.id)
     const request = ++selectionRequest.current
-    const selected = await onSelectProfile(profile.id)
-    if (!selected && request === selectionRequest.current) setActiveIndex(previousIndex)
+    await onSelectProfile(profile.id)
+    if (request === selectionRequest.current) setOptimisticProfileId(null)
   }
 
   const selectRelative = (direction: number) => {

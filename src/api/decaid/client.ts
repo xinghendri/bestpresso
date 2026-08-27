@@ -28,6 +28,7 @@ async function getJson<T>(path: string, timeoutMs = 4500): Promise<T> {
 export const getWorkflow = () => getJson<DecaidWorkflow>('/workflow')
 export const getProfiles = () => getJson<DecaidProfileRecord[]>('/profiles')
 export const getFavoriteAssignments = () => getJson<FavoriteAssignments>('/store/streamline-app/favorite-profiles')
+export const getSharedSetting = <T>(key: string) => getJson<T>(`/store/streamline-app/${encodeURIComponent(key)}`)
 export const getDevices = () => getJson<DecaidDevice[]>('/devices')
 export const scanForDevices = () => getJson<unknown[]>('/devices/scan', 30000)
 export const getDisplayState = () => getJson<DisplayState>('/display')
@@ -92,7 +93,7 @@ export async function setSharedSetting(key: string, value: unknown) {
   if (!response.ok) throw new Error(`Decaid shared setting returned ${response.status}`)
 }
 
-export async function setMachineState(state: 'idle' | 'sleeping' | 'cleaning') {
+export async function setMachineState(state: 'idle' | 'sleeping' | 'espresso' | 'cleaning') {
   const response = await fetch(`${getDecaidEndpoints().apiBase}/machine/state/${state}`, { method: 'PUT' })
   if (!response.ok) throw new Error(`Decaid machine state returned ${response.status}`)
 }

@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isCleaningProfile, isEspressoExtractionSnapshot, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotStage, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres, tankSensorLevelForMillilitres } from '../../api/decaid/adapters'
-import { connectDevice, DecaidApiError, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getSettings, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineProfile, setMachineState, setSharedSetting, tareScale, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
+import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isCleaningProfile, isEspressoExtractionSnapshot, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotStage, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres } from '../../api/decaid/adapters'
+import { connectDevice, DecaidApiError, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getSettings, getSharedSetting, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineProfile, setMachineState, setSharedSetting, tareScale, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, DecaidWorkflow, DecaidWorkflowPatch, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
-import { WATER_TANK_LOW_LEVEL_ML, WATER_TANK_SENSOR_FULL_MM, WATER_TANK_WARNING_OFFSET_CLICKS } from '../../domain/brewing'
+import { WATER_TANK_SENSOR_FULL_MM, waterTankLevelState } from '../../domain/brewing'
 import type { AvailableScale, BrewProfile, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, LiveUtilityOperation, MachineReadiness, PreviousShot, PreviousShotStatus, ScaleConnection, SettingFeedback, UtilityOperationKind } from '../../domain/brewing'
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { brewingFixture } from '../../fixtures/brewingFixture'
 import { scaleFixtureForKey } from '../../fixtures/scaleFixtures'
+import { CLEANING_PROFILE_START_STATE, isCleaningSequenceRun } from '../cleaning/cleaningSequence'
+import { LAST_SELECTED_PROFILE_LOCAL_KEY, LAST_SELECTED_PROFILE_SHARED_KEY, normalizeRememberedProfileId, resolveRememberedProfileId } from '../profiles/profileSelectionPersistence'
 
 const MAX_LIVE_SHOT_POINTS = 900
 const MIN_SUCCESSFUL_SHOT_MS = 5_000
@@ -94,6 +96,16 @@ const storedFixtureFavoriteAssignments = () => {
   } catch {
     return null
   }
+}
+
+const storedLastSelectedProfileId = () => {
+  try { return normalizeRememberedProfileId(window.localStorage.getItem(LAST_SELECTED_PROFILE_LOCAL_KEY)) }
+  catch { return null }
+}
+
+const storeLastSelectedProfileIdLocally = (profileId: string) => {
+  try { window.localStorage.setItem(LAST_SELECTED_PROFILE_LOCAL_KEY, profileId) }
+  catch { /* Decaid's shared store remains the durable source. */ }
 }
 
 const workflowValuesForProfile = (record: DecaidProfileRecord, profile: BrewProfile) => {
@@ -418,15 +430,36 @@ export function useBrewingData() {
     const shotHistoryRequest = getShotHistory()
       .then((history) => ({ history, failed: false }))
       .catch(() => ({ history: null, failed: true }))
+    const rememberedProfileRequest = getSharedSetting<unknown>(LAST_SELECTED_PROFILE_SHARED_KEY)
+      .then((value) => normalizeRememberedProfileId(value) ?? storedLastSelectedProfileId())
+      .catch(storedLastSelectedProfileId)
 
-    Promise.all([getWorkflowWithFlushDurationDefault(), getProfiles(), getFavoriteAssignments().catch(() => null), latestShotRequest, shotHistoryRequest])
-      .then(([workflow, records, assignments, latestShot, historyResult]) => {
+    Promise.all([getWorkflowWithFlushDurationDefault(), getProfiles(), getFavoriteAssignments().catch(() => null), latestShotRequest, shotHistoryRequest, rememberedProfileRequest])
+      .then(async ([initialWorkflow, records, assignments, latestShot, historyResult, rememberedProfileId]) => {
         if (disposed) return
         profileRecords.current = records
         favoriteAssignments.current = assignments
-        const domainProfiles = profileRecordsToDomain(records, workflow, fixtureProfiles)
+        let workflow = initialWorkflow
+        let domainProfiles = profileRecordsToDomain(records, workflow, fixtureProfiles)
+        const workflowProfile = activeProfileForWorkflow(domainProfiles, records, workflow)
+        const restoredProfileId = resolveRememberedProfileId(domainProfiles.map((profile) => profile.id), rememberedProfileId, workflowProfile?.id)
+        if (restoredProfileId && restoredProfileId !== workflowProfile?.id) {
+          const restoredProfile = domainProfiles.find((profile) => profile.id === restoredProfileId)
+          const restoredRecord = records.find((record) => (record.id || record.profile?.title) === restoredProfileId)
+          if (restoredProfile && restoredRecord?.profile?.steps?.length) {
+            try {
+              workflow = await updateWorkflow(workflowValuesForProfile(restoredRecord, restoredProfile).patch)
+              if (disposed) return
+              domainProfiles = profileRecordsToDomain(records, workflow, fixtureProfiles)
+            } catch {
+              workflow = initialWorkflow
+              domainProfiles = profileRecordsToDomain(records, workflow, fixtureProfiles)
+            }
+          }
+        }
         const slots = resolveFavoriteProfileSlots(domainProfiles, assignments)
         const activeProfile = activeProfileForWorkflow(domainProfiles, records, workflow)
+        if (activeProfile) storeLastSelectedProfileIdLocally(activeProfile.id)
         retainedAdHocProfileId.current = activeProfile && !slots.includes(activeProfile.id) ? activeProfile.id : null
         allProfilesRef.current = domainProfiles
         setAllProfiles(domainProfiles)
@@ -448,7 +481,7 @@ export function useBrewingData() {
         const assignments = storedFixtureFavoriteAssignments()
         const slots = resolveFavoriteProfileSlots(fixtureProfiles, assignments)
         favoriteAssignments.current = assignments
-        const activeProfileId = latestModel.current.activeProfileId
+        const activeProfileId = resolveRememberedProfileId(fixtureProfiles.map((profile) => profile.id), storedLastSelectedProfileId(), latestModel.current.activeProfileId) ?? latestModel.current.activeProfileId
         retainedAdHocProfileId.current = activeProfileId && !slots.includes(activeProfileId) ? activeProfileId : null
         allProfilesRef.current = fixtureProfiles
         setAllProfiles(fixtureProfiles)
@@ -462,7 +495,8 @@ export function useBrewingData() {
         setShotHistory(fixtureShot ? [fixtureShot] : [])
         setModel((current) => ({
           ...current,
-          profiles: carouselProfiles(fixtureProfiles, assignments, current.activeProfileId, retainedAdHocProfileId.current),
+          profiles: carouselProfiles(fixtureProfiles, assignments, activeProfileId, retainedAdHocProfileId.current),
+          activeProfileId,
           previousShot: fixtureShot,
         }))
       })
@@ -501,7 +535,7 @@ export function useBrewingData() {
         setUtilityOperation(null)
       }
       const isEspressoExtraction = isEspressoExtractionSnapshot(snapshot)
-      const isCleaning = machineStateForSnapshot(snapshot) === 'cleaning'
+      const isCleaning = isCleaningSequenceRun(machineStateForSnapshot(snapshot), isEspressoExtraction, pendingCleaningSequence.current !== null)
       if (isEspressoExtraction || isCleaning) {
         const now = snapshotTime(snapshot.timestamp)
         const currentModel = latestModel.current
@@ -572,7 +606,10 @@ export function useBrewingData() {
         readiness,
         utilities: current.utilities.map((utility) => {
           if (utility.id === 'steam') return { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Current' && snapshot.steamTemperature !== undefined ? { ...metric, value: String(Math.round(snapshot.steamTemperature)), highlight: snapshot.steamTemperature < STEAM_HEATER_READY_C } : metric) }
-          if (utility.id === 'tank') return { ...utility, alert: machineNeedsWater.current || (latestTankVolume.current !== null && latestTankVolume.current <= WATER_TANK_LOW_LEVEL_ML) }
+          if (utility.id === 'tank') {
+            const tankState = waterTankLevelState(latestTankVolume.current ?? Number.POSITIVE_INFINITY, machineNeedsWater.current)
+            return { ...utility, alert: tankState === 'needsWater', warning: tankState === 'warning' }
+          }
           return utility
         }),
       }))
@@ -617,20 +654,14 @@ export function useBrewingData() {
       const sensorLevel = levels.currentLevel
       const volume = tankMillilitres(sensorLevel)
       const levelPercent = Math.max(0, Math.min(100, sensorLevel / WATER_TANK_SENSOR_FULL_MM * 100))
-      const calculatedRefillLevel = tankSensorLevelForMillilitres(WATER_TANK_LOW_LEVEL_ML)
-      const configuredRefillLevel = typeof levels.refillLevel === 'number' && Number.isFinite(levels.refillLevel)
-        ? levels.refillLevel
-        : calculatedRefillLevel
-      const refillLevel = Math.max(calculatedRefillLevel, configuredRefillLevel)
-      const needsWater = machineNeedsWater.current || volume <= WATER_TANK_LOW_LEVEL_ML
-      const warnsWater = !needsWater && sensorLevel <= refillLevel + WATER_TANK_WARNING_OFFSET_CLICKS
+      const tankState = waterTankLevelState(volume, machineNeedsWater.current)
       latestTankVolume.current = volume
       setModel((current) => ({
         ...current,
         utilities: current.utilities.map((utility) => utility.id === 'tank' ? {
           ...utility,
-          alert: needsWater,
-          warning: warnsWater,
+          alert: tankState === 'needsWater',
+          warning: tankState === 'warning',
           levelPercent,
           metrics: utility.metrics.map((metric) => ({ ...metric, value: volume.toLocaleString('en-US') })),
         } : utility),
@@ -888,7 +919,7 @@ export function useBrewingData() {
     cleaningStartInFlight.current = true
     showMachineActionError(null)
     try {
-      await setMachineState('cleaning')
+      await setMachineState(CLEANING_PROFILE_START_STATE)
       return true
     } catch {
       showMachineActionError('The machine did not start the cleaning sequence.')
@@ -1025,10 +1056,13 @@ export function useBrewingData() {
     const isFavorite = favoriteSlots.includes(profileId)
     if (latestModel.current.activeProfileId === profileId) {
       if (!isFavorite) retainedAdHocProfileId.current = profileId
+      storeLastSelectedProfileIdLocally(profileId)
+      if (connection === 'connected') await setSharedSetting(LAST_SELECTED_PROFILE_SHARED_KEY, profileId).catch(() => undefined)
       return true
     }
     if (connection === 'fixture') {
       if (!isFavorite) retainedAdHocProfileId.current = profileId
+      storeLastSelectedProfileIdLocally(profileId)
       setModel((current) => ({
         ...current,
         profiles: carouselProfiles(allProfiles, favoriteAssignments.current, profileId, retainedAdHocProfileId.current),
@@ -1049,6 +1083,8 @@ export function useBrewingData() {
       const workflow = await updateWorkflow(workflowValuesForProfile(record, profile).patch)
       if (!isFavorite) retainedAdHocProfileId.current = profileId
       setModel((current) => applyWorkflow(current, workflow, profileRecords.current, favoriteAssignments.current, retainedAdHocProfileId.current))
+      storeLastSelectedProfileIdLocally(profileId)
+      await setSharedSetting(LAST_SELECTED_PROFILE_SHARED_KEY, profileId).catch(() => undefined)
       return true
     } catch {
       showSettingFeedback({ status: 'error', message: `${profile.name} could not be selected.` })
