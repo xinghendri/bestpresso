@@ -6,6 +6,7 @@ import sleep from '../assets/figma/sleep.svg'
 import utilityCollapse from '../assets/figma/utility-collapse.svg'
 import utilityExpand from '../assets/figma/utility-expand.svg'
 import { StatusPill } from '../components/StatusPill/StatusPill'
+import { LayoutDiagnostics } from '../components/LayoutDiagnostics/LayoutDiagnostics'
 import { isCleaningProfile } from '../api/decaid/adapters'
 import type { AvailableScale, BrewProfile, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveUtilityOperation, PreviousShotStatus, ScaleConnection, SettingFeedback } from '../domain/brewing'
 import { BrewingPanel } from '../features/brew/BrewingPanel'
@@ -96,6 +97,7 @@ export function AppShell({ model, allProfiles, liveBrew, utilityOperation, previ
   if (sleepScreenActive) return <button className="sleep-screen" type="button" aria-label="Wake machine" onClick={onWake}><span>Tap to wake</span></button>
   if (liveBrew.visible && !utilityOperation) return <LiveBrewingScreen model={model} liveBrew={liveBrew} stopPending={brewStopPending} actionError={machineActionError} onStop={onStopEspresso} onDismiss={onDismissLiveBrew} />
   return <main className={`app-shell${utilitiesCollapsed ? ' app-shell--utilities-collapsed' : ''}${utilityLayoutHasChanged ? ' app-shell--utility-layout-transitioned' : ''}`}>
+    <LayoutDiagnostics />
     <header className="topbar"><div className="topbar__brand"><button className="utility-layout-toggle" type="button" aria-label={utilitiesCollapsed ? 'Expand utility panels' : 'Minimize utility panels'} aria-controls="machine-utilities" aria-expanded={!utilitiesCollapsed} title={utilitiesCollapsed ? 'Expand utility panels' : 'Minimize utility panels'} onClick={toggleUtilityLayout}><img src={utilitiesCollapsed ? utilityExpand : utilityCollapse} alt="" /></button><img className="logo" src={logo} alt="decent" /></div><nav aria-label="Machine controls"><button className="control-button control-button--cleaning" type="button" aria-label="Cleaning sequences" title="Cleaning" onClick={() => setCleaningPickerOpen(true)}><img src={cleaning} alt="" /></button><button className={sleepPending ? 'control-button control-button--pending' : 'control-button'} type="button" aria-label={sleepPending ? `${sleepLabel} request in progress` : sleepLabel} title={sleepLabel} disabled={sleepPending} onClick={onSleep}><img src={sleep} alt="" /></button><button className="control-button" type="button" aria-label="Settings" title="Settings" onClick={onOpenSettings}><img src={settings} alt="" /></button><StatusPill status={model.readiness} connection={connection} machineConnection={machineConnection} heatingSeconds={heatingSeconds} /></nav></header>
     {(machineActionError || settingFeedback) && <div className="system-messages">
       {machineActionError && <div className="system-message system-message--error" role="alert">{machineActionError}</div>}
