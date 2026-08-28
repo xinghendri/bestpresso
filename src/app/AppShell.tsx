@@ -16,6 +16,7 @@ import { HistoryPanel } from '../features/history/HistoryPanel'
 import { MachineUtilityCard } from '../features/machine/MachineUtilityCard'
 import { LiveUtilityOperationOverlay } from '../features/machine/LiveUtilityOperationOverlay'
 import { ScaleDevicePicker } from '../features/machine/ScaleDevicePicker'
+import { SleepWakeScreen } from '../features/sleep/SleepWakeScreen'
 
 interface AppShellProps {
   model: BrewingScreenModel
@@ -94,7 +95,7 @@ export function AppShell({ model, allProfiles, liveBrew, utilityOperation, previ
     return started
   }
 
-  if (sleepScreenActive) return <button className="sleep-screen" type="button" aria-label="Wake machine" onClick={onWake}><span>Tap to wake</span></button>
+  if (sleepScreenActive) return <SleepWakeScreen onWake={onWake} />
   if (liveBrew.visible && !utilityOperation) return <LiveBrewingScreen model={model} liveBrew={liveBrew} stopPending={brewStopPending} actionError={machineActionError} onStop={onStopEspresso} onDismiss={onDismissLiveBrew} />
   return <main className={`app-shell${utilitiesCollapsed ? ' app-shell--utilities-collapsed' : ''}${utilityLayoutHasChanged ? ' app-shell--utility-layout-transitioned' : ''}`}>
     <LayoutDiagnostics />

@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { DecaidSettings, ScalePowerMode } from '../src/api/decaid/types.ts'
-import { sleepMachineAndConnectedScale } from '../src/features/brew/sleepControl.ts'
+import { SLEEP_DISPLAY_BRIGHTNESS, sleepMachineAndConnectedScale } from '../src/features/brew/sleepControl.ts'
+
+test('keeps the sleeping display faintly visible', () => {
+  assert.equal(SLEEP_DISPLAY_BRIGHTNESS, 10)
+})
 
 function sleepApi(settings: DecaidSettings = {}) {
   const calls: string[] = []

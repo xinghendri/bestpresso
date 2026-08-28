@@ -18,8 +18,8 @@ test('uses transport identifiers only to disambiguate legacy Decent names', () =
 })
 
 test('does not let a transport-shaped identifier override a canonical model name', () => {
-  assert.equal(match('Acaia Lunar', 'wifi:unexpected')?.id, 'acaia-lunar')
-  assert.equal(match('Bookoo Mini Scale', 'serial-unexpected')?.id, 'bookoo-mini-scale')
+  assert.equal(match('Acaia Lunar', 'wifi:unexpected')?.id, 'acaia-scale')
+  assert.equal(match('Bookoo Mini Scale', 'serial-unexpected')?.id, 'bookoo-scale')
 })
 
 test('maps every supplied image to the matching Decaid scale name', () => {
@@ -27,18 +27,21 @@ test('maps every supplied image to the matching Decaid scale name', () => {
   assert.equal(match('Half Decent Scale (USB)', 'serial-1')?.imageName, 'half-decent-scale-usb.png')
   assert.equal(match('Half Decent Scale (WiFi)', 'wifi:hds.local')?.imageName, 'half-decent-scale-usb.png')
   assert.equal(match('Skale2', 'ble-1')?.imageName, 'skale2.png')
-  assert.equal(match('LUNAR', 'ble-2')?.imageName, 'acaia-lunar.png')
+  assert.equal(match('LUNAR', 'ble-2')?.imageName, 'acaia-scale.png')
   assert.equal(match('Felicita Arc', 'ble-3')?.imageName, 'felicita-arc.png')
-  assert.equal(match('Bookoo Mini Scale', 'ble-4')?.imageName, 'bookoo-mini.png')
+  assert.equal(match('Bookoo Mini Scale', 'ble-4')?.imageName, 'bookoo-scale.png')
   assert.equal(match('Eureka Precisa', 'ble-5')?.imageName, 'eureka-precisa.png')
   assert.equal(match('Difluid Microbalance', 'ble-6')?.imageName, 'difluid-microbalance.png')
 })
 
-test('keeps specific aliases ahead of shared driver families', () => {
-  assert.equal(match('Bookoo Ultra', 'ble-1')?.id, 'bookoo-ultra')
-  assert.equal(match('Bookoo Themis Mini', 'ble-2')?.id, 'bookoo-mini-scale')
-  assert.equal(match('Acaia Pearl S', 'ble-3')?.id, 'acaia-pearl')
-  assert.equal(match('Solo Barista', 'ble-4')?.id, 'solo-barista')
+test('presents ambiguous Acaia and Bookoo models as brand families', () => {
+  assert.equal(match('Bookoo Ultra', 'ble-1')?.id, 'bookoo-scale')
+  assert.equal(match('Bookoo Themis Mini', 'ble-2')?.id, 'bookoo-scale')
+  assert.equal(match('Themis Mini', 'ble-3')?.displayName, 'Bookoo')
+  assert.equal(match('Acaia Pearl S', 'ble-4')?.id, 'acaia-scale')
+  assert.equal(match('PYXIS', 'ble-5')?.displayName, 'Acaia')
+  assert.equal(match('PROCH', 'ble-6')?.imageName, 'acaia-scale.png')
+  assert.equal(match('Solo Barista', 'ble-7')?.id, 'solo-barista')
 })
 
 test('keeps supported scales without supplied art image-free', () => {

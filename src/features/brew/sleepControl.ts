@@ -1,5 +1,7 @@
 import type { DecaidSettings, ScalePowerMode } from '../../api/decaid/types'
 
+export const SLEEP_DISPLAY_BRIGHTNESS = 10
+
 interface SleepControlApi {
   getSettings: () => Promise<DecaidSettings>
   setScalePowerMode: (mode: ScalePowerMode) => Promise<void>
