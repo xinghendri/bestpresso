@@ -9,9 +9,9 @@ import type { AvailableScale, BrewProfile, BrewingScreenModel, DataConnection, E
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { brewingFixture } from '../../fixtures/brewingFixture'
 import { scaleFixtureForKey } from '../../fixtures/scaleFixtures'
-import { CLEANING_PROFILE_START_STATE, isCleaningSequenceRun } from '../cleaning/cleaningSequence'
+import { CLEANING_PROFILE_START_STATE, isCleaningSequenceRun, profileForCleaningShortcut } from '../cleaning/cleaningSequence'
 import { LAST_SELECTED_PROFILE_LOCAL_KEY, LAST_SELECTED_PROFILE_SHARED_KEY, normalizeRememberedProfileId, resolveRememberedProfileId } from '../profiles/profileSelectionPersistence'
-import { sleepMachineAndConnectedScale } from './sleepControl'
+import { SLEEP_DISPLAY_BRIGHTNESS, sleepMachineAndConnectedScale } from './sleepControl'
 
 const MAX_LIVE_SHOT_POINTS = 900
 const MIN_SUCCESSFUL_SHOT_MS = 5_000
@@ -235,7 +235,7 @@ export function useBrewingData() {
       const display = await getDisplayState()
       if (typeof display.requestedBrightness === 'number' && display.requestedBrightness > 0) brightnessBeforeSleep.current = display.requestedBrightness
     } catch { /* brightness capture is optional */ }
-    try { await setDisplayBrightness(0) }
+    try { await setDisplayBrightness(SLEEP_DISPLAY_BRIGHTNESS) }
     catch { displayDimmed.current = false }
   }
 
@@ -879,10 +879,11 @@ export function useBrewingData() {
     showMachineActionError(null)
     try {
       if (!cleaningRestoreWorkflow.current) cleaningRestoreWorkflow.current = workflowPatch(await getWorkflow())
-      await setMachineProfile(record.profile)
-      const cleaningWorkflow = await updateWorkflow({ profile: record.profile })
+      const executionProfile = profileForCleaningShortcut(record.profile)
+      await setMachineProfile(executionProfile)
+      const cleaningWorkflow = await updateWorkflow({ profile: executionProfile })
       const selectedProfile = cleaningWorkflow.profile
-      if (selectedProfile?.title !== record.profile.title || selectedProfile?.beverage_type?.toLowerCase() !== 'cleaning') {
+      if (selectedProfile?.title !== executionProfile.title || selectedProfile?.beverage_type?.toLowerCase() !== 'cleaning') {
         throw new Error('Decaid did not retain the selected cleaning profile')
       }
       pendingCleaningSequence.current = { profileId, profileName: profile.name, stepNames: profile.stepNames }
