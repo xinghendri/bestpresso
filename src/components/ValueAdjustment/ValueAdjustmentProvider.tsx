@@ -5,12 +5,10 @@ import { MAX_VALUE_SUGGESTIONS } from '../../domain/valueAdjustments'
 import { NumericKeypad } from './NumericKeypad'
 import { ValueAdjustmentContext } from './ValueAdjustmentContext'
 import type { ValueAdjustmentMode, ValueAdjustmentRequest } from './ValueAdjustmentContext'
-import { appendNumericKey, gestureIncrement, maximumGesturePointers, modeForNumericDraft, modeForShortcut, normalizedNumericDraft, numericDraftRangeIssue, removeNumericKey } from './valueAdjustmentGestures'
+import { appendNumericKey, gestureIncrement, maximumGesturePointers, normalizedNumericDraft, numericDraftRangeIssue, removeNumericKey } from './valueAdjustmentGestures'
 
 const SUGGESTION_STORAGE_KEY = 'bestpresso.value-adjustment-suggestions.v2'
-const MODE_STORAGE_KEY = 'bestpresso.value-adjustment-modes.v1'
 type SuggestionStore = Partial<Record<ValueAdjustmentRequest['suggestionKey'], number[]>>
-type ModeStore = Partial<Record<ValueAdjustmentRequest['suggestionKey'], ValueAdjustmentMode>>
 
 const formatValue = (value: number, mode: ValueAdjustmentMode) => mode === 'decimal' ? value.toFixed(1) : String(Math.round(value))
 const formatSuggestion = (value: number, mode: ValueAdjustmentMode) => mode === 'decimal' && !Number.isInteger(value) ? value.toFixed(1) : String(value)
@@ -51,24 +49,6 @@ const writeSuggestionStore = (store: SuggestionStore) => {
   }
 }
 
-const readModeStore = (): ModeStore => {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(MODE_STORAGE_KEY) ?? '{}')
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
-    return Object.fromEntries(Object.entries(parsed).filter((entry): entry is [string, ValueAdjustmentMode] => entry[1] === 'integer' || entry[1] === 'decimal')) as ModeStore
-  } catch {
-    return {}
-  }
-}
-
-const writeMode = (key: ValueAdjustmentRequest['suggestionKey'], mode: ValueAdjustmentMode) => {
-  try {
-    window.localStorage.setItem(MODE_STORAGE_KEY, JSON.stringify({ ...readModeStore(), [key]: mode }))
-  } catch {
-    // The selected ruler mode can safely fall back to the default when storage is unavailable.
-  }
-}
-
 interface DragState {
   pointers: Map<number, number>
   startCenter: number
@@ -82,16 +62,9 @@ interface DragState {
 const pointerCenter = (pointers: Map<number, number>) => [...pointers.values()].reduce((sum, position) => sum + position, 0) / Math.max(1, pointers.size)
 
 function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentRequest; onClose: () => void }) {
-  const supportsModeToggle = Boolean(request.modes?.includes('integer') && request.modes.includes('decimal'))
-  const storedMode = readModeStore()[request.suggestionKey]
-  const initialMode = supportsModeToggle && storedMode && request.modes?.includes(storedMode) ? storedMode : request.mode
-  const [mode, setMode] = useState<ValueAdjustmentMode>(initialMode)
-  const activeRequest = useMemo<ValueAdjustmentRequest>(() => ({
-    ...request,
-    mode,
-    step: supportsModeToggle ? mode === 'integer' ? 1 : 0.1 : request.step,
-  }), [mode, request, supportsModeToggle])
-  const [value, setValue] = useState(() => normalizedValue(request.value, { ...request, mode: initialMode, step: supportsModeToggle && initialMode === 'integer' ? 1 : request.step }))
+  const mode = request.mode
+  const activeRequest = request
+  const [value, setValue] = useState(() => normalizedValue(request.value, request))
   const [visualValue, setVisualValue] = useState(value)
   const ruler = useRef<HTMLDivElement>(null)
   const drag = useRef<DragState | null>(null)
@@ -101,7 +74,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const lastFeedbackValue = useRef(value)
   const lastFeedbackAt = useRef(0)
   const fixedSelection = useRef<number | null>(null)
-  const directEntryStart = useRef({ value, mode: initialMode })
+  const directEntryStart = useRef(value)
   const replaceDraftOnKey = useRef(false)
   const directDraftText = useRef<HTMLSpanElement>(null)
   const directEntryAnimation = useRef<number | null>(null)
@@ -110,7 +83,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const gestureTipTimer = useRef<number | null>(null)
   const [editingValue, setEditingValue] = useState(false)
   const [gestureTip, setGestureTip] = useState<string | null>(null)
-  const [draftValue, setDraftValue] = useState(formatValue(value, initialMode))
+  const [draftValue, setDraftValue] = useState(formatValue(value, mode))
   const draftValueRef = useRef(draftValue)
   const draftRangeIssue = editingValue ? numericDraftRangeIssue(draftValue, request.min, request.max) : null
   const directInputError = draftRangeIssue === 'above'
@@ -123,11 +96,9 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const hasSuggestionHistory = Object.prototype.hasOwnProperty.call(suggestionStore, request.suggestionKey)
   const presets = useMemo(() => {
     const source = hasSuggestionHistory ? suggestionStore[request.suggestionKey] ?? [] : request.presets ?? []
-    const values = supportsModeToggle
-      ? Array.from(new Set(source.filter((suggestion) => Number.isFinite(suggestion) && suggestion >= request.min && suggestion <= request.max))).slice(-MAX_VALUE_SUGGESTIONS)
-      : normalizedSuggestions(source, activeRequest)
+    const values = normalizedSuggestions(source, activeRequest)
     return [...values].sort((first, second) => first - second)
-  }, [activeRequest, hasSuggestionHistory, request, suggestionStore, supportsModeToggle])
+  }, [activeRequest, hasSuggestionHistory, request, suggestionStore])
   const valueHint = request.valueHint?.(normalizedValue(visualValue, activeRequest))
   const centerLabel = Math.round(visualValue)
   const labels = Array.from({ length: 9 }, (_, index) => centerLabel + index - 4)
@@ -260,9 +231,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     const current = suggestionStoreRef.current
     const hasHistory = Object.prototype.hasOwnProperty.call(current, request.suggestionKey)
     const source = hasHistory ? current[request.suggestionKey] ?? [] : request.presets ?? []
-    const existing = supportsModeToggle
-      ? Array.from(new Set(source.filter((suggestion) => Number.isFinite(suggestion) && suggestion >= request.min && suggestion <= request.max)))
-      : normalizedSuggestions(source, adjustment)
+    const existing = normalizedSuggestions(source, adjustment)
     const alreadyIncluded = existing.includes(selected)
     let next = existing.filter((suggestion) => suggestion !== selected)
 
@@ -279,48 +248,22 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     suggestionStoreRef.current = updated
     writeSuggestionStore(updated)
     setSuggestionStore(updated)
-  }, [activeRequest, request, supportsModeToggle])
-
-  const changeMode = (nextMode: ValueAdjustmentMode, targetValue = visualValueRef.current, animate = false) => {
-    if (!supportsModeToggle || nextMode === mode) {
-      if (animate) animateToValue(targetValue)
-      return
-    }
-    stopAnimation()
-    const nextRequest = { ...request, mode: nextMode, step: nextMode === 'integer' ? 1 : 0.1 }
-    const nextValue = normalizedValue(targetValue, nextRequest)
-    setMode(nextMode)
-    if (animate) animateToValue(nextValue, undefined, nextRequest)
-    else {
-      visualValueRef.current = nextValue
-      setVisualValue(nextValue)
-      setValue(nextValue)
-      lastFeedbackValue.current = nextValue
-    }
-    setDraftValue(formatValue(nextValue, nextMode))
-  }
+  }, [activeRequest, request])
 
   const selectPreset = (preset: number) => {
     fixedSelection.current = null
     prepareAudioFeedback()
-    const nextMode = modeForShortcut(preset, supportsModeToggle, mode)
-    if (nextMode !== mode) changeMode(nextMode, preset, true)
-    else animateToValue(preset)
+    animateToValue(preset)
   }
 
   const beginDirectEntry = () => {
     stopAnimation()
-    directEntryStart.current = { value: normalizedValue(visualValueRef.current, activeRequest), mode }
+    directEntryStart.current = normalizedValue(visualValueRef.current, activeRequest)
     replaceDraftOnKey.current = true
     const startingDraft = formatValue(normalizedValue(visualValueRef.current, activeRequest), mode)
     draftValueRef.current = startingDraft
     setDraftValue(startingDraft)
     setEditingValue(true)
-  }
-
-  const requestForNumericDraft = (draft: string) => {
-    const nextMode = supportsModeToggle ? modeForNumericDraft(draft, mode) : mode
-    return { ...request, mode: nextMode, step: supportsModeToggle ? nextMode === 'integer' ? 1 : 0.1 : request.step }
   }
 
   const queueDirectEntry = (nextDraft: string) => {
@@ -332,14 +275,12 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     if (directEntryAnimation.current !== null) window.clearTimeout(directEntryAnimation.current)
     directEntryAnimation.current = null
     if (!normalizedDraft || normalizedDraft === '.') return
-    const nextRequest = requestForNumericDraft(normalizedDraft)
     const parsed = Number(normalizedDraft)
     if (Number.isFinite(parsed)) {
       directEntryAnimation.current = window.setTimeout(() => {
         directEntryAnimation.current = null
         setDraftValue(normalizedDraft)
-        if (supportsModeToggle && nextRequest.mode !== mode) setMode(nextRequest.mode)
-        animateToValue(parsed, 220, nextRequest)
+        animateToValue(parsed, 220)
       }, 1500)
     }
   }
@@ -362,16 +303,15 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     if (directEntryAnimation.current !== null) window.clearTimeout(directEntryAnimation.current)
     directEntryAnimation.current = null
     const starting = directEntryStart.current
-    setMode(starting.mode)
-    visualValueRef.current = starting.value
-    setVisualValue(starting.value)
-    setValue(starting.value)
-    const startingDraft = formatValue(starting.value, starting.mode)
+    visualValueRef.current = starting
+    setVisualValue(starting)
+    setValue(starting)
+    const startingDraft = formatValue(starting, mode)
     draftValueRef.current = startingDraft
     setDraftValue(startingDraft)
-    lastFeedbackValue.current = starting.value
+    lastFeedbackValue.current = starting
     setEditingValue(false)
-  }, [stopAnimation])
+  }, [mode, stopAnimation])
 
   const commitDirectEntry = () => {
     if (directEntryAnimation.current !== null) window.clearTimeout(directEntryAnimation.current)
@@ -380,14 +320,12 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     const parsed = Number(normalizedDraft)
     if (numericDraftRangeIssue(normalizedDraft, request.min, request.max)) return
     if (Number.isFinite(parsed) && normalizedDraft !== '') {
-      const nextRequest = requestForNumericDraft(normalizedDraft)
-      const nextValue = normalizedValue(parsed, nextRequest)
+      const nextValue = normalizedValue(parsed, activeRequest)
       stopAnimation()
-      if (supportsModeToggle && nextRequest.mode !== mode) setMode(nextRequest.mode)
       visualValueRef.current = nextValue
       setVisualValue(nextValue)
       setValue(nextValue)
-      const committedDraft = formatValue(nextValue, nextRequest.mode)
+      const committedDraft = formatValue(nextValue, mode)
       draftValueRef.current = committedDraft
       setDraftValue(committedDraft)
       lastFeedbackValue.current = nextValue
@@ -399,10 +337,8 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     const normalizedDraft = normalizedNumericDraft(draftValueRef.current)
     const parsedDraft = Number(normalizedDraft)
     if (editingValue && numericDraftRangeIssue(normalizedDraft, request.min, request.max)) return
-    const saveRequest = editingValue && Number.isFinite(parsedDraft) && normalizedDraft !== '' ? requestForNumericDraft(normalizedDraft) : activeRequest
-    const savedValue = editingValue && Number.isFinite(parsedDraft) && normalizedDraft !== '' ? normalizedValue(parsedDraft, saveRequest) : value
-    if (fixedSelection.current !== savedValue) rememberSuggestion(savedValue, saveRequest)
-    if (supportsModeToggle) writeMode(request.suggestionKey, saveRequest.mode)
+    const savedValue = editingValue && Number.isFinite(parsedDraft) && normalizedDraft !== '' ? normalizedValue(parsedDraft, activeRequest) : value
+    if (fixedSelection.current !== savedValue) rememberSuggestion(savedValue)
     request.onSave(savedValue)
     onClose()
   }
@@ -448,6 +384,11 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   }
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (editingValue) {
+      const rangeIssue = numericDraftRangeIssue(draftValueRef.current, request.min, request.max)
+      if (rangeIssue) cancelDirectEntry()
+      else commitDirectEntry()
+    }
     prepareAudioFeedback()
     stopAnimation()
     fixedSelection.current = null
@@ -558,7 +499,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     </section>
     {editingValue && <NumericKeypad disabled={Boolean(directInputError)} label={request.label} onDelete={deleteKeypadKey} onDismiss={() => { playKeypadFeedback(); commitDirectEntry() }} onKey={pressKeypadKey} />}
     {!editingValue && <footer className="value-adjuster__presets">
-      <div className="value-adjuster__preset-row" aria-label={`${request.label} suggestions`}>{presets.map((preset) => <button key={preset} type="button" className={preset === value ? 'value-adjuster__preset value-adjuster__preset--active' : 'value-adjuster__preset'} onClick={() => selectPreset(preset)}>{formatSuggestion(preset, modeForShortcut(preset, supportsModeToggle, mode))}{request.unit && <small>{request.unit}</small>}</button>)}</div>
+      <div className="value-adjuster__preset-row" aria-label={`${request.label} suggestions`}>{presets.map((preset) => <button key={preset} type="button" className={preset === value ? 'value-adjuster__preset value-adjuster__preset--active' : 'value-adjuster__preset'} onClick={() => selectPreset(preset)}>{formatSuggestion(preset, mode)}{request.unit && <small>{request.unit}</small>}</button>)}</div>
       {request.fixedSuggestions && <div className="value-adjuster__preset-row value-adjuster__preset-row--fixed" aria-label={`${request.label} typical ratios`}>{request.fixedSuggestions.map((suggestion) => {
         const available = Number.isFinite(suggestion.value) && suggestion.value >= activeRequest.min && suggestion.value <= activeRequest.max
         const suggestionValue = available ? normalizedValue(suggestion.value, activeRequest) : suggestion.value

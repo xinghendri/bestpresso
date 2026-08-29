@@ -11,7 +11,6 @@ export interface ValueAdjustmentRequest {
   max: number
   step: number
   mode: ValueAdjustmentMode
-  modes?: readonly ValueAdjustmentMode[]
   suggestionKey: ValueAdjustmentKey
   presets?: readonly number[]
   fixedSuggestions?: readonly FixedValueSuggestion[]

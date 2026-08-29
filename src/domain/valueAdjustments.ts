@@ -15,7 +15,6 @@ export interface ValueAdjustmentDefinition {
   max: number
   step: number
   mode: ValueAdjustmentMode
-  modes?: readonly ValueAdjustmentMode[]
   defaultValue?: number
   suggestions: readonly number[]
 }
@@ -77,7 +76,6 @@ export const VALUE_ADJUSTMENTS = {
     max: 2500,
     step: 0.1,
     mode: 'decimal',
-    modes: ['integer', 'decimal'],
     defaultValue: 20,
     suggestions: [],
   },
