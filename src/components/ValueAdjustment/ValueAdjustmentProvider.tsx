@@ -1,12 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react'
 import logo from '../../assets/figma/decent-logo.png'
-import keypadBackspace from '../../assets/figma/keypad-backspace.svg'
-import keypadBackspaceXA from '../../assets/figma/keypad-backspace-x-a.svg'
-import keypadBackspaceXB from '../../assets/figma/keypad-backspace-x-b.svg'
-import keypadChevronDown from '../../assets/figma/keypad-chevron-down.svg'
-import keypadChevronUp from '../../assets/figma/keypad-chevron-up.svg'
 import { MAX_VALUE_SUGGESTIONS } from '../../domain/valueAdjustments'
+import { NumericKeypad } from './NumericKeypad'
 import { ValueAdjustmentContext } from './ValueAdjustmentContext'
 import type { ValueAdjustmentMode, ValueAdjustmentRequest } from './ValueAdjustmentContext'
 import { appendNumericKey, gestureIncrement, maximumGesturePointers, modeForNumericDraft, modeForShortcut, normalizedNumericDraft, numericDraftRangeIssue, removeNumericKey } from './valueAdjustmentGestures'
@@ -311,7 +307,6 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     if (supportsModeToggle && nextRequest.mode !== mode) setMode(nextRequest.mode)
     const parsed = Number(normalizedDraft)
     if (Number.isFinite(parsed)) {
-      playStepFeedback(parsed, nextRequest)
       directEntryAnimation.current = window.setTimeout(() => {
         directEntryAnimation.current = null
         animateToValue(parsed, 220, nextRequest, false)
@@ -320,14 +315,12 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   }
 
   const pressKeypadKey = (key: string) => {
-    prepareAudioFeedback()
     const nextDraft = appendNumericKey(draftValueRef.current, key, replaceDraftOnKey.current)
     replaceDraftOnKey.current = false
     changeDirectEntry(nextDraft)
   }
 
   const deleteKeypadKey = () => {
-    prepareAudioFeedback()
     replaceDraftOnKey.current = false
     changeDirectEntry(removeNumericKey(draftValueRef.current))
   }
@@ -531,15 +524,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
         </div>
       </div>
     </section>
-    {editingValue && <section className="value-adjuster__keypad" aria-label={`Enter ${request.label}`}>
-        <div className="value-adjuster__keypad-grid">
-          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((key) => <button key={key} type="button" onPointerDown={(event) => { event.preventDefault(); pressKeypadKey(key) }}>{key}</button>)}
-          <button className="value-adjuster__keypad-delete" type="button" aria-label="Delete last digit" onPointerDown={(event) => { event.preventDefault(); deleteKeypadKey() }}><span><img src={keypadBackspace} alt="" /><img src={keypadBackspaceXA} alt="" /><img src={keypadBackspaceXB} alt="" /></span></button>
-          <button type="button" onPointerDown={(event) => { event.preventDefault(); pressKeypadKey('0') }}>0</button>
-          <button type="button" aria-label="Decimal point" onPointerDown={(event) => { event.preventDefault(); pressKeypadKey('.') }}>.</button>
-        </div>
-        <button className="value-adjuster__keypad-dismiss" type="button" aria-label="Dismiss number keypad" disabled={Boolean(directInputError)} onPointerDown={(event) => { event.preventDefault(); commitDirectEntry() }}><img src={keypadChevronUp} alt="" /><img src={keypadChevronDown} alt="" /></button>
-    </section>}
+    {editingValue && <NumericKeypad disabled={Boolean(directInputError)} label={request.label} onDelete={deleteKeypadKey} onDismiss={commitDirectEntry} onKey={pressKeypadKey} />}
     {!editingValue && <footer className="value-adjuster__presets">
       <div className="value-adjuster__preset-row" aria-label={`${request.label} suggestions`}>{presets.map((preset) => <button key={preset} type="button" className={preset === value ? 'value-adjuster__preset value-adjuster__preset--active' : 'value-adjuster__preset'} onClick={() => selectPreset(preset)}>{formatSuggestion(preset, modeForShortcut(preset, supportsModeToggle, mode))}{request.unit && <small>{request.unit}</small>}</button>)}</div>
       {request.fixedSuggestions && <div className="value-adjuster__preset-row value-adjuster__preset-row--fixed" aria-label={`${request.label} typical ratios`}>{request.fixedSuggestions.map((suggestion) => {
