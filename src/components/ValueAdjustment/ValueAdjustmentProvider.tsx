@@ -78,6 +78,8 @@ interface DragState {
   startCenter: number
   startValue: number
   increment: number
+  maxPointers: number
+  moved: boolean
   ended: boolean
 }
 
@@ -106,7 +108,11 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const directEntryStart = useRef({ value, mode: initialMode })
   const replaceDraftOnKey = useRef(false)
   const directEntryAnimation = useRef<number | null>(null)
+  const completedSingleFingerSwipes = useRef(0)
+  const gestureTipShown = useRef(false)
+  const gestureTipTimer = useRef<number | null>(null)
   const [editingValue, setEditingValue] = useState(false)
+  const [gestureTip, setGestureTip] = useState<string | null>(null)
   const [draftValue, setDraftValue] = useState(formatValue(value, initialMode))
   const draftValueRef = useRef(draftValue)
   const draftRangeIssue = editingValue ? numericDraftRangeIssue(draftValue, request.min, request.max) : null
@@ -382,6 +388,8 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
       stopAnimation()
       if (directEntryAnimation.current !== null) window.clearTimeout(directEntryAnimation.current)
       directEntryAnimation.current = null
+      if (gestureTipTimer.current !== null) window.clearTimeout(gestureTipTimer.current)
+      gestureTipTimer.current = null
       if (audioContext.current?.state !== 'closed') void audioContext.current?.close().catch(() => undefined)
       audioContext.current = null
     }
@@ -428,9 +436,10 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
       setVisualValue(startValue)
       setValue(selectedValue)
       lastFeedbackValue.current = selectedValue
-      drag.current = { pointers, startCenter: event.clientX, startValue, increment: activeRequest.step, ended: false }
+      drag.current = { pointers, startCenter: event.clientX, startValue, increment: activeRequest.step, maxPointers: 1, moved: false, ended: false }
     } else {
       currentDrag.pointers.set(event.pointerId, event.clientX)
+      currentDrag.maxPointers = Math.max(currentDrag.maxPointers, currentDrag.pointers.size)
       if (currentDrag.pointers.size > maximumPointers) currentDrag.ended = true
       else {
         currentDrag.startCenter = pointerCenter(currentDrag.pointers)
@@ -451,6 +460,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     const width = Math.max(1, track?.getBoundingClientRect().width ?? event.currentTarget.getBoundingClientRect().width)
     const visibleSteps = activeDrag.pointers.size === 1 ? mode === 'decimal' ? 80 : 12 : 12
     const stepDelta = (activeDrag.startCenter - pointerCenter(activeDrag.pointers)) / (width / visibleSteps)
+    if (Math.abs(stepDelta) >= 0.15) activeDrag.moved = true
     const rawValue = activeDrag.startValue + stepDelta * increment
     const coarseRequest = increment > activeRequest.step ? { ...activeRequest, step: increment } : activeRequest
     const nextVisualValue = increment > activeRequest.step
@@ -472,6 +482,19 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
       return
     }
     drag.current = null
+    if (activeDrag.moved && activeDrag.maxPointers === 1 && !gestureTipShown.current && (request.suggestionKey === 'grindSetting' || request.suggestionKey === 'targetYield')) {
+      completedSingleFingerSwipes.current += 1
+      if (completedSingleFingerSwipes.current > 3) {
+        gestureTipShown.current = true
+        setGestureTip(request.suggestionKey === 'grindSetting'
+          ? 'Swipe with two fingers for steps of 10, or three fingers for steps of 100.'
+          : 'Swipe with two fingers to move in steps of 10.')
+        gestureTipTimer.current = window.setTimeout(() => {
+          gestureTipTimer.current = null
+          setGestureTip(null)
+        }, 5000)
+      }
+    }
     const selectedValue = normalizedValue(visualValueRef.current, activeDrag.increment > activeRequest.step ? { ...activeRequest, step: activeDrag.increment } : activeRequest)
     if (mode === 'integer') animateToValue(selectedValue, 160)
     else setImmediateValue(selectedValue)
@@ -480,6 +503,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const hasFixedSuggestions = Boolean(request.fixedSuggestions?.length)
 
   return <main className={`value-adjuster value-adjuster--${mode}${hasFixedSuggestions ? ' value-adjuster--has-fixed-suggestions' : ''}${editingValue ? ' value-adjuster--keyboard' : ''}`} aria-label={`Adjust ${request.label}`}>
+    {gestureTip && <div className="system-messages"><div className="system-message value-adjuster__gesture-tip" role="status" aria-live="polite"><span className="value-adjuster__gesture-tip-icon" aria-hidden="true">i</span><span>{gestureTip}</span></div></div>}
     <header className="value-adjuster__header">
       <img className="logo" src={logo} alt="decent" />
       <div className="value-adjuster__actions"><button className="value-adjuster__cancel" type="button" onClick={onClose}>Cancel</button><button className="value-adjuster__save" type="button" disabled={Boolean(directInputError)} onClick={saveAdjustment}>Save</button></div>
