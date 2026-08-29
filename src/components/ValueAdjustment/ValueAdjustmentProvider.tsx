@@ -103,6 +103,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const fixedSelection = useRef<number | null>(null)
   const directEntryStart = useRef({ value, mode: initialMode })
   const replaceDraftOnKey = useRef(false)
+  const directDraftText = useRef<HTMLSpanElement>(null)
   const directEntryAnimation = useRef<number | null>(null)
   const completedSingleFingerSwipes = useRef(0)
   const gestureTipShown = useRef(false)
@@ -294,21 +295,22 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     return { ...request, mode: nextMode, step: supportsModeToggle ? nextMode === 'integer' ? 1 : 0.1 : request.step }
   }
 
-  const changeDirectEntry = (nextDraft: string) => {
+  const queueDirectEntry = (nextDraft: string) => {
     const normalizedDraft = normalizedNumericDraft(nextDraft)
     if (!/^\d*(?:\.\d*)?$/.test(normalizedDraft)) return
     stopAnimation()
     draftValueRef.current = normalizedDraft
-    setDraftValue(normalizedDraft)
+    if (directDraftText.current) directDraftText.current.textContent = normalizedDraft || '—'
     if (directEntryAnimation.current !== null) window.clearTimeout(directEntryAnimation.current)
     directEntryAnimation.current = null
     if (!normalizedDraft || normalizedDraft === '.') return
     const nextRequest = requestForNumericDraft(normalizedDraft)
-    if (supportsModeToggle && nextRequest.mode !== mode) setMode(nextRequest.mode)
     const parsed = Number(normalizedDraft)
     if (Number.isFinite(parsed)) {
       directEntryAnimation.current = window.setTimeout(() => {
         directEntryAnimation.current = null
+        setDraftValue(normalizedDraft)
+        if (supportsModeToggle && nextRequest.mode !== mode) setMode(nextRequest.mode)
         animateToValue(parsed, 220, nextRequest, false)
       }, 1500)
     }
@@ -317,12 +319,12 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const pressKeypadKey = (key: string) => {
     const nextDraft = appendNumericKey(draftValueRef.current, key, replaceDraftOnKey.current)
     replaceDraftOnKey.current = false
-    changeDirectEntry(nextDraft)
+    queueDirectEntry(nextDraft)
   }
 
   const deleteKeypadKey = () => {
     replaceDraftOnKey.current = false
-    changeDirectEntry(removeNumericKey(draftValueRef.current))
+    queueDirectEntry(removeNumericKey(draftValueRef.current))
   }
 
   const cancelDirectEntry = useCallback(() => {
@@ -505,7 +507,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
       <p>{request.label}</p>
       <div className="value-adjuster__value" aria-live="polite">
         {editingValue
-          ? <span className="value-adjuster__direct-value" aria-label={`${request.label}, ${draftValue || 'empty'}`}>{draftValue || '—'}{request.unit && <small>{request.unit}</small>}</span>
+          ? <span className="value-adjuster__direct-value" aria-label={`${request.label}, ${draftValue || 'empty'}`}><span ref={directDraftText}>{draftValue || '—'}</span>{request.unit && <small>{request.unit}</small>}</span>
           : <button type="button" onClick={beginDirectEntry} aria-label={`Enter ${request.label} with keypad`}>{formatValue(visualValue, mode)}{request.unit && <small>{request.unit}</small>}</button>}
       </div>
       {directInputError && <p className="value-adjuster__validation" role="alert">{directInputError}</p>}
