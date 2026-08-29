@@ -311,18 +311,20 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
         directEntryAnimation.current = null
         setDraftValue(normalizedDraft)
         if (supportsModeToggle && nextRequest.mode !== mode) setMode(nextRequest.mode)
-        animateToValue(parsed, 220, nextRequest, false)
+        animateToValue(parsed, 220, nextRequest)
       }, 1500)
     }
   }
 
   const pressKeypadKey = (key: string) => {
+    prepareAudioFeedback()
     const nextDraft = appendNumericKey(draftValueRef.current, key, replaceDraftOnKey.current)
     replaceDraftOnKey.current = false
     queueDirectEntry(nextDraft)
   }
 
   const deleteKeypadKey = () => {
+    prepareAudioFeedback()
     replaceDraftOnKey.current = false
     queueDirectEntry(removeNumericKey(draftValueRef.current))
   }
