@@ -1,16 +1,20 @@
 import { useRef, useState } from 'react'
-import type { KeyboardEvent, PointerEvent } from 'react'
+import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react'
 import { Metric } from '../../components/Metric/Metric'
 import type { BrewProfile, EditableProfileSetting } from '../../domain/brewing'
 import type { FixedValueSuggestion } from '../../domain/valueAdjustments'
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { ProfileTargetChart } from './ProfileTargetChart'
+import { profileCardMotion, projectedProfileSteps, wrappedProfileOffset } from './profileCarouselMotion'
 
-function wrappedOffset(index: number, activeIndex: number, length: number) {
-  const direct = index - activeIndex
-  if (direct > length / 2) return direct - length
-  if (direct < -length / 2) return direct + length
-  return direct
+interface CarouselDrag {
+  pointerId: number
+  startX: number
+  lastX: number
+  lastAt: number
+  velocity: number
+  stride: number
+  moved: boolean
 }
 
 function doseToYieldRatio(dose: string | number, targetYield: string | number) {
@@ -27,7 +31,8 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
   const [optimisticProfileId, setOptimisticProfileId] = useState<string | null>(null)
   const optimisticIndex = profiles.findIndex((profile) => profile.id === optimisticProfileId)
   const activeIndex = optimisticIndex >= 0 ? optimisticIndex : initialIndex
-  const pointerStart = useRef<{ x: number; moved: boolean } | null>(null)
+  const [dragProgress, setDragProgress] = useState(0)
+  const pointerStart = useRef<CarouselDrag | null>(null)
   const suppressClick = useRef(false)
   const selectionRequest = useRef(0)
   const activeProfile = profiles[activeIndex] ?? profiles[0]
@@ -80,22 +85,45 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
   }
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    pointerStart.current = { x: event.clientX, moved: false }
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    const width = event.currentTarget.getBoundingClientRect().width
+    pointerStart.current = { pointerId: event.pointerId, startX: event.clientX, lastX: event.clientX, lastAt: event.timeStamp, velocity: 0, stride: Math.max(84, width * 0.215), moved: false }
+    event.currentTarget.setPointerCapture(event.pointerId)
   }
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    if (pointerStart.current && Math.abs(event.clientX - pointerStart.current.x) >= 8) pointerStart.current.moved = true
+    const gesture = pointerStart.current
+    if (!gesture || gesture.pointerId !== event.pointerId) return
+    const elapsed = Math.max(1, event.timeStamp - gesture.lastAt)
+    const instantaneousVelocity = (event.clientX - gesture.lastX) / elapsed
+    gesture.velocity = gesture.velocity * 0.65 + instantaneousVelocity * 0.35
+    gesture.lastX = event.clientX
+    gesture.lastAt = event.timeStamp
+    const distance = event.clientX - gesture.startX
+    if (Math.abs(distance) >= 8) gesture.moved = true
+    const maximumProgress = Math.max(1, profiles.length - 1)
+    setDragProgress(Math.max(-maximumProgress, Math.min(maximumProgress, distance / gesture.stride)))
   }
 
   const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
-    if (pointerStart.current === null) return
-    const { x, moved } = pointerStart.current
-    const distance = event.clientX - x
+    const gesture = pointerStart.current
+    if (!gesture || gesture.pointerId !== event.pointerId) return
+    const distance = event.clientX - gesture.startX
     pointerStart.current = null
-    if (moved && Math.abs(distance) >= 42) {
+    setDragProgress(0)
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    if (gesture.moved) {
       suppressClick.current = true
-      selectRelative(distance < 0 ? 1 : -1)
+      const steps = projectedProfileSteps(distance, gesture.velocity, gesture.stride, profiles.length)
+      if (steps !== 0) void selectIndex((activeIndex + steps + profiles.length) % profiles.length)
     }
+  }
+
+  const cancelPointerGesture = (event: PointerEvent<HTMLDivElement>) => {
+    if (pointerStart.current?.pointerId !== event.pointerId) return
+    pointerStart.current = null
+    setDragProgress(0)
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
   }
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -104,23 +132,32 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
   }
 
   return <section className="brew-panel">
-    <div className="profile-carousel" aria-label="Profiles" aria-roledescription="carousel" tabIndex={0} onKeyDown={handleKeyDown} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={() => { pointerStart.current = null }}>
+    <div className={`profile-carousel${dragProgress !== 0 ? ' profile-carousel--dragging' : ''}`} aria-label="Profiles" aria-roledescription="carousel" tabIndex={0} onKeyDown={handleKeyDown} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={cancelPointerGesture}>
       {profiles.map((profile, index) => {
-        const offset = wrappedOffset(index, activeIndex, profiles.length)
-        const position = offset === 0
+        const offset = wrappedProfileOffset(index, activeIndex - dragProgress, profiles.length)
+        const roundedOffset = Math.round(offset)
+        const position = roundedOffset === 0
           ? 'active'
-          : offset === -1
+          : roundedOffset === -1
             ? 'left'
-            : offset === 1
+            : roundedOffset === 1
               ? 'right'
-              : offset === -2
+              : roundedOffset === -2
                 ? 'far-left'
-                : offset === 2
+                : roundedOffset === 2
                   ? 'far-right'
                   : 'hidden'
-        return <button key={profile.id} className={`profile-card profile-card--${position}`} type="button" onClick={() => { if (suppressClick.current) { suppressClick.current = false; return } void selectIndex(index) }} aria-current={offset === 0 ? 'true' : undefined} aria-label={`${profile.name}${offset === 0 ? ', selected' : ''}`}>
+        const motion = profileCardMotion(offset)
+        const style = {
+          '--profile-free-x': `${motion.xPercent}%`,
+          '--profile-free-scale': motion.scale,
+          '--profile-free-opacity': motion.opacity,
+          zIndex: motion.zIndex,
+        } as CSSProperties
+        const visuallyActive = Math.abs(offset) < 0.5
+        return <button key={profile.id} className={`profile-card profile-card--free profile-card--${position}`} style={style} type="button" onClick={() => { if (suppressClick.current) { suppressClick.current = false; return } void selectIndex(index) }} aria-current={index === activeIndex ? 'true' : undefined} aria-label={`${profile.name}${index === activeIndex ? ', selected' : ''}`}>
           <h1>{profile.name}</h1>
-          {offset === 0 && <ProfileTargetChart profileName={profile.name} points={profile.targetPoints} />}
+          {visuallyActive && <ProfileTargetChart profileName={profile.name} points={profile.targetPoints} />}
         </button>
       })}
     </div>
