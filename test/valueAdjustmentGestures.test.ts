@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { gestureIncrement, maximumGesturePointers, modeForShortcut } from '../src/components/ValueAdjustment/valueAdjustmentGestures.ts'
+import { gestureIncrement, maximumGesturePointers, modeForNumericDraft, modeForShortcut, normalizedNumericDraft } from '../src/components/ValueAdjustment/valueAdjustmentGestures.ts'
 import { VALUE_ADJUSTMENTS } from '../src/domain/valueAdjustments.ts'
 
 test('mixed grind shortcuts choose their matching number format', () => {
@@ -30,4 +30,12 @@ test('grind size keeps the requested default and full reference range', () => {
   assert.equal(VALUE_ADJUSTMENTS.grindSetting.defaultValue, 20)
   assert.equal(VALUE_ADJUSTMENTS.grindSetting.max, 2500)
   assert.deepEqual(VALUE_ADJUSTMENTS.grindSetting.modes, ['integer', 'decimal'])
+})
+
+test('direct numeric entry accepts integers and locale decimal separators', () => {
+  assert.equal(modeForNumericDraft('1200', 'decimal'), 'integer')
+  assert.equal(modeForNumericDraft('18.3', 'integer'), 'decimal')
+  assert.equal(modeForNumericDraft('18.', 'integer'), 'decimal')
+  assert.equal(modeForNumericDraft('.5', 'integer'), 'decimal')
+  assert.equal(normalizedNumericDraft('18,3'), '18.3')
 })

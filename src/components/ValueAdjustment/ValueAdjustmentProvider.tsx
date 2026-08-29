@@ -4,7 +4,7 @@ import logo from '../../assets/figma/decent-logo.png'
 import { MAX_VALUE_SUGGESTIONS } from '../../domain/valueAdjustments'
 import { ValueAdjustmentContext } from './ValueAdjustmentContext'
 import type { ValueAdjustmentMode, ValueAdjustmentRequest } from './ValueAdjustmentContext'
-import { gestureIncrement, maximumGesturePointers, modeForShortcut } from './valueAdjustmentGestures'
+import { gestureIncrement, maximumGesturePointers, modeForNumericDraft, modeForShortcut, normalizedNumericDraft } from './valueAdjustmentGestures'
 
 const SUGGESTION_STORAGE_KEY = 'bestpresso.value-adjustment-suggestions.v2'
 const MODE_STORAGE_KEY = 'bestpresso.value-adjustment-modes.v1'
@@ -210,14 +210,14 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     animationFrame.current = requestAnimationFrame(animate)
   }, [activeRequest, playStepFeedback, stopAnimation])
 
-  const rememberSuggestion = useCallback((nextValue: number) => {
-    const selected = normalizedValue(nextValue, activeRequest)
+  const rememberSuggestion = useCallback((nextValue: number, adjustment = activeRequest) => {
+    const selected = normalizedValue(nextValue, adjustment)
     const current = suggestionStoreRef.current
     const hasHistory = Object.prototype.hasOwnProperty.call(current, request.suggestionKey)
     const source = hasHistory ? current[request.suggestionKey] ?? [] : request.presets ?? []
     const existing = supportsModeToggle
       ? Array.from(new Set(source.filter((suggestion) => Number.isFinite(suggestion) && suggestion >= request.min && suggestion <= request.max)))
-      : normalizedSuggestions(source, activeRequest)
+      : normalizedSuggestions(source, adjustment)
     const alreadyIncluded = existing.includes(selected)
     let next = existing.filter((suggestion) => suggestion !== selected)
 
@@ -269,18 +269,46 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     setEditingValue(true)
   }
 
+  const requestForNumericDraft = (draft: string) => {
+    const nextMode = supportsModeToggle ? modeForNumericDraft(draft, mode) : mode
+    return { ...request, mode: nextMode, step: supportsModeToggle ? nextMode === 'integer' ? 1 : 0.1 : request.step }
+  }
+
+  const changeDirectEntry = (nextDraft: string) => {
+    const normalizedDraft = normalizedNumericDraft(nextDraft)
+    if (!/^\d*(?:\.\d*)?$/.test(normalizedDraft)) return
+    setDraftValue(normalizedDraft)
+    if (!normalizedDraft || normalizedDraft === '.') return
+    const nextRequest = requestForNumericDraft(normalizedDraft)
+    if (supportsModeToggle && nextRequest.mode !== mode) setMode(nextRequest.mode)
+    const parsed = Number(normalizedDraft)
+    if (Number.isFinite(parsed)) animateToValue(parsed, 280, nextRequest)
+  }
+
   const commitDirectEntry = () => {
-    const parsed = Number(draftValue)
-    if (Number.isFinite(parsed)) setImmediateValue(parsed)
-    else setDraftValue(formatValue(value, mode))
+    const normalizedDraft = normalizedNumericDraft(draftValue)
+    const parsed = Number(normalizedDraft)
+    if (Number.isFinite(parsed) && normalizedDraft !== '') {
+      const nextRequest = requestForNumericDraft(normalizedDraft)
+      const nextValue = normalizedValue(parsed, nextRequest)
+      stopAnimation()
+      if (supportsModeToggle && nextRequest.mode !== mode) setMode(nextRequest.mode)
+      visualValueRef.current = nextValue
+      setVisualValue(nextValue)
+      setValue(nextValue)
+      setDraftValue(formatValue(nextValue, nextRequest.mode))
+      lastFeedbackValue.current = nextValue
+    } else setDraftValue(formatValue(value, mode))
     setEditingValue(false)
   }
 
   const saveAdjustment = () => {
-    const parsedDraft = Number(draftValue)
-    const savedValue = editingValue && Number.isFinite(parsedDraft) ? normalizedValue(parsedDraft, activeRequest) : value
-    if (fixedSelection.current !== savedValue) rememberSuggestion(savedValue)
-    if (supportsModeToggle) writeMode(request.suggestionKey, mode)
+    const normalizedDraft = normalizedNumericDraft(draftValue)
+    const parsedDraft = Number(normalizedDraft)
+    const saveRequest = editingValue && Number.isFinite(parsedDraft) && normalizedDraft !== '' ? requestForNumericDraft(normalizedDraft) : activeRequest
+    const savedValue = editingValue && Number.isFinite(parsedDraft) && normalizedDraft !== '' ? normalizedValue(parsedDraft, saveRequest) : value
+    if (fixedSelection.current !== savedValue) rememberSuggestion(savedValue, saveRequest)
+    if (supportsModeToggle) writeMode(request.suggestionKey, saveRequest.mode)
     request.onSave(savedValue)
     onClose()
   }
@@ -398,7 +426,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
       <p>{request.label}</p>
       <div className="value-adjuster__value" aria-live="polite">
         {editingValue
-          ? <input ref={directInput} type="number" inputMode={mode === 'integer' ? 'numeric' : 'decimal'} min={activeRequest.min} max={activeRequest.max} step={activeRequest.step} value={draftValue} aria-label={`Enter ${request.label}`} onChange={(event) => setDraftValue(event.target.value)} onBlur={commitDirectEntry} onKeyDown={(event) => { if (['e', 'E', '+', '-'].includes(event.key) || (mode === 'integer' && ['.', ','].includes(event.key))) event.preventDefault(); else if (event.key === 'Enter') { event.preventDefault(); commitDirectEntry() } else if (event.key === 'Escape') { event.preventDefault(); setEditingValue(false) } }} />
+          ? <input ref={directInput} type="text" inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*" enterKeyHint="done" value={draftValue} aria-label={`Enter ${request.label}`} onChange={(event) => changeDirectEntry(event.target.value)} onBlur={commitDirectEntry} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); commitDirectEntry() } else if (event.key === 'Escape') { event.preventDefault(); setEditingValue(false) } }} />
           : <button type="button" onClick={beginDirectEntry} aria-label={`Enter ${request.label} with keypad`}>{formatValue(visualValue, mode)}{request.unit && <small>{request.unit}</small>}</button>}
       </div>
       {valueHint && <div className="value-adjuster__value-hint"><span>{valueHint}</span></div>}

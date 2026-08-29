@@ -15,3 +15,13 @@ export function gestureIncrement(mode: ValueAdjustmentMode, pointerCount: number
 export function maximumGesturePointers(allowThreeFinger: boolean) {
   return allowThreeFinger ? 3 : 2
 }
+
+export function normalizedNumericDraft(value: string) {
+  return value.replace(',', '.')
+}
+
+export function modeForNumericDraft(value: string, currentMode: ValueAdjustmentMode): ValueAdjustmentMode {
+  const normalized = normalizedNumericDraft(value)
+  if (!normalized || !/^\d*(?:\.\d*)?$/.test(normalized)) return currentMode
+  return normalized.includes('.') ? 'decimal' : 'integer'
+}
