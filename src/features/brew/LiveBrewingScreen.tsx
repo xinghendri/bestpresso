@@ -9,8 +9,10 @@ interface LiveBrewingScreenProps {
   model: BrewingScreenModel
   liveBrew: LiveBrewState
   stopPending: boolean
+  skipPending: boolean
   actionError: string | null
   onStop: () => void
+  onSkipStage: () => void
   onDismiss: () => void
 }
 
@@ -27,7 +29,7 @@ const latestWeight = (liveBrew: LiveBrewState) => {
   return undefined
 }
 
-export function LiveBrewingScreen({ model, liveBrew, stopPending, actionError, onStop, onDismiss }: LiveBrewingScreenProps) {
+export function LiveBrewingScreen({ model, liveBrew, stopPending, skipPending, actionError, onStop, onSkipStage, onDismiss }: LiveBrewingScreenProps) {
   const [dimmedSeries, setDimmedSeries] = useState<ChartSeries[]>([])
   const profile = model.profiles.find((candidate) => candidate.id === model.activeProfileId) ?? model.profiles[0]
   if (!profile && !liveBrew.profileName) return null
@@ -52,6 +54,6 @@ export function LiveBrewingScreen({ model, liveBrew, stopPending, actionError, o
     <section className="live-pull-chart-panel" aria-label={`Running ${profileName}`}>
       <LiveShotChart points={liveBrew.points} elapsedMs={liveBrew.elapsedMs} targetYield={targetYield} showWeight={!isCleaning} legendFilterEnabled={!liveBrew.active} dimmedSeries={dimmedSeries} onToggleSeries={(series) => setDimmedSeries((current) => toggleDimmedChartSeries(current, series))} />
     </section>
-    <LiveBrewStages points={liveBrew.points} elapsedMs={liveBrew.elapsedMs} active={liveBrew.active} showYield={!isCleaning} />
+    <LiveBrewStages points={liveBrew.points} elapsedMs={liveBrew.elapsedMs} active={liveBrew.active} showYield={!isCleaning} skipPending={skipPending} onSkipStage={onSkipStage} />
   </main>
 }

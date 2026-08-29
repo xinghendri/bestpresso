@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { LiveShotPoint } from '../../domain/brewing'
+import { DOUBLE_TAP_CONFIRMATION_WINDOW_MS, registerDoubleTap } from './doubleTapConfirmation'
 
 interface StageSummary {
   key: string
@@ -97,11 +98,45 @@ function summarizeLiveBrewStages(points: LiveShotPoint[], elapsedMs: number): St
 
 const reading = (value: number | undefined, digits = 1) => value === undefined ? '—' : value.toFixed(digits)
 
-export function LiveBrewStages({ points, elapsedMs, active = false, showYield = true, selectedStageKey, onStageSelect }: { points: LiveShotPoint[]; elapsedMs: number; active?: boolean; showYield?: boolean; selectedStageKey?: string; onStageSelect?: (stage: BrewStageSelection | null) => void }) {
+export function LiveBrewStages({ points, elapsedMs, active = false, showYield = true, skipPending = false, selectedStageKey, onStageSelect, onSkipStage }: { points: LiveShotPoint[]; elapsedMs: number; active?: boolean; showYield?: boolean; skipPending?: boolean; selectedStageKey?: string; onStageSelect?: (stage: BrewStageSelection | null) => void; onSkipStage?: () => void }) {
   const stages = summarizeLiveBrewStages(points, elapsedMs)
   const stripRef = useRef<HTMLElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
   const stageRefs = useRef(new Map<string, HTMLElement>())
+  const previousSkipTap = useRef<number | null>(null)
+  const skipConfirmationTimeout = useRef<number | null>(null)
+  const skipButtonRef = useRef<HTMLButtonElement>(null)
+
+  const resetSkipConfirmation = () => {
+    previousSkipTap.current = null
+    skipButtonRef.current?.classList.remove('live-brew-skip--armed')
+    skipButtonRef.current?.setAttribute('aria-pressed', 'false')
+    if (skipConfirmationTimeout.current !== null) window.clearTimeout(skipConfirmationTimeout.current)
+    skipConfirmationTimeout.current = null
+  }
+
+  useEffect(() => () => {
+    if (skipConfirmationTimeout.current !== null) window.clearTimeout(skipConfirmationTimeout.current)
+  }, [])
+
+  useEffect(() => {
+    if (!active) resetSkipConfirmation()
+  }, [active])
+
+  const handleSkipTap = () => {
+    if (skipPending || !onSkipStage) return
+    const result = registerDoubleTap(previousSkipTap.current, Date.now())
+    previousSkipTap.current = result.nextTapAt
+    if (result.confirmed) {
+      resetSkipConfirmation()
+      onSkipStage()
+      return
+    }
+    skipButtonRef.current?.classList.add('live-brew-skip--armed')
+    skipButtonRef.current?.setAttribute('aria-pressed', 'true')
+    if (skipConfirmationTimeout.current !== null) window.clearTimeout(skipConfirmationTimeout.current)
+    skipConfirmationTimeout.current = window.setTimeout(resetSkipConfirmation, DOUBLE_TAP_CONFIRMATION_WINDOW_MS)
+  }
 
   useEffect(() => {
     const strip = stripRef.current
@@ -170,6 +205,10 @@ export function LiveBrewStages({ points, elapsedMs, active = false, showYield = 
         <div><dt>Pressure</dt><dd>{stage.pressureMovements.length ? stage.pressureMovements.map((pressure) => reading(pressure)).join(' → ') : '—'}</dd></div>
       </dl>
     </article>})}
+    {active && onSkipStage && <button className={`live-brew-skip${skipPending ? ' live-brew-skip--pending' : ''}`} type="button" disabled={skipPending} aria-label="Double tap to skip to the next phase" aria-pressed="false" onClick={handleSkipTap} ref={skipButtonRef}>
+      <span className="live-brew-skip__icon" aria-hidden="true">&gt;|</span>
+      <span>double tap to skip</span>
+    </button>}
     </div>
   </section>
 }

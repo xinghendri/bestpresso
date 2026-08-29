@@ -151,6 +151,7 @@ export function useBrewingData() {
   const [scaleConnectPendingId, setScaleConnectPendingId] = useState<string | null>(null)
   const [scaleTarePending, setScaleTarePending] = useState(false)
   const [brewStopPending, setBrewStopPending] = useState(false)
+  const [brewSkipPending, setBrewSkipPending] = useState(false)
   const [cleaningStartPending, setCleaningStartPending] = useState(false)
   const [cleaningPreparedProfileId, setCleaningPreparedProfileId] = useState<string | null>(null)
   const [sleepPending, setSleepPending] = useState(false)
@@ -177,6 +178,7 @@ export function useBrewingData() {
   const connectedScale = useRef(Boolean(localScaleFixture))
   const scaleTareInFlight = useRef(false)
   const brewStopRequestInFlight = useRef(false)
+  const brewSkipRequestInFlight = useRef(false)
   const cleaningStartInFlight = useRef(false)
   const pendingCleaningSequence = useRef<PendingCleaningSequence | null>(null)
   const cleaningRestoreWorkflow = useRef<DecaidWorkflowPatch | null>(null)
@@ -359,7 +361,9 @@ export function useBrewingData() {
       if (!session) return
       liveShotSession.current = null
       brewStopRequestInFlight.current = false
+      brewSkipRequestInFlight.current = false
       setBrewStopPending(false)
+      setBrewSkipPending(false)
       const points = [...session.points]
       const elapsedMs = points.at(-1)?.elapsedMs ?? 0
       if (session.kind === 'cleaning') {
@@ -980,6 +984,25 @@ export function useBrewingData() {
     }
   }
 
+  const skipBrewStage = async () => {
+    if (brewSkipRequestInFlight.current || !liveShotSession.current) return
+    if (connection !== 'connected' || machineConnection !== 'connected') {
+      showMachineActionError('The machine is disconnected, so the phase could not be skipped.')
+      return
+    }
+    brewSkipRequestInFlight.current = true
+    setBrewSkipPending(true)
+    showMachineActionError(null)
+    try {
+      await setMachineState('skipStep')
+    } catch {
+      showMachineActionError('The machine did not accept the skip command.')
+    } finally {
+      brewSkipRequestInFlight.current = false
+      setBrewSkipPending(false)
+    }
+  }
+
   const showSettingFeedback = (feedback: SettingFeedback) => {
     if (feedbackTimeout.current !== null) window.clearTimeout(feedbackTimeout.current)
     setSettingFeedback(feedback)
@@ -1174,5 +1197,5 @@ export function useBrewingData() {
   const dismissLiveBrew = () => setLiveBrew((current) => current.active ? current : { ...current, visible: false })
   const favoriteProfileIds = favoriteProfileSlots.filter((id): id is string => Boolean(id))
 
-  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, utilityOperation, previousShotStatus, shotHistory, loadHistoryShot, heatingSeconds, connection, machineConnection, scale, availableScales, scaleConnectPendingId, scaleTarePending, brewStopPending, cleaningStartPending, cleaningPreparedProfileId, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, prepareCleaningSequence, startCleaningSequence, cancelCleaningSequence, dismissLiveBrew, searchForScale, connectToScale, dismissScalePicker, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
+  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, utilityOperation, previousShotStatus, shotHistory, loadHistoryShot, heatingSeconds, connection, machineConnection, scale, availableScales, scaleConnectPendingId, scaleTarePending, brewStopPending, brewSkipPending, cleaningStartPending, cleaningPreparedProfileId, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, skipBrewStage, prepareCleaningSequence, startCleaningSequence, cancelCleaningSequence, dismissLiveBrew, searchForScale, connectToScale, dismissScalePicker, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
 }
