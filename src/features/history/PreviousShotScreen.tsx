@@ -67,7 +67,11 @@ export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, o
   const [stageSelection, setStageSelection] = useState<{ shotId: string | undefined; stage: BrewStageSelection } | null>(null)
 
   const activeId = selectedId && shots.some((shot) => shot.id === selectedId) ? selectedId : firstShot?.id
-  const activeShot = selectedShot?.id === activeId ? selectedShot : initialShot?.id === activeId ? initialShot : shots.find((shot) => shot.id === activeId) ?? null
+  const refreshedShot = initialShot?.id === activeId ? initialShot : shots.find((shot) => shot.id === activeId)
+  const selectedActiveShot = selectedShot && selectedShot.id === activeId ? selectedShot : null
+  const activeShot: PreviousShot | null = selectedActiveShot
+    ? { ...selectedActiveShot, ...refreshedShot, points: refreshedShot?.points?.length ? refreshedShot.points : selectedActiveShot.points }
+    : refreshedShot ?? null
   const selectedStage = stageSelection && stageSelection.shotId === activeId ? stageSelection.stage : null
   const isCleaning = activeShot?.beverageType?.toLowerCase() === 'cleaning'
 
