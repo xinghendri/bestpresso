@@ -12,7 +12,7 @@ interface LiveBrewingScreenProps {
   skipPending: boolean
   actionError: string | null
   onStop: () => void
-  onSkipStage: () => void
+  onSkipStage: () => Promise<boolean>
   onDismiss: () => void
 }
 
@@ -54,6 +54,6 @@ export function LiveBrewingScreen({ model, liveBrew, stopPending, skipPending, a
     <section className="live-pull-chart-panel" aria-label={`Running ${profileName}`}>
       <LiveShotChart points={liveBrew.points} elapsedMs={liveBrew.elapsedMs} targetYield={targetYield} showWeight={!isCleaning} legendFilterEnabled={!liveBrew.active} dimmedSeries={dimmedSeries} onToggleSeries={(series) => setDimmedSeries((current) => toggleDimmedChartSeries(current, series))} />
     </section>
-    <LiveBrewStages points={liveBrew.points} elapsedMs={liveBrew.elapsedMs} active={liveBrew.active} showYield={!isCleaning} skipPending={skipPending} onSkipStage={onSkipStage} />
+    <LiveBrewStages key={liveBrew.startedAt ?? 'pending'} points={liveBrew.points} elapsedMs={liveBrew.elapsedMs} active={liveBrew.active} showYield={!isCleaning} skipPending={skipPending} onSkipStage={onSkipStage} />
   </main>
 }

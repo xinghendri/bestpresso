@@ -367,7 +367,7 @@ export function useBrewingData() {
       const points = [...session.points]
       const elapsedMs = points.at(-1)?.elapsedMs ?? 0
       if (session.kind === 'cleaning') {
-        setLiveBrew({ active: false, visible: false, kind: 'cleaning', profileName: session.profileName, elapsedMs, points })
+        setLiveBrew({ active: false, visible: false, startedAt: session.startedAt, kind: 'cleaning', profileName: session.profileName, elapsedMs, points })
         pendingCleaningSequence.current = null
         setCleaningPreparedProfileId(null)
         const restorePatch = cleaningRestoreWorkflow.current
@@ -384,7 +384,7 @@ export function useBrewingData() {
         }
         return
       }
-      setLiveBrew({ active: false, visible: true, kind: 'espresso', profileName: session.profileName, targetYield: session.targetYield, elapsedMs, points })
+      setLiveBrew({ active: false, visible: true, startedAt: session.startedAt, kind: 'espresso', profileName: session.profileName, targetYield: session.targetYield, elapsedMs, points })
 
       const hasExtraction = points.some((point) => (point.pressure ?? 0) > 0.5 || (point.flow ?? 0) > 0.1)
       if (elapsedMs < MIN_SUCCESSFUL_SHOT_MS || !hasExtraction) return
@@ -587,7 +587,7 @@ export function useBrewingData() {
           })
           if (session.points.length > MAX_LIVE_SHOT_POINTS) session.points.shift()
         }
-        setLiveBrew({ active: true, visible: true, kind: session.kind, profileName: session.profileName, targetYield: session.targetYield, elapsedMs, points: [...session.points] })
+        setLiveBrew({ active: true, visible: true, startedAt: session.startedAt, kind: session.kind, profileName: session.profileName, targetYield: session.targetYield, elapsedMs, points: [...session.points] })
       } else if (liveShotSession.current) {
         completeLiveShot()
       }
@@ -984,19 +984,21 @@ export function useBrewingData() {
     }
   }
 
-  const skipBrewStage = async () => {
-    if (brewSkipRequestInFlight.current || !liveShotSession.current) return
+  const skipBrewStage = async (): Promise<boolean> => {
+    if (brewSkipRequestInFlight.current || !liveShotSession.current) return false
     if (connection !== 'connected' || machineConnection !== 'connected') {
       showMachineActionError('The machine is disconnected, so the phase could not be skipped.')
-      return
+      return false
     }
     brewSkipRequestInFlight.current = true
     setBrewSkipPending(true)
     showMachineActionError(null)
     try {
       await setMachineState('skipStep')
+      return true
     } catch {
       showMachineActionError('The machine did not accept the skip command.')
+      return false
     } finally {
       brewSkipRequestInFlight.current = false
       setBrewSkipPending(false)

@@ -105,6 +105,7 @@ export interface LiveShotPoint {
 export interface LiveBrewState {
   active: boolean
   visible: boolean
+  startedAt?: number
   kind?: 'espresso' | 'cleaning'
   profileName?: string
   targetYield?: number

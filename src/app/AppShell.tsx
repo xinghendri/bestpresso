@@ -43,7 +43,7 @@ interface AppShellProps {
   onSleep: () => void
   onWake: () => void
   onStopEspresso: () => void
-  onSkipBrewStage: () => void
+  onSkipBrewStage: () => Promise<boolean>
   onPrepareCleaning: (profileId: string) => Promise<boolean>
   onStartCleaning: (profileId: string) => Promise<boolean>
   onCancelCleaning: () => Promise<boolean>
