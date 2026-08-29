@@ -10,6 +10,7 @@ import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { brewingFixture } from '../../fixtures/brewingFixture'
 import { scaleFixtureForKey } from '../../fixtures/scaleFixtures'
 import { CLEANING_PROFILE_START_STATE, isCleaningSequenceRun, profileForCleaningShortcut } from '../cleaning/cleaningSequence'
+import { observePostShotWeight, reconciledShotYield, type YieldFinalizationState } from '../history/shotYieldFinalization'
 import { LAST_SELECTED_PROFILE_LOCAL_KEY, LAST_SELECTED_PROFILE_SHARED_KEY, normalizeRememberedProfileId, resolveRememberedProfileId } from '../profiles/profileSelectionPersistence'
 import { SLEEP_DISPLAY_BRIGHTNESS, sleepMachineAndConnectedScale } from './sleepControl'
 
@@ -37,6 +38,14 @@ interface PendingCleaningSequence {
   profileId: string
   profileName: string
   stepNames?: string[]
+}
+
+interface PendingYieldFinalization {
+  session: LiveShotSession
+  localShotId: string
+  state: YieldFinalizationState
+  displayWeight: number
+  timeout: number | null
 }
 
 interface UtilityOperationSession {
@@ -303,6 +312,8 @@ export function useBrewingData() {
     let timeToReadyEstimate: { deadline: number; receivedAt: number } | null = null
     let latestShotRefreshTimeout: number | null = null
     let preferredScaleId: string | null = null
+    let pendingYieldFinalization: PendingYieldFinalization | null = null
+    const settledYieldBySession = new Map<number, number>()
 
     const updateMachineConnection = (next: DataConnection) => {
       const previous = machineConnectionRef.current
@@ -346,7 +357,14 @@ export function useBrewingData() {
           const timestamp = shot?.timestamp ? Date.parse(shot.timestamp) : Number.NaN
           const isCompletedSession = shot && (!Number.isFinite(timestamp) || timestamp >= session.startedAt - 2_000)
           if (isCompletedSession) {
-            const domainShot = { ...shotToDomain(shot), profileName: session.profileName, beverageType: session.kind }
+            const persistedShot = shotToDomain(shot)
+            const domainShot = {
+              ...persistedShot,
+              profileName: session.profileName,
+              beverageType: session.kind,
+              totalYield: reconciledShotYield(persistedShot.totalYield, settledYieldBySession.get(session.startedAt)),
+            }
+            settledYieldBySession.delete(session.startedAt)
             if (domainShot.id) shotHistoryCache.current.set(domainShot.id, domainShot)
             setModel((current) => ({ ...current, previousShot: domainShot }))
             setShotHistory((current) => [domainShot, ...current.filter((candidate) => candidate.id !== domainShot.id && candidate.id !== `live:${session.startedAt}`)])
@@ -354,6 +372,25 @@ export function useBrewingData() {
           } else if (attempt < 2) schedulePersistedShotRefresh(session, attempt + 1)
         }).catch(() => { if (!disposed && attempt < 2) schedulePersistedShotRefresh(session, attempt + 1) })
       }, 800 * (attempt + 1))
+    }
+
+    const updateLocalShotYield = (localShotId: string, weight: number) => {
+      const totalYield = weight.toFixed(1)
+      setModel((current) => current.previousShot?.id === localShotId
+        ? { ...current, previousShot: { ...current.previousShot, totalYield } }
+        : current)
+      setShotHistory((current) => current.map((shot) => shot.id === localShotId ? { ...shot, totalYield } : shot))
+      const cachedShot = shotHistoryCache.current.get(localShotId)
+      if (cachedShot) shotHistoryCache.current.set(localShotId, { ...cachedShot, totalYield })
+    }
+
+    const finishPendingYield = () => {
+      const pending = pendingYieldFinalization
+      if (!pending) return
+      if (pending.timeout !== null) window.clearTimeout(pending.timeout)
+      settledYieldBySession.set(pending.session.startedAt, pending.displayWeight)
+      pendingYieldFinalization = null
+      schedulePersistedShotRefresh(pending.session)
     }
 
     const completeLiveShot = () => {
@@ -405,7 +442,19 @@ export function useBrewingData() {
       shotHistoryCache.current.set(localShot.id, localShot)
       setShotHistory((current) => [localShot, ...current])
       setPreviousShotStatus('loaded')
-      schedulePersistedShotRefresh(session)
+      if (finalWeight !== undefined && connectedScale.current) {
+        finishPendingYield()
+        pendingYieldFinalization = {
+          session,
+          localShotId: localShot.id,
+          state: { bestWeight: finalWeight, lastWeight: finalWeight, stableSamples: 0, previousFlow: points.at(-1)?.weightFlow },
+          displayWeight: finalWeight,
+          timeout: null,
+        }
+        pendingYieldFinalization.timeout = window.setTimeout(finishPendingYield, 4_000)
+      } else {
+        schedulePersistedShotRefresh(session)
+      }
     }
 
     const refreshConnectedScale = () => {
@@ -549,6 +598,7 @@ export function useBrewingData() {
           ? allProfilesRef.current.find((candidate) => candidate.id === cleaningSequence.profileId)
           : currentModel.profiles.find((candidate) => candidate.id === currentModel.activeProfileId) ?? currentModel.profiles[0]
         if (!liveShotSession.current) {
+          finishPendingYield()
           liveShotSession.current = {
             kind: isCleaning ? 'cleaning' : 'espresso',
             startedAt: now,
@@ -638,12 +688,20 @@ export function useBrewingData() {
           weightFlow: snapshot.weightFlow ?? latestScaleSnapshot.current.weightFlow,
         }
       }
+      if (pendingYieldFinalization && snapshot.weight !== undefined) {
+        const result = observePostShotWeight(pendingYieldFinalization.state, snapshot.weight, snapshot.weightFlow)
+        pendingYieldFinalization.state = result.state
+        pendingYieldFinalization.displayWeight = result.displayWeight
+        updateLocalShotYield(pendingYieldFinalization.localShotId, result.displayWeight)
+        if (result.finished) finishPendingYield()
+      }
       if (snapshot.status === 'connected') {
         connectedScale.current = true
         refreshConnectedScale()
         return
       }
       if (snapshot.status === 'disconnected') {
+        finishPendingYield()
         connectedScale.current = false
         latestScaleSnapshot.current = {}
         setScale((current) => current.status === 'searching' ? current : { status: 'disconnected' })
@@ -740,6 +798,8 @@ export function useBrewingData() {
       if (backgroundScaleSearchTimeout !== null) window.clearTimeout(backgroundScaleSearchTimeout)
       window.clearInterval(heatingCountdown)
       if (latestShotRefreshTimeout !== null) window.clearTimeout(latestShotRefreshTimeout)
+      const pendingYieldTimeout = pendingYieldFinalization?.timeout
+      if (pendingYieldTimeout !== null && pendingYieldTimeout !== undefined) window.clearTimeout(pendingYieldTimeout)
       if (feedbackTimeout.current !== null) window.clearTimeout(feedbackTimeout.current)
       if (actionErrorTimeout.current !== null) window.clearTimeout(actionErrorTimeout.current)
       machine.close(); scale.close(); water.close(); timeToReady.close()
