@@ -315,7 +315,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
       directEntryAnimation.current = window.setTimeout(() => {
         directEntryAnimation.current = null
         animateToValue(parsed, 220, nextRequest, false)
-      }, 90)
+      }, 1500)
     }
   }
 
