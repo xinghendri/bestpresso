@@ -52,6 +52,7 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
       max: definition.max,
       step: definition.step,
       mode: definition.mode,
+      modes: 'modes' in definition ? definition.modes : undefined,
       initialValue: 'defaultValue' in definition ? definition.defaultValue : undefined,
       suggestionKey: setting,
       presets: definition.suggestions,

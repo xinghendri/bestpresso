@@ -8,6 +8,7 @@ interface MetricEdit {
   max: number
   step: number
   mode: ValueAdjustmentMode
+  modes?: readonly ValueAdjustmentMode[]
   initialValue?: number
   title?: string
   suggestionKey: ValueAdjustmentKey
@@ -28,7 +29,7 @@ export function Metric({ metric, compact = false, edit }: { metric: DisplayMetri
   const subtextClassName = `metric__subtext${metric.subtextVariant === 'pill' ? ' metric__subtext--pill' : ''}`
   const unitClassName = `metric__unit${metric.unit === '°' ? ' metric__unit--degree' : ''}`
 
-  if (edit) return <button className={`${className} metric__edit-button`} type="button" disabled={editDisabled} onClick={() => { if (adjustmentValue !== undefined) openAdjustment({ label: edit.title ?? metric.label, value: adjustmentValue, unit: metric.unit, min: edit.min, max: edit.max, step: edit.step, mode: edit.mode, suggestionKey: edit.suggestionKey, presets: edit.presets, fixedSuggestions: edit.fixedSuggestions, valueHint: edit.valueHint, onSave: edit.onSave }) }} aria-label={`Edit ${metric.label}, current value ${adjustmentValue ?? metric.value}${metric.unit ?? ''}`}>
+  if (edit) return <button className={`${className} metric__edit-button`} type="button" disabled={editDisabled} onClick={() => { if (adjustmentValue !== undefined) openAdjustment({ label: edit.title ?? metric.label, value: adjustmentValue, unit: metric.unit, min: edit.min, max: edit.max, step: edit.step, mode: edit.mode, modes: edit.modes, suggestionKey: edit.suggestionKey, presets: edit.presets, fixedSuggestions: edit.fixedSuggestions, valueHint: edit.valueHint, onSave: edit.onSave }) }} aria-label={`Edit ${metric.label}, current value ${adjustmentValue ?? metric.value}${metric.unit ?? ''}`}>
     <span className="metric__label">{metric.label}{!editDisabled && <span className="metric__edit-indicator" aria-hidden="true">›</span>}</span>
     <span className={readingClassName}>{metric.value}{metric.unit && <small className={unitClassName}>{metric.unit}</small>}</span>
     {metric.subtext && <span className={subtextClassName}>{metric.subtext}</span>}
