@@ -35,3 +35,19 @@ export function numericDraftRangeIssue(value: string, min: number, max: number):
   if (parsed > max) return 'above'
   return null
 }
+
+export function appendNumericKey(value: string, key: string, replaceExisting = false) {
+  if (!/^\d$/.test(key) && key !== '.') return value
+  if (key === '.') {
+    if (!replaceExisting && value.includes('.')) return value
+    return replaceExisting || value === '' ? '0.' : `${value}.`
+  }
+
+  if (replaceExisting) return key
+  if (value === '0') return key
+  return `${value}${key}`
+}
+
+export function removeNumericKey(value: string) {
+  return value.slice(0, -1)
+}

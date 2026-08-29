@@ -4,7 +4,7 @@ import logo from '../../assets/figma/decent-logo.png'
 import { MAX_VALUE_SUGGESTIONS } from '../../domain/valueAdjustments'
 import { ValueAdjustmentContext } from './ValueAdjustmentContext'
 import type { ValueAdjustmentMode, ValueAdjustmentRequest } from './ValueAdjustmentContext'
-import { gestureIncrement, maximumGesturePointers, modeForNumericDraft, modeForShortcut, normalizedNumericDraft, numericDraftRangeIssue } from './valueAdjustmentGestures'
+import { appendNumericKey, gestureIncrement, maximumGesturePointers, modeForNumericDraft, modeForShortcut, normalizedNumericDraft, numericDraftRangeIssue, removeNumericKey } from './valueAdjustmentGestures'
 
 const SUGGESTION_STORAGE_KEY = 'bestpresso.value-adjustment-suggestions.v2'
 const MODE_STORAGE_KEY = 'bestpresso.value-adjustment-modes.v1'
@@ -91,7 +91,6 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const [value, setValue] = useState(() => normalizedValue(request.value, { ...request, mode: initialMode, step: supportsModeToggle && initialMode === 'integer' ? 1 : request.step }))
   const [visualValue, setVisualValue] = useState(value)
   const ruler = useRef<HTMLDivElement>(null)
-  const directInput = useRef<HTMLInputElement>(null)
   const drag = useRef<DragState | null>(null)
   const visualValueRef = useRef(value)
   const animationFrame = useRef<number | null>(null)
@@ -99,6 +98,8 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const lastFeedbackValue = useRef(value)
   const lastFeedbackAt = useRef(0)
   const fixedSelection = useRef<number | null>(null)
+  const directEntryStart = useRef({ value, mode: initialMode })
+  const replaceDraftOnKey = useRef(false)
   const [editingValue, setEditingValue] = useState(false)
   const [draftValue, setDraftValue] = useState(formatValue(value, initialMode))
   const draftRangeIssue = editingValue ? numericDraftRangeIssue(draftValue, request.min, request.max) : null
@@ -271,6 +272,8 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
 
   const beginDirectEntry = () => {
     stopAnimation()
+    directEntryStart.current = { value: normalizedValue(visualValueRef.current, activeRequest), mode }
+    replaceDraftOnKey.current = true
     setDraftValue(formatValue(normalizedValue(visualValueRef.current, activeRequest), mode))
     setEditingValue(true)
   }
@@ -290,6 +293,31 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     const parsed = Number(normalizedDraft)
     if (Number.isFinite(parsed)) animateToValue(parsed, 280, nextRequest)
   }
+
+  const pressKeypadKey = (key: string) => {
+    prepareAudioFeedback()
+    const nextDraft = appendNumericKey(draftValue, key, replaceDraftOnKey.current)
+    replaceDraftOnKey.current = false
+    changeDirectEntry(nextDraft)
+  }
+
+  const deleteKeypadKey = () => {
+    prepareAudioFeedback()
+    replaceDraftOnKey.current = false
+    changeDirectEntry(removeNumericKey(draftValue))
+  }
+
+  const cancelDirectEntry = useCallback(() => {
+    stopAnimation()
+    const starting = directEntryStart.current
+    setMode(starting.mode)
+    visualValueRef.current = starting.value
+    setVisualValue(starting.value)
+    setValue(starting.value)
+    setDraftValue(formatValue(starting.value, starting.mode))
+    lastFeedbackValue.current = starting.value
+    setEditingValue(false)
+  }, [stopAnimation])
 
   const commitDirectEntry = () => {
     const normalizedDraft = normalizedNumericDraft(draftValue)
@@ -323,21 +351,22 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
 
   useEffect(() => {
     ruler.current?.focus()
-    const handleEscape = (event: globalThis.KeyboardEvent) => { if (event.key === 'Escape' && document.activeElement !== directInput.current) onClose() }
-    window.addEventListener('keydown', handleEscape)
     return () => {
-      window.removeEventListener('keydown', handleEscape)
       stopAnimation()
       if (audioContext.current?.state !== 'closed') void audioContext.current?.close().catch(() => undefined)
       audioContext.current = null
     }
-  }, [onClose, stopAnimation])
+  }, [stopAnimation])
 
   useEffect(() => {
-    if (!editingValue) return
-    directInput.current?.focus()
-    directInput.current?.select()
-  }, [editingValue])
+    const handleEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      if (editingValue) cancelDirectEntry()
+      else onClose()
+    }
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [cancelDirectEntry, editingValue, onClose])
 
   const changeBySteps = (steps: number) => {
     fixedSelection.current = null
@@ -434,7 +463,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
       <p>{request.label}</p>
       <div className="value-adjuster__value" aria-live="polite">
         {editingValue
-          ? <input ref={directInput} type="text" inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*" enterKeyHint="done" value={draftValue} aria-label={`Enter ${request.label}`} onChange={(event) => changeDirectEntry(event.target.value)} onBlur={commitDirectEntry} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); commitDirectEntry() } else if (event.key === 'Escape') { event.preventDefault(); setEditingValue(false) } }} />
+          ? <span className="value-adjuster__direct-value" aria-label={`${request.label}, ${draftValue || 'empty'}`}>{draftValue || '—'}{request.unit && <small>{request.unit}</small>}</span>
           : <button type="button" onClick={beginDirectEntry} aria-label={`Enter ${request.label} with keypad`}>{formatValue(visualValue, mode)}{request.unit && <small>{request.unit}</small>}</button>}
       </div>
       {directInputError && <p className="value-adjuster__validation" role="alert">{directInputError}</p>}
@@ -461,6 +490,22 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
         return <button key={suggestion.label} type="button" className={available && suggestionValue === value ? 'value-adjuster__fixed-preset value-adjuster__fixed-preset--active' : 'value-adjuster__fixed-preset'} disabled={!available} aria-label={`${suggestion.label}, ${formatSuggestion(suggestion.value, mode)}${request.unit ?? ''}, ${suggestion.detail}`} onClick={() => { fixedSelection.current = suggestionValue; prepareAudioFeedback(); animateToValue(suggestionValue) }}>{suggestion.label}</button>
       })}</div>}
     </footer>
+    {editingValue && <div className="value-adjuster__keypad-backdrop" role="presentation">
+      <section className="value-adjuster__keypad" role="dialog" aria-modal="true" aria-label={`Enter ${request.label}`}>
+        <div className="value-adjuster__keypad-display" aria-live="polite"><strong>{draftValue || '—'}</strong>{request.unit && <small>{request.unit}</small>}</div>
+        <div className="value-adjuster__keypad-message" aria-live="polite">{directInputError ?? `Range ${request.min.toLocaleString()}–${request.max.toLocaleString()}`}</div>
+        <div className="value-adjuster__keypad-grid">
+          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((key) => <button key={key} type="button" onClick={() => pressKeypadKey(key)}>{key}</button>)}
+          <button type="button" aria-label="Decimal point" onClick={() => pressKeypadKey('.')}>.</button>
+          <button type="button" onClick={() => pressKeypadKey('0')}>0</button>
+          <button className="value-adjuster__keypad-delete" type="button" aria-label="Delete last digit" onClick={deleteKeypadKey}>⌫</button>
+        </div>
+        <div className="value-adjuster__keypad-actions">
+          <button type="button" onClick={cancelDirectEntry}>Cancel</button>
+          <button type="button" disabled={Boolean(directInputError)} onClick={commitDirectEntry}>Done</button>
+        </div>
+      </section>
+    </div>}
   </main>
 }
 

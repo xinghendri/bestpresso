@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { gestureIncrement, maximumGesturePointers, modeForNumericDraft, modeForShortcut, normalizedNumericDraft, numericDraftRangeIssue } from '../src/components/ValueAdjustment/valueAdjustmentGestures.ts'
+import { appendNumericKey, gestureIncrement, maximumGesturePointers, modeForNumericDraft, modeForShortcut, normalizedNumericDraft, numericDraftRangeIssue, removeNumericKey } from '../src/components/ValueAdjustment/valueAdjustmentGestures.ts'
 import { VALUE_ADJUSTMENTS } from '../src/domain/valueAdjustments.ts'
 
 test('mixed grind shortcuts choose their matching number format', () => {
@@ -45,4 +45,12 @@ test('direct numeric entry reports values outside the allowed range', () => {
   assert.equal(numericDraftRangeIssue('-1', 0, 2500), 'below')
   assert.equal(numericDraftRangeIssue('2500', 0, 2500), null)
   assert.equal(numericDraftRangeIssue('2500.1', 0, 2500), 'above')
+})
+
+test('in-app keypad replaces the selected value and keeps one decimal separator', () => {
+  assert.equal(appendNumericKey('20', '4', true), '4')
+  assert.equal(appendNumericKey('20', '.', true), '0.')
+  assert.equal(appendNumericKey('18.3', '.'), '18.3')
+  assert.equal(appendNumericKey('0', '7'), '7')
+  assert.equal(removeNumericKey('18.3'), '18.')
 })
