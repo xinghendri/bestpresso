@@ -105,8 +105,10 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const fixedSelection = useRef<number | null>(null)
   const directEntryStart = useRef({ value, mode: initialMode })
   const replaceDraftOnKey = useRef(false)
+  const directEntryAnimation = useRef<number | null>(null)
   const [editingValue, setEditingValue] = useState(false)
   const [draftValue, setDraftValue] = useState(formatValue(value, initialMode))
+  const draftValueRef = useRef(draftValue)
   const draftRangeIssue = editingValue ? numericDraftRangeIssue(draftValue, request.min, request.max) : null
   const directInputError = draftRangeIssue === 'above'
     ? `Maximum is ${request.max.toLocaleString()}.`
@@ -194,7 +196,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     playStepFeedback(next)
   }, [activeRequest, playStepFeedback, stopAnimation])
 
-  const animateToValue = useCallback((nextValue: number, requestedDuration?: number, adjustment = activeRequest) => {
+  const animateToValue = useCallback((nextValue: number, requestedDuration?: number, adjustment = activeRequest, feedback = true) => {
     const target = normalizedValue(nextValue, adjustment)
     const start = visualValueRef.current
     stopAnimation()
@@ -215,7 +217,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
       const next = start + (target - start) * easedProgress
       visualValueRef.current = next
       setVisualValue(next)
-      playStepFeedback(next, adjustment)
+      if (feedback) playStepFeedback(next, adjustment)
       if (progress < 1) animationFrame.current = requestAnimationFrame(animate)
       else animationFrame.current = null
     }
@@ -279,7 +281,9 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     stopAnimation()
     directEntryStart.current = { value: normalizedValue(visualValueRef.current, activeRequest), mode }
     replaceDraftOnKey.current = true
-    setDraftValue(formatValue(normalizedValue(visualValueRef.current, activeRequest), mode))
+    const startingDraft = formatValue(normalizedValue(visualValueRef.current, activeRequest), mode)
+    draftValueRef.current = startingDraft
+    setDraftValue(startingDraft)
     setEditingValue(true)
   }
 
@@ -291,17 +295,27 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const changeDirectEntry = (nextDraft: string) => {
     const normalizedDraft = normalizedNumericDraft(nextDraft)
     if (!/^\d*(?:\.\d*)?$/.test(normalizedDraft)) return
+    stopAnimation()
+    draftValueRef.current = normalizedDraft
     setDraftValue(normalizedDraft)
+    if (directEntryAnimation.current !== null) window.clearTimeout(directEntryAnimation.current)
+    directEntryAnimation.current = null
     if (!normalizedDraft || normalizedDraft === '.') return
     const nextRequest = requestForNumericDraft(normalizedDraft)
     if (supportsModeToggle && nextRequest.mode !== mode) setMode(nextRequest.mode)
     const parsed = Number(normalizedDraft)
-    if (Number.isFinite(parsed)) animateToValue(parsed, 280, nextRequest)
+    if (Number.isFinite(parsed)) {
+      playStepFeedback(parsed, nextRequest)
+      directEntryAnimation.current = window.setTimeout(() => {
+        directEntryAnimation.current = null
+        animateToValue(parsed, 220, nextRequest, false)
+      }, 90)
+    }
   }
 
   const pressKeypadKey = (key: string) => {
     prepareAudioFeedback()
-    const nextDraft = appendNumericKey(draftValue, key, replaceDraftOnKey.current)
+    const nextDraft = appendNumericKey(draftValueRef.current, key, replaceDraftOnKey.current)
     replaceDraftOnKey.current = false
     changeDirectEntry(nextDraft)
   }
@@ -309,23 +323,29 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const deleteKeypadKey = () => {
     prepareAudioFeedback()
     replaceDraftOnKey.current = false
-    changeDirectEntry(removeNumericKey(draftValue))
+    changeDirectEntry(removeNumericKey(draftValueRef.current))
   }
 
   const cancelDirectEntry = useCallback(() => {
     stopAnimation()
+    if (directEntryAnimation.current !== null) window.clearTimeout(directEntryAnimation.current)
+    directEntryAnimation.current = null
     const starting = directEntryStart.current
     setMode(starting.mode)
     visualValueRef.current = starting.value
     setVisualValue(starting.value)
     setValue(starting.value)
-    setDraftValue(formatValue(starting.value, starting.mode))
+    const startingDraft = formatValue(starting.value, starting.mode)
+    draftValueRef.current = startingDraft
+    setDraftValue(startingDraft)
     lastFeedbackValue.current = starting.value
     setEditingValue(false)
   }, [stopAnimation])
 
   const commitDirectEntry = () => {
-    const normalizedDraft = normalizedNumericDraft(draftValue)
+    if (directEntryAnimation.current !== null) window.clearTimeout(directEntryAnimation.current)
+    directEntryAnimation.current = null
+    const normalizedDraft = normalizedNumericDraft(draftValueRef.current)
     const parsed = Number(normalizedDraft)
     if (numericDraftRangeIssue(normalizedDraft, request.min, request.max)) return
     if (Number.isFinite(parsed) && normalizedDraft !== '') {
@@ -336,14 +356,16 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
       visualValueRef.current = nextValue
       setVisualValue(nextValue)
       setValue(nextValue)
-      setDraftValue(formatValue(nextValue, nextRequest.mode))
+      const committedDraft = formatValue(nextValue, nextRequest.mode)
+      draftValueRef.current = committedDraft
+      setDraftValue(committedDraft)
       lastFeedbackValue.current = nextValue
     } else setDraftValue(formatValue(value, mode))
     setEditingValue(false)
   }
 
   const saveAdjustment = () => {
-    const normalizedDraft = normalizedNumericDraft(draftValue)
+    const normalizedDraft = normalizedNumericDraft(draftValueRef.current)
     const parsedDraft = Number(normalizedDraft)
     if (editingValue && numericDraftRangeIssue(normalizedDraft, request.min, request.max)) return
     const saveRequest = editingValue && Number.isFinite(parsedDraft) && normalizedDraft !== '' ? requestForNumericDraft(normalizedDraft) : activeRequest
@@ -358,6 +380,8 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     ruler.current?.focus()
     return () => {
       stopAnimation()
+      if (directEntryAnimation.current !== null) window.clearTimeout(directEntryAnimation.current)
+      directEntryAnimation.current = null
       if (audioContext.current?.state !== 'closed') void audioContext.current?.close().catch(() => undefined)
       audioContext.current = null
     }
@@ -455,16 +479,12 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
 
   const hasFixedSuggestions = Boolean(request.fixedSuggestions?.length)
 
-  return <main className={`value-adjuster value-adjuster--${mode}${supportsModeToggle ? ' value-adjuster--mode-toggle' : ''}${hasFixedSuggestions ? ' value-adjuster--has-fixed-suggestions' : ''}${editingValue ? ' value-adjuster--keyboard' : ''}`} aria-label={`Adjust ${request.label}`}>
+  return <main className={`value-adjuster value-adjuster--${mode}${hasFixedSuggestions ? ' value-adjuster--has-fixed-suggestions' : ''}${editingValue ? ' value-adjuster--keyboard' : ''}`} aria-label={`Adjust ${request.label}`}>
     <header className="value-adjuster__header">
       <img className="logo" src={logo} alt="decent" />
       <div className="value-adjuster__actions"><button className="value-adjuster__cancel" type="button" onClick={onClose}>Cancel</button><button className="value-adjuster__save" type="button" disabled={Boolean(directInputError)} onClick={saveAdjustment}>Save</button></div>
     </header>
     <section className="value-adjuster__body">
-      {supportsModeToggle && <div className="value-adjuster__mode-selector" role="group" aria-label="Grind size number format">
-        <button type="button" className={mode === 'integer' ? 'value-adjuster__mode-option value-adjuster__mode-option--active' : 'value-adjuster__mode-option'} aria-pressed={mode === 'integer'} onClick={() => changeMode('integer')}>Whole number</button>
-        <button type="button" className={mode === 'decimal' ? 'value-adjuster__mode-option value-adjuster__mode-option--active' : 'value-adjuster__mode-option'} aria-pressed={mode === 'decimal'} onClick={() => changeMode('decimal')}>Decimal</button>
-      </div>}
       <p>{request.label}</p>
       <div className="value-adjuster__value" aria-live="polite">
         {editingValue
