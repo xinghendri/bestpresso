@@ -1,4 +1,5 @@
 import type { BrewProfile, BrewingScreenModel, PreviousShot, ProfileTargetPoint } from '../../domain/brewing'
+import { isSteamHeatingEnabled } from '../../features/machine/steamHeating'
 import type { DecaidProfileRecord, DecaidProfileStep, DecaidWorkflow, FavoriteAssignments, MachineSnapshot, ShotRecord } from './types'
 
 const MM_TO_ML = [0,16,43,70,97,124,151,179,206,233,261,288,316,343,371,398,426,453,481,509,537,564,592,620,648,676,704,732,760,788,816,844,872,900,929,957,985,1013,1042,1070,1104,1138,1172,1207,1242,1277,1312,1347,1382,1417,1453,1488,1523,1559,1594,1630,1665,1701,1736,1772,1808,1843,1879,1915,1951,1986,2022,2058]
@@ -194,7 +195,21 @@ export function applyWorkflow(model: BrewingScreenModel, workflow: DecaidWorkflo
   const profiles = carouselProfiles(allProfiles, assignments, active?.id, retainedAdHocProfileId)
   const utilities = model.utilities.map((utility) => {
     if (utility.id === 'water') return { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Volume' ? { ...metric, value: numberString(workflow.hotWaterData?.volume, metric.value) } : { ...metric, value: numberString(workflow.hotWaterData?.targetTemperature, metric.value) }) }
-    if (utility.id === 'steam') return { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Target' ? { ...metric, value: numberString(workflow.steamSettings?.targetTemperature, metric.value) } : metric.label === 'Duration' ? { ...metric, value: numberString(workflow.steamSettings?.duration, metric.value) } : metric.label === 'Flow' ? { ...metric, value: numberString(workflow.steamSettings?.flow, metric.value) } : metric) }
+    if (utility.id === 'steam') {
+      const targetTemperature = finiteNumber(workflow.steamSettings?.targetTemperature)
+      const enabled = targetTemperature === undefined ? utility.enabled ?? true : isSteamHeatingEnabled(targetTemperature)
+      return {
+        ...utility,
+        enabled,
+        metrics: utility.metrics.map((metric) => metric.label === 'Target'
+          ? enabled ? { ...metric, value: numberString(targetTemperature, metric.value) } : metric
+          : metric.label === 'Duration'
+            ? { ...metric, value: numberString(workflow.steamSettings?.duration, metric.value) }
+            : metric.label === 'Flow'
+              ? { ...metric, value: numberString(workflow.steamSettings?.flow, metric.value) }
+              : metric),
+      }
+    }
     return utility
   })
   return { ...model, profiles, activeProfileId: active?.id ?? profiles[0]?.id, utilities }

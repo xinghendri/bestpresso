@@ -40,6 +40,7 @@ export interface MachineUtility {
   id: UtilityId
   label: string
   metrics: DisplayMetric[]
+  enabled?: boolean
   alert?: boolean
   warning?: boolean
   levelPercent?: number

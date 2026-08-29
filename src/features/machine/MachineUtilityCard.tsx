@@ -9,6 +9,7 @@ import { WATER_TANK_CAPACITY_ML, waterTankLevelState } from '../../domain/brewin
 import type { EditableMachineSetting, MachineUtility, ScaleConnection } from '../../domain/brewing'
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { scalePresentationForDevice } from './scaleArtwork'
+import { steamTargetForToggle } from './steamHeating'
 
 const icons = { water: hotWaterIcon, steam: steamIcon, scale: scaleIcon }
 
@@ -84,6 +85,9 @@ export function MachineUtilityCard({ utility, compact = false, scale, onExpand, 
   }
 
   const isScale = utility.id === 'scale'
+  const isSteam = utility.id === 'steam'
+  const steamHeatingEnabled = utility.enabled !== false
+  const steamTarget = Number(utility.metrics.find((metric) => metric.label === 'Target')?.value)
   const scaleConnected = isScale && scale?.status === 'connected'
   const connectedScaleName = scaleConnected ? scale.name || 'Scale' : undefined
   const scalePresentation = scaleConnected ? scalePresentationForDevice(connectedScaleName, scale.id) : undefined
@@ -102,6 +106,7 @@ export function MachineUtilityCard({ utility, compact = false, scale, onExpand, 
   return <section className={cardClassName} data-layout={compact ? 'compact' : 'expanded'} data-scale-model={scalePresentation?.id} data-scale-image={scalePresentation?.imageName} role={sectionIsExpandControl ? 'button' : undefined} tabIndex={sectionIsExpandControl ? 0 : undefined} aria-label={sectionIsExpandControl ? expandLabel : undefined} onClick={sectionIsExpandControl ? onExpand : undefined} onKeyDown={sectionIsExpandControl ? expandWithKeyboard : undefined}>
     {compact && isScale && <button className="utility-card__expand-surface" type="button" aria-label={expandLabel} onClick={onExpand} />}
     <header><img src={icons[utility.id]} alt="" /><span>{title}</span></header>
+    {!compact && isSteam && <button className={`steam-heating-toggle${steamHeatingEnabled ? ' steam-heating-toggle--enabled' : ''}`} type="button" role="switch" aria-checked={steamHeatingEnabled} aria-label={steamHeatingEnabled ? 'Disable steam heating' : 'Enable steam heating'} title={steamHeatingEnabled ? 'Disable steam heating' : 'Enable steam heating'} disabled={settingsDisabled || !onUpdateSetting} onClick={() => onUpdateSetting?.('steamTemperature', steamTargetForToggle(!steamHeatingEnabled, steamTarget))}><span /></button>}
     {isScale && !scaleConnected
       ? <button className={compact ? 'scale-search scale-compact-summary' : 'scale-search'} type="button" onClick={onSearchScale} disabled={scale?.status === 'searching'}>{scale?.status === 'searching' ? 'Searching…' : 'Search'}</button>
       : <div className="utility-card__metrics">{utility.metrics.map((metric) => scaleCanTare
