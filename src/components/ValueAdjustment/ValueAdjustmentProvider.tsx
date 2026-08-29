@@ -156,6 +156,34 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     if (audioContext.current?.state === 'suspended') void audioContext.current.resume().catch(() => undefined)
   }, [])
 
+  const playKeypadFeedback = useCallback(() => {
+    prepareAudioFeedback()
+    const context = audioContext.current
+    if (!context || context.state === 'closed') return
+
+    try {
+      const oscillator = context.createOscillator()
+      const gain = context.createGain()
+      const startedAt = context.currentTime
+      oscillator.type = 'sine'
+      oscillator.frequency.setValueAtTime(520, startedAt)
+      oscillator.frequency.exponentialRampToValueAtTime(360, startedAt + 0.022)
+      gain.gain.setValueAtTime(0.0001, startedAt)
+      gain.gain.exponentialRampToValueAtTime(0.018, startedAt + 0.002)
+      gain.gain.exponentialRampToValueAtTime(0.0001, startedAt + 0.026)
+      oscillator.connect(gain)
+      gain.connect(context.destination)
+      oscillator.addEventListener('ended', () => {
+        oscillator.disconnect()
+        gain.disconnect()
+      }, { once: true })
+      oscillator.start(startedAt)
+      oscillator.stop(startedAt + 0.03)
+    } catch {
+      // Sound is progressive enhancement; keypad input remains functional without it.
+    }
+  }, [prepareAudioFeedback])
+
   const playStepFeedback = useCallback((nextValue: number, adjustment = activeRequest) => {
     const selectedValue = normalizedValue(nextValue, adjustment)
     if (selectedValue === lastFeedbackValue.current) return
@@ -317,14 +345,14 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   }
 
   const pressKeypadKey = (key: string) => {
-    prepareAudioFeedback()
+    playKeypadFeedback()
     const nextDraft = appendNumericKey(draftValueRef.current, key, replaceDraftOnKey.current)
     replaceDraftOnKey.current = false
     queueDirectEntry(nextDraft)
   }
 
   const deleteKeypadKey = () => {
-    prepareAudioFeedback()
+    playKeypadFeedback()
     replaceDraftOnKey.current = false
     queueDirectEntry(removeNumericKey(draftValueRef.current))
   }
@@ -528,7 +556,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
         </div>
       </div>
     </section>
-    {editingValue && <NumericKeypad disabled={Boolean(directInputError)} label={request.label} onDelete={deleteKeypadKey} onDismiss={commitDirectEntry} onKey={pressKeypadKey} />}
+    {editingValue && <NumericKeypad disabled={Boolean(directInputError)} label={request.label} onDelete={deleteKeypadKey} onDismiss={() => { playKeypadFeedback(); commitDirectEntry() }} onKey={pressKeypadKey} />}
     {!editingValue && <footer className="value-adjuster__presets">
       <div className="value-adjuster__preset-row" aria-label={`${request.label} suggestions`}>{presets.map((preset) => <button key={preset} type="button" className={preset === value ? 'value-adjuster__preset value-adjuster__preset--active' : 'value-adjuster__preset'} onClick={() => selectPreset(preset)}>{formatSuggestion(preset, modeForShortcut(preset, supportsModeToggle, mode))}{request.unit && <small>{request.unit}</small>}</button>)}</div>
       {request.fixedSuggestions && <div className="value-adjuster__preset-row value-adjuster__preset-row--fixed" aria-label={`${request.label} typical ratios`}>{request.fixedSuggestions.map((suggestion) => {
