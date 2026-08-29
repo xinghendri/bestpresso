@@ -4,7 +4,7 @@ import type { DecaidSettings, ScalePowerMode } from '../src/api/decaid/types.ts'
 import { SLEEP_DISPLAY_BRIGHTNESS, sleepMachineAndConnectedScale } from '../src/features/brew/sleepControl.ts'
 
 test('keeps the sleeping display faintly visible', () => {
-  assert.equal(SLEEP_DISPLAY_BRIGHTNESS, 10)
+  assert.equal(SLEEP_DISPLAY_BRIGHTNESS, 7)
 })
 
 function sleepApi(settings: DecaidSettings = {}) {
