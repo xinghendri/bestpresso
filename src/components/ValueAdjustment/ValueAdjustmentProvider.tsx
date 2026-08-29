@@ -4,7 +4,7 @@ import logo from '../../assets/figma/decent-logo.png'
 import { MAX_VALUE_SUGGESTIONS } from '../../domain/valueAdjustments'
 import { ValueAdjustmentContext } from './ValueAdjustmentContext'
 import type { ValueAdjustmentMode, ValueAdjustmentRequest } from './ValueAdjustmentContext'
-import { gestureIncrement, maximumGesturePointers, modeForNumericDraft, modeForShortcut, normalizedNumericDraft } from './valueAdjustmentGestures'
+import { gestureIncrement, maximumGesturePointers, modeForNumericDraft, modeForShortcut, normalizedNumericDraft, numericDraftRangeIssue } from './valueAdjustmentGestures'
 
 const SUGGESTION_STORAGE_KEY = 'bestpresso.value-adjustment-suggestions.v2'
 const MODE_STORAGE_KEY = 'bestpresso.value-adjustment-modes.v1'
@@ -101,6 +101,12 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const fixedSelection = useRef<number | null>(null)
   const [editingValue, setEditingValue] = useState(false)
   const [draftValue, setDraftValue] = useState(formatValue(value, initialMode))
+  const draftRangeIssue = editingValue ? numericDraftRangeIssue(draftValue, request.min, request.max) : null
+  const directInputError = draftRangeIssue === 'above'
+    ? `Maximum is ${request.max.toLocaleString()}.`
+    : draftRangeIssue === 'below'
+      ? `Minimum is ${request.min.toLocaleString()}.`
+      : draftRangeIssue === 'required' ? 'Enter a number.' : null
   const [suggestionStore, setSuggestionStore] = useState<SuggestionStore>(readSuggestionStore)
   const suggestionStoreRef = useRef(suggestionStore)
   const hasSuggestionHistory = Object.prototype.hasOwnProperty.call(suggestionStore, request.suggestionKey)
@@ -288,6 +294,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const commitDirectEntry = () => {
     const normalizedDraft = normalizedNumericDraft(draftValue)
     const parsed = Number(normalizedDraft)
+    if (numericDraftRangeIssue(normalizedDraft, request.min, request.max)) return
     if (Number.isFinite(parsed) && normalizedDraft !== '') {
       const nextRequest = requestForNumericDraft(normalizedDraft)
       const nextValue = normalizedValue(parsed, nextRequest)
@@ -305,6 +312,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const saveAdjustment = () => {
     const normalizedDraft = normalizedNumericDraft(draftValue)
     const parsedDraft = Number(normalizedDraft)
+    if (editingValue && numericDraftRangeIssue(normalizedDraft, request.min, request.max)) return
     const saveRequest = editingValue && Number.isFinite(parsedDraft) && normalizedDraft !== '' ? requestForNumericDraft(normalizedDraft) : activeRequest
     const savedValue = editingValue && Number.isFinite(parsedDraft) && normalizedDraft !== '' ? normalizedValue(parsedDraft, saveRequest) : value
     if (fixedSelection.current !== savedValue) rememberSuggestion(savedValue, saveRequest)
@@ -416,7 +424,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   return <main className={`value-adjuster value-adjuster--${mode}${supportsModeToggle ? ' value-adjuster--mode-toggle' : ''}${hasFixedSuggestions ? ' value-adjuster--has-fixed-suggestions' : ''}`} aria-label={`Adjust ${request.label}`}>
     <header className="value-adjuster__header">
       <img className="logo" src={logo} alt="decent" />
-      <div className="value-adjuster__actions"><button className="value-adjuster__cancel" type="button" onClick={onClose}>Cancel</button><button className="value-adjuster__save" type="button" onClick={saveAdjustment}>Save</button></div>
+      <div className="value-adjuster__actions"><button className="value-adjuster__cancel" type="button" onClick={onClose}>Cancel</button><button className="value-adjuster__save" type="button" disabled={Boolean(directInputError)} onClick={saveAdjustment}>Save</button></div>
     </header>
     <section className="value-adjuster__body">
       {supportsModeToggle && <div className="value-adjuster__mode-selector" role="group" aria-label="Grind size number format">
@@ -429,6 +437,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
           ? <input ref={directInput} type="text" inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*" enterKeyHint="done" value={draftValue} aria-label={`Enter ${request.label}`} onChange={(event) => changeDirectEntry(event.target.value)} onBlur={commitDirectEntry} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); commitDirectEntry() } else if (event.key === 'Escape') { event.preventDefault(); setEditingValue(false) } }} />
           : <button type="button" onClick={beginDirectEntry} aria-label={`Enter ${request.label} with keypad`}>{formatValue(visualValue, mode)}{request.unit && <small>{request.unit}</small>}</button>}
       </div>
+      {directInputError && <p className="value-adjuster__validation" role="alert">{directInputError}</p>}
       {valueHint && <div className="value-adjuster__value-hint"><span>{valueHint}</span></div>}
       <div ref={ruler} className="value-adjuster__scrubber" role="slider" tabIndex={0} aria-label={request.label} aria-valuemin={activeRequest.min} aria-valuemax={activeRequest.max} aria-valuenow={value} aria-valuetext={`${formatValue(value, mode)}${request.unit ?? ''}${valueHint ? `, ${valueHint}` : ''}`} onKeyDown={handleKeyDown} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={endDrag} onPointerCancel={endDrag}>
         <div className="value-adjuster__scrubber-track">

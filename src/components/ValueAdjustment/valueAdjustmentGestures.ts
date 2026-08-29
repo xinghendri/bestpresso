@@ -25,3 +25,13 @@ export function modeForNumericDraft(value: string, currentMode: ValueAdjustmentM
   if (!normalized || !/^\d*(?:\.\d*)?$/.test(normalized)) return currentMode
   return normalized.includes('.') ? 'decimal' : 'integer'
 }
+
+export function numericDraftRangeIssue(value: string, min: number, max: number): 'required' | 'below' | 'above' | null {
+  const normalized = normalizedNumericDraft(value)
+  if (!normalized || normalized === '.') return 'required'
+  const parsed = Number(normalized)
+  if (!Number.isFinite(parsed)) return 'required'
+  if (parsed < min) return 'below'
+  if (parsed > max) return 'above'
+  return null
+}

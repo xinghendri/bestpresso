@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { gestureIncrement, maximumGesturePointers, modeForNumericDraft, modeForShortcut, normalizedNumericDraft } from '../src/components/ValueAdjustment/valueAdjustmentGestures.ts'
+import { gestureIncrement, maximumGesturePointers, modeForNumericDraft, modeForShortcut, normalizedNumericDraft, numericDraftRangeIssue } from '../src/components/ValueAdjustment/valueAdjustmentGestures.ts'
 import { VALUE_ADJUSTMENTS } from '../src/domain/valueAdjustments.ts'
 
 test('mixed grind shortcuts choose their matching number format', () => {
@@ -38,4 +38,11 @@ test('direct numeric entry accepts integers and locale decimal separators', () =
   assert.equal(modeForNumericDraft('18.', 'integer'), 'decimal')
   assert.equal(modeForNumericDraft('.5', 'integer'), 'decimal')
   assert.equal(normalizedNumericDraft('18,3'), '18.3')
+})
+
+test('direct numeric entry reports values outside the allowed range', () => {
+  assert.equal(numericDraftRangeIssue('', 0, 2500), 'required')
+  assert.equal(numericDraftRangeIssue('-1', 0, 2500), 'below')
+  assert.equal(numericDraftRangeIssue('2500', 0, 2500), null)
+  assert.equal(numericDraftRangeIssue('2500.1', 0, 2500), 'above')
 })
