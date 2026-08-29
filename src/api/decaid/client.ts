@@ -102,7 +102,7 @@ export async function setSharedSetting(key: string, value: unknown) {
   if (!response.ok) throw new Error(`Decaid shared setting returned ${response.status}`)
 }
 
-export async function setMachineState(state: 'idle' | 'sleeping' | 'espresso' | 'cleaning') {
+export async function setMachineState(state: 'idle' | 'sleeping' | 'espresso' | 'cleaning' | 'skipStep') {
   const response = await fetch(`${getDecaidEndpoints().apiBase}/machine/state/${state}`, { method: 'PUT' })
   if (!response.ok) throw new Error(`Decaid machine state returned ${response.status}`)
 }

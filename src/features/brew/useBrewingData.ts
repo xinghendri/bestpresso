@@ -151,6 +151,7 @@ export function useBrewingData() {
   const [scaleConnectPendingId, setScaleConnectPendingId] = useState<string | null>(null)
   const [scaleTarePending, setScaleTarePending] = useState(false)
   const [brewStopPending, setBrewStopPending] = useState(false)
+  const [brewSkipPending, setBrewSkipPending] = useState(false)
   const [cleaningStartPending, setCleaningStartPending] = useState(false)
   const [cleaningPreparedProfileId, setCleaningPreparedProfileId] = useState<string | null>(null)
   const [sleepPending, setSleepPending] = useState(false)
@@ -177,6 +178,7 @@ export function useBrewingData() {
   const connectedScale = useRef(Boolean(localScaleFixture))
   const scaleTareInFlight = useRef(false)
   const brewStopRequestInFlight = useRef(false)
+  const brewSkipRequestInFlight = useRef(false)
   const cleaningStartInFlight = useRef(false)
   const pendingCleaningSequence = useRef<PendingCleaningSequence | null>(null)
   const cleaningRestoreWorkflow = useRef<DecaidWorkflowPatch | null>(null)
@@ -359,11 +361,13 @@ export function useBrewingData() {
       if (!session) return
       liveShotSession.current = null
       brewStopRequestInFlight.current = false
+      brewSkipRequestInFlight.current = false
       setBrewStopPending(false)
+      setBrewSkipPending(false)
       const points = [...session.points]
       const elapsedMs = points.at(-1)?.elapsedMs ?? 0
       if (session.kind === 'cleaning') {
-        setLiveBrew({ active: false, visible: false, kind: 'cleaning', profileName: session.profileName, elapsedMs, points })
+        setLiveBrew({ active: false, visible: false, startedAt: session.startedAt, kind: 'cleaning', profileName: session.profileName, elapsedMs, points })
         pendingCleaningSequence.current = null
         setCleaningPreparedProfileId(null)
         const restorePatch = cleaningRestoreWorkflow.current
@@ -380,7 +384,7 @@ export function useBrewingData() {
         }
         return
       }
-      setLiveBrew({ active: false, visible: true, kind: 'espresso', profileName: session.profileName, targetYield: session.targetYield, elapsedMs, points })
+      setLiveBrew({ active: false, visible: true, startedAt: session.startedAt, kind: 'espresso', profileName: session.profileName, targetYield: session.targetYield, elapsedMs, points })
 
       const hasExtraction = points.some((point) => (point.pressure ?? 0) > 0.5 || (point.flow ?? 0) > 0.1)
       if (elapsedMs < MIN_SUCCESSFUL_SHOT_MS || !hasExtraction) return
@@ -583,7 +587,7 @@ export function useBrewingData() {
           })
           if (session.points.length > MAX_LIVE_SHOT_POINTS) session.points.shift()
         }
-        setLiveBrew({ active: true, visible: true, kind: session.kind, profileName: session.profileName, targetYield: session.targetYield, elapsedMs, points: [...session.points] })
+        setLiveBrew({ active: true, visible: true, startedAt: session.startedAt, kind: session.kind, profileName: session.profileName, targetYield: session.targetYield, elapsedMs, points: [...session.points] })
       } else if (liveShotSession.current) {
         completeLiveShot()
       }
@@ -980,6 +984,27 @@ export function useBrewingData() {
     }
   }
 
+  const skipBrewStage = async (): Promise<boolean> => {
+    if (brewSkipRequestInFlight.current || !liveShotSession.current) return false
+    if (connection !== 'connected' || machineConnection !== 'connected') {
+      showMachineActionError('The machine is disconnected, so the phase could not be skipped.')
+      return false
+    }
+    brewSkipRequestInFlight.current = true
+    setBrewSkipPending(true)
+    showMachineActionError(null)
+    try {
+      await setMachineState('skipStep')
+      return true
+    } catch {
+      showMachineActionError('The machine did not accept the skip command.')
+      return false
+    } finally {
+      brewSkipRequestInFlight.current = false
+      setBrewSkipPending(false)
+    }
+  }
+
   const showSettingFeedback = (feedback: SettingFeedback) => {
     if (feedbackTimeout.current !== null) window.clearTimeout(feedbackTimeout.current)
     setSettingFeedback(feedback)
@@ -1174,5 +1199,5 @@ export function useBrewingData() {
   const dismissLiveBrew = () => setLiveBrew((current) => current.active ? current : { ...current, visible: false })
   const favoriteProfileIds = favoriteProfileSlots.filter((id): id is string => Boolean(id))
 
-  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, utilityOperation, previousShotStatus, shotHistory, loadHistoryShot, heatingSeconds, connection, machineConnection, scale, availableScales, scaleConnectPendingId, scaleTarePending, brewStopPending, cleaningStartPending, cleaningPreparedProfileId, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, prepareCleaningSequence, startCleaningSequence, cancelCleaningSequence, dismissLiveBrew, searchForScale, connectToScale, dismissScalePicker, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
+  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, utilityOperation, previousShotStatus, shotHistory, loadHistoryShot, heatingSeconds, connection, machineConnection, scale, availableScales, scaleConnectPendingId, scaleTarePending, brewStopPending, brewSkipPending, cleaningStartPending, cleaningPreparedProfileId, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, skipBrewStage, prepareCleaningSequence, startCleaningSequence, cancelCleaningSequence, dismissLiveBrew, searchForScale, connectToScale, dismissScalePicker, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
 }

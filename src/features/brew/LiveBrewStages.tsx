@@ -1,5 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { MouseEvent } from 'react'
+import skipNext from '../../assets/figma/skip-next.svg'
 import type { LiveShotPoint } from '../../domain/brewing'
+import { DOUBLE_TAP_CONFIRMATION_WINDOW_MS, registerDoubleTap } from './doubleTapConfirmation'
 
 interface StageSummary {
   key: string
@@ -97,11 +100,49 @@ function summarizeLiveBrewStages(points: LiveShotPoint[], elapsedMs: number): St
 
 const reading = (value: number | undefined, digits = 1) => value === undefined ? '—' : value.toFixed(digits)
 
-export function LiveBrewStages({ points, elapsedMs, active = false, showYield = true, selectedStageKey, onStageSelect }: { points: LiveShotPoint[]; elapsedMs: number; active?: boolean; showYield?: boolean; selectedStageKey?: string; onStageSelect?: (stage: BrewStageSelection | null) => void }) {
+export function LiveBrewStages({ points, elapsedMs, active = false, showYield = true, skipPending = false, selectedStageKey, onStageSelect, onSkipStage }: { points: LiveShotPoint[]; elapsedMs: number; active?: boolean; showYield?: boolean; skipPending?: boolean; selectedStageKey?: string; onStageSelect?: (stage: BrewStageSelection | null) => void; onSkipStage?: () => Promise<boolean> }) {
   const stages = summarizeLiveBrewStages(points, elapsedMs)
   const stripRef = useRef<HTMLElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
   const stageRefs = useRef(new Map<string, HTMLElement>())
+  const previousSkipTap = useRef<number | null>(null)
+  const skipConfirmationTimeout = useRef<number | null>(null)
+  const skipButtonRef = useRef<HTMLButtonElement>(null)
+  const [skippedStageKeys, setSkippedStageKeys] = useState<Set<string>>(() => new Set())
+
+  const resetSkipConfirmation = () => {
+    previousSkipTap.current = null
+    skipButtonRef.current?.classList.remove('live-brew-skip--armed')
+    skipButtonRef.current?.setAttribute('aria-pressed', 'false')
+    if (skipConfirmationTimeout.current !== null) window.clearTimeout(skipConfirmationTimeout.current)
+    skipConfirmationTimeout.current = null
+  }
+
+  useEffect(() => () => {
+    if (skipConfirmationTimeout.current !== null) window.clearTimeout(skipConfirmationTimeout.current)
+  }, [])
+
+  useEffect(() => {
+    if (!active) resetSkipConfirmation()
+  }, [active])
+
+  const handleSkipTap = async (event: MouseEvent<HTMLButtonElement>) => {
+    if (skipPending || !onSkipStage) return
+    const result = registerDoubleTap(previousSkipTap.current, event.timeStamp)
+    previousSkipTap.current = result.nextTapAt
+    if (result.confirmed) {
+      const skippedStageKey = stages.at(-1)?.key
+      resetSkipConfirmation()
+      if (await onSkipStage() && skippedStageKey) {
+        setSkippedStageKeys((current) => new Set(current).add(skippedStageKey))
+      }
+      return
+    }
+    skipButtonRef.current?.classList.add('live-brew-skip--armed')
+    skipButtonRef.current?.setAttribute('aria-pressed', 'true')
+    if (skipConfirmationTimeout.current !== null) window.clearTimeout(skipConfirmationTimeout.current)
+    skipConfirmationTimeout.current = window.setTimeout(resetSkipConfirmation, DOUBLE_TAP_CONFIRMATION_WINDOW_MS)
+  }
 
   useEffect(() => {
     const strip = stripRef.current
@@ -153,6 +194,7 @@ export function LiveBrewStages({ points, elapsedMs, active = false, showYield = 
     {stages.map((stage, index) => {
       const isActive = active && index === stages.length - 1
       const isSelected = selectedStageKey === stage.key
+      const wasSkipped = skippedStageKeys.has(stage.key)
       const selectable = Boolean(onStageSelect)
       const toggleSelection = () => onStageSelect?.(isSelected ? null : { key: stage.key, name: stage.name, startedAt: stage.startedAt, endedAt: stage.endedAt, points: stage.points })
       return <article className={`live-brew-stage${isActive ? ' live-brew-stage--active' : ''}${isSelected ? ' live-brew-stage--selected' : ''}`} aria-current={isActive ? 'step' : undefined} aria-pressed={selectable ? isSelected : undefined} key={stage.key} onClick={selectable ? toggleSelection : undefined} onKeyDown={selectable ? (event) => {
@@ -163,13 +205,17 @@ export function LiveBrewStages({ points, elapsedMs, active = false, showYield = 
         if (node) stageRefs.current.set(stage.key, node)
         else stageRefs.current.delete(stage.key)
       }} role={selectable ? 'button' : undefined} tabIndex={selectable ? 0 : undefined}>
-      <header><h2>{stage.name}</h2><time>{timedLabel(stage.endedAt - stage.startedAt)}</time></header>
+      <header><h2>{stage.name}</h2><div className="live-brew-stage__time"><time>{timedLabel(stage.endedAt - stage.startedAt)}</time>{wasSkipped && <span className="live-brew-stage__skipped" aria-label="Skipped phase"><img src={skipNext} alt="" /></span>}</div></header>
       <dl>
         {showYield && <div><dt>Yield</dt><dd>{reading(stage.yield)}<small>g</small></dd></div>}
         <div><dt>Temperature range</dt><dd>{reading(stage.minimumTemperature, 0)}° – {reading(stage.maximumTemperature, 0)}°</dd></div>
         <div><dt>Pressure</dt><dd>{stage.pressureMovements.length ? stage.pressureMovements.map((pressure) => reading(pressure)).join(' → ') : '—'}</dd></div>
       </dl>
     </article>})}
+    {active && onSkipStage && <button className={`live-brew-skip${skipPending ? ' live-brew-skip--pending' : ''}`} type="button" disabled={skipPending} aria-label="Double tap to skip to the next phase" aria-pressed="false" onClick={handleSkipTap} ref={skipButtonRef}>
+      <img className="live-brew-skip__icon" src={skipNext} alt="" />
+      <span>double tap to skip</span>
+    </button>}
     </div>
   </section>
 }

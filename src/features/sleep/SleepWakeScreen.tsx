@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type TouchEvent as ReactTouchEvent } from 'react'
 import logo from '../../assets/figma/decent-logo.png'
+import { formatDeviceTime } from './deviceTime'
 import { WAKE_HOLD_DURATION_MS, WakeHoldGesture, type WakeHoldUpdate } from './wakeHoldGesture'
 
 interface SleepWakeScreenProps {
@@ -106,7 +107,7 @@ export function SleepWakeScreen({ onWake }: SleepWakeScreenProps) {
   >
     <span className="sleep-screen__identity" aria-hidden="true">
       <img src={logo} alt="" />
-      <span className="sleep-screen__time">{new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(now)}</span>
+      <span className="sleep-screen__time">{formatDeviceTime(now)}</span>
     </span>
     <span className="sleep-screen__hint">Touch and hold to wake</span>
     {pulse && <span className="sleep-screen__pulse" style={{ left: pulse.x, top: pulse.y }} aria-hidden="true" />}
