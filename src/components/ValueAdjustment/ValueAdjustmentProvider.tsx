@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react'
 import logo from '../../assets/figma/decent-logo.png'
+import keypadBackspace from '../../assets/figma/keypad-backspace.svg'
+import keypadBackspaceXA from '../../assets/figma/keypad-backspace-x-a.svg'
+import keypadBackspaceXB from '../../assets/figma/keypad-backspace-x-b.svg'
+import keypadChevronDown from '../../assets/figma/keypad-chevron-down.svg'
+import keypadChevronUp from '../../assets/figma/keypad-chevron-up.svg'
 import { MAX_VALUE_SUGGESTIONS } from '../../domain/valueAdjustments'
 import { ValueAdjustmentContext } from './ValueAdjustmentContext'
 import type { ValueAdjustmentMode, ValueAdjustmentRequest } from './ValueAdjustmentContext'
@@ -450,7 +455,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
 
   const hasFixedSuggestions = Boolean(request.fixedSuggestions?.length)
 
-  return <main className={`value-adjuster value-adjuster--${mode}${supportsModeToggle ? ' value-adjuster--mode-toggle' : ''}${hasFixedSuggestions ? ' value-adjuster--has-fixed-suggestions' : ''}`} aria-label={`Adjust ${request.label}`}>
+  return <main className={`value-adjuster value-adjuster--${mode}${supportsModeToggle ? ' value-adjuster--mode-toggle' : ''}${hasFixedSuggestions ? ' value-adjuster--has-fixed-suggestions' : ''}${editingValue ? ' value-adjuster--keyboard' : ''}`} aria-label={`Adjust ${request.label}`}>
     <header className="value-adjuster__header">
       <img className="logo" src={logo} alt="decent" />
       <div className="value-adjuster__actions"><button className="value-adjuster__cancel" type="button" onClick={onClose}>Cancel</button><button className="value-adjuster__save" type="button" disabled={Boolean(directInputError)} onClick={saveAdjustment}>Save</button></div>
@@ -481,31 +486,24 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
           </div>
         </div>
       </div>
+      {editingValue && <section className="value-adjuster__keypad" aria-label={`Enter ${request.label}`}>
+        <div className="value-adjuster__keypad-grid">
+          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((key) => <button key={key} type="button" onClick={() => pressKeypadKey(key)}>{key}</button>)}
+          <button className="value-adjuster__keypad-delete" type="button" aria-label="Delete last digit" onClick={deleteKeypadKey}><span><img src={keypadBackspace} alt="" /><img src={keypadBackspaceXA} alt="" /><img src={keypadBackspaceXB} alt="" /></span></button>
+          <button type="button" onClick={() => pressKeypadKey('0')}>0</button>
+          <button type="button" aria-label="Decimal point" onClick={() => pressKeypadKey('.')}>.</button>
+        </div>
+        <button className="value-adjuster__keypad-dismiss" type="button" aria-label="Dismiss number keypad" disabled={Boolean(directInputError)} onClick={commitDirectEntry}><img src={keypadChevronUp} alt="" /><img src={keypadChevronDown} alt="" /></button>
+      </section>}
     </section>
-    <footer className="value-adjuster__presets">
+    {!editingValue && <footer className="value-adjuster__presets">
       <div className="value-adjuster__preset-row" aria-label={`${request.label} suggestions`}>{presets.map((preset) => <button key={preset} type="button" className={preset === value ? 'value-adjuster__preset value-adjuster__preset--active' : 'value-adjuster__preset'} onClick={() => selectPreset(preset)}>{formatSuggestion(preset, modeForShortcut(preset, supportsModeToggle, mode))}{request.unit && <small>{request.unit}</small>}</button>)}</div>
       {request.fixedSuggestions && <div className="value-adjuster__preset-row value-adjuster__preset-row--fixed" aria-label={`${request.label} typical ratios`}>{request.fixedSuggestions.map((suggestion) => {
         const available = Number.isFinite(suggestion.value) && suggestion.value >= activeRequest.min && suggestion.value <= activeRequest.max
         const suggestionValue = available ? normalizedValue(suggestion.value, activeRequest) : suggestion.value
         return <button key={suggestion.label} type="button" className={available && suggestionValue === value ? 'value-adjuster__fixed-preset value-adjuster__fixed-preset--active' : 'value-adjuster__fixed-preset'} disabled={!available} aria-label={`${suggestion.label}, ${formatSuggestion(suggestion.value, mode)}${request.unit ?? ''}, ${suggestion.detail}`} onClick={() => { fixedSelection.current = suggestionValue; prepareAudioFeedback(); animateToValue(suggestionValue) }}>{suggestion.label}</button>
       })}</div>}
-    </footer>
-    {editingValue && <div className="value-adjuster__keypad-backdrop" role="presentation">
-      <section className="value-adjuster__keypad" role="dialog" aria-modal="true" aria-label={`Enter ${request.label}`}>
-        <div className="value-adjuster__keypad-display" aria-live="polite"><strong>{draftValue || '—'}</strong>{request.unit && <small>{request.unit}</small>}</div>
-        <div className="value-adjuster__keypad-message" aria-live="polite">{directInputError ?? `Range ${request.min.toLocaleString()}–${request.max.toLocaleString()}`}</div>
-        <div className="value-adjuster__keypad-grid">
-          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((key) => <button key={key} type="button" onClick={() => pressKeypadKey(key)}>{key}</button>)}
-          <button type="button" aria-label="Decimal point" onClick={() => pressKeypadKey('.')}>.</button>
-          <button type="button" onClick={() => pressKeypadKey('0')}>0</button>
-          <button className="value-adjuster__keypad-delete" type="button" aria-label="Delete last digit" onClick={deleteKeypadKey}>⌫</button>
-        </div>
-        <div className="value-adjuster__keypad-actions">
-          <button type="button" onClick={cancelDirectEntry}>Cancel</button>
-          <button type="button" disabled={Boolean(directInputError)} onClick={commitDirectEntry}>Done</button>
-        </div>
-      </section>
-    </div>}
+    </footer>}
   </main>
 }
 
