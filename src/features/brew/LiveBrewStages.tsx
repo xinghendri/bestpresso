@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { MouseEvent } from 'react'
+import skipNext from '../../assets/figma/skip-next.svg'
 import type { LiveShotPoint } from '../../domain/brewing'
 import { DOUBLE_TAP_CONFIRMATION_WINDOW_MS, registerDoubleTap } from './doubleTapConfirmation'
 
@@ -204,7 +205,7 @@ export function LiveBrewStages({ points, elapsedMs, active = false, showYield = 
         if (node) stageRefs.current.set(stage.key, node)
         else stageRefs.current.delete(stage.key)
       }} role={selectable ? 'button' : undefined} tabIndex={selectable ? 0 : undefined}>
-      <header><h2>{stage.name}</h2><div className="live-brew-stage__time">{wasSkipped && <span className="live-brew-stage__skipped" aria-label="Skipped phase">&gt;|</span>}<time>{timedLabel(stage.endedAt - stage.startedAt)}</time></div></header>
+      <header><h2>{stage.name}</h2><div className="live-brew-stage__time">{wasSkipped && <span className="live-brew-stage__skipped" aria-label="Skipped phase"><img src={skipNext} alt="" /></span>}<time>{timedLabel(stage.endedAt - stage.startedAt)}</time></div></header>
       <dl>
         {showYield && <div><dt>Yield</dt><dd>{reading(stage.yield)}<small>g</small></dd></div>}
         <div><dt>Temperature range</dt><dd>{reading(stage.minimumTemperature, 0)}° – {reading(stage.maximumTemperature, 0)}°</dd></div>
@@ -212,7 +213,7 @@ export function LiveBrewStages({ points, elapsedMs, active = false, showYield = 
       </dl>
     </article>})}
     {active && onSkipStage && <button className={`live-brew-skip${skipPending ? ' live-brew-skip--pending' : ''}`} type="button" disabled={skipPending} aria-label="Double tap to skip to the next phase" aria-pressed="false" onClick={handleSkipTap} ref={skipButtonRef}>
-      <span className="live-brew-skip__icon" aria-hidden="true">&gt;|</span>
+      <img className="live-brew-skip__icon" src={skipNext} alt="" />
       <span>double tap to skip</span>
     </button>}
     </div>
