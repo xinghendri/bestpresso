@@ -56,6 +56,7 @@ interface UtilityOperationSession {
   lastAt: number
   previousFlow: number
   volumeMl: number
+  weightGrams?: number
 }
 
 const snapshotTime = (timestamp?: string) => {
@@ -551,7 +552,14 @@ export function useBrewingData() {
         const now = snapshotTime(snapshot.timestamp)
         let session = utilityOperationSession.current
         if (!session || session.kind !== operationKind) {
-          session = { kind: operationKind, startedAt: now, lastAt: now, previousFlow: Math.max(0, snapshot.flow ?? 0), volumeMl: 0 }
+          session = {
+            kind: operationKind,
+            startedAt: now,
+            lastAt: now,
+            previousFlow: Math.max(0, snapshot.flow ?? 0),
+            volumeMl: 0,
+            weightGrams: operationKind === 'hotWater' && connectedScale.current ? 0 : undefined,
+          }
           utilityOperationSession.current = session
           setLiveBrew((current) => current.active ? current : { ...current, visible: false })
         } else {
@@ -568,6 +576,8 @@ export function useBrewingData() {
           flow: Math.max(0, snapshot.flow ?? 0),
           temperature: operationKind === 'steam' ? snapshot.steamTemperature : snapshot.mixTemperature ?? snapshot.groupTemperature,
           volumeMl: session.volumeMl,
+          scaleConnected: operationKind === 'hotWater' && connectedScale.current,
+          weightGrams: operationKind === 'hotWater' ? session.weightGrams : undefined,
           targetDuration: operationKind === 'flush' ? latestFlushDuration.current : operationKind === 'steam' ? metricNumber(model, 'steam', 'Duration') : undefined,
           targetVolume: operationKind === 'hotWater' ? metricNumber(model, 'water', 'Volume') : undefined,
         })
@@ -675,6 +685,11 @@ export function useBrewingData() {
           weightFlow: snapshot.weightFlow ?? latestScaleSnapshot.current.weightFlow,
         }
       }
+      if (snapshot.weight !== undefined && utilityOperationSession.current?.kind === 'hotWater') {
+        const weightGrams = Math.max(0, snapshot.weight)
+        utilityOperationSession.current.weightGrams = weightGrams
+        setUtilityOperation((current) => current?.kind === 'hotWater' ? { ...current, scaleConnected: true, weightGrams } : current)
+      }
       if (pendingYieldFinalization && snapshot.weight !== undefined) {
         const result = observePostShotWeight(pendingYieldFinalization.state, snapshot.weight, snapshot.weightFlow)
         pendingYieldFinalization.state = result.state
@@ -684,6 +699,7 @@ export function useBrewingData() {
       }
       if (snapshot.status === 'connected') {
         connectedScale.current = true
+        setUtilityOperation((current) => current?.kind === 'hotWater' ? { ...current, scaleConnected: true } : current)
         refreshConnectedScale()
         return
       }
@@ -691,6 +707,8 @@ export function useBrewingData() {
         finishPendingYield()
         connectedScale.current = false
         latestScaleSnapshot.current = {}
+        if (utilityOperationSession.current?.kind === 'hotWater') utilityOperationSession.current.weightGrams = undefined
+        setUtilityOperation((current) => current?.kind === 'hotWater' ? { ...current, scaleConnected: false, weightGrams: undefined } : current)
         setScale((current) => current.status === 'searching' ? current : { status: 'disconnected' })
         return
       }
