@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isCleaningProfile, isEspressoExtractionSnapshot, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotStage, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres } from '../../api/decaid/adapters'
+import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isCleaningProfile, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotStage, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres } from '../../api/decaid/adapters'
 import { connectDevice, DecaidApiError, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getSettings, getSharedSetting, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineProfile, setMachineState, setScalePowerMode, setSharedSetting, tareScale, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
@@ -12,6 +12,7 @@ import { scaleFixtureForKey } from '../../fixtures/scaleFixtures'
 import { CLEANING_PROFILE_START_STATE, isCleaningSequenceRun, profileForCleaningShortcut } from '../cleaning/cleaningSequence'
 import { observePostShotWeight, reconciledShotYield, type YieldFinalizationState } from '../history/shotYieldFinalization'
 import { LAST_SELECTED_PROFILE_LOCAL_KEY, LAST_SELECTED_PROFILE_SHARED_KEY, normalizeRememberedProfileId, resolveRememberedProfileId } from '../profiles/profileSelectionPersistence'
+import { isEspressoExtractionSnapshot } from './liveShotState'
 import { SLEEP_DISPLAY_BRIGHTNESS, sleepMachineAndConnectedScale } from './sleepControl'
 
 const MAX_LIVE_SHOT_POINTS = 900
@@ -571,7 +572,7 @@ export function useBrewingData() {
         utilityOperationSession.current = null
         setUtilityOperation(null)
       }
-      const isEspressoExtraction = isEspressoExtractionSnapshot(snapshot)
+      const isEspressoExtraction = isEspressoExtractionSnapshot(snapshot, liveShotSession.current !== null)
       const isCleaning = isCleaningSequenceRun(machineStateForSnapshot(snapshot), isEspressoExtraction, pendingCleaningSequence.current !== null)
       if (isEspressoExtraction || isCleaning) {
         const now = snapshotTime(snapshot.timestamp)

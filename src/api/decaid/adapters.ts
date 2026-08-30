@@ -1,6 +1,6 @@
 import type { BrewProfile, BrewingScreenModel, PreviousShot, ProfileTargetPoint } from '../../domain/brewing'
 import { isSteamHeatingEnabled } from '../../features/machine/steamHeating'
-import type { DecaidProfileRecord, DecaidProfileStep, DecaidWorkflow, FavoriteAssignments, MachineSnapshot, ShotRecord } from './types'
+import type { DecaidProfileRecord, DecaidProfileStep, DecaidWorkflow, FavoriteAssignments, ShotRecord } from './types'
 
 const MM_TO_ML = [0,16,43,70,97,124,151,179,206,233,261,288,316,343,371,398,426,453,481,509,537,564,592,620,648,676,704,732,760,788,816,844,872,900,929,957,985,1013,1042,1070,1104,1138,1172,1207,1242,1277,1312,1347,1382,1417,1453,1488,1523,1559,1594,1630,1665,1701,1736,1772,1808,1843,1879,1915,1951,1986,2022,2058]
 export const STEAM_HEATER_READY_C = 130
@@ -9,15 +9,6 @@ const numberString = (value: unknown, fallback: string) => value === null || val
 const finiteNumber = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? value : undefined
 const textValue = (...values: unknown[]) => values.find((value): value is string => typeof value === 'string' && value.trim().length > 0)?.trim()
 const ESPRESSO_EXTRACTION_SUBSTATES = new Set(['preinfusion', 'pouring'])
-
-export function isEspressoExtractionSnapshot(snapshot: Pick<MachineSnapshot, 'state'>) {
-  const state = (typeof snapshot.state === 'string' ? snapshot.state : snapshot.state?.state)?.toLowerCase()
-  const substate = (typeof snapshot.state === 'object' ? snapshot.state?.substate : undefined)?.toLowerCase()
-  if (state && state !== 'espresso') return false
-  if (substate) return ESPRESSO_EXTRACTION_SUBSTATES.has(substate)
-  return state === 'espresso'
-}
-
 export function shotStage(profileFrame: number | undefined, substate: string | undefined, stepNames: string[] | undefined) {
   const frame = typeof profileFrame === 'number' && Number.isFinite(profileFrame)
     ? Math.max(0, Math.floor(profileFrame))
