@@ -2,7 +2,7 @@ import type { LiveShotPoint } from '../../domain/brewing'
 import type { ChartSeries } from './chartSeries'
 import { chartSeriesForLine } from './chartSeries'
 import { smoothShotTelemetry } from './chartSmoothing'
-import { removeOverlappingFocusedTimeTicks } from './chartTimeTicks'
+import { removeOverlappingFocusedTimeTicks, shouldShowTimelineLabel } from './chartTimeTicks'
 
 interface LiveShotChartProps {
   points: LiveShotPoint[]
@@ -86,13 +86,23 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
     const seconds = (startMs + tick) / 1000
     return `${Number.isInteger(seconds) ? seconds : seconds.toFixed(1)}s`
   }
-  const timeTicks = fitDuration
-    ? removeOverlappingFocusedTimeTicks(candidateTimeTicks.map((offsetMs) => ({
+  const gridTimeTicks = candidateTimeTicks.map((offsetMs) => ({
+    offsetMs,
+    x: xForElapsedMs(startMs + offsetMs),
+  }))
+  const labelTimeTicks = gridTimeTicks.filter(({ offsetMs }) => shouldShowTimelineLabel(
+    offsetMs,
+    startMs,
+    durationMs,
+    fitDuration && (offsetMs === 0 || offsetMs === durationMs),
+  )).map((tick) => ({ ...tick, label: timeLabel(tick.offsetMs) }))
+  const timeLabels = fitDuration
+    ? removeOverlappingFocusedTimeTicks(labelTimeTicks.map(({ offsetMs, x, label }) => ({
       offsetMs,
-      x: xForElapsedMs(startMs + offsetMs),
-      label: timeLabel(offsetMs),
+      x,
+      label,
     })))
-    : candidateTimeTicks.map((offsetMs) => ({ offsetMs, x: xForElapsedMs(startMs + offsetMs), label: timeLabel(offsetMs) }))
+    : labelTimeTicks
   const lineClass = (series: ChartSeries) => dimmedSeries.includes(series) ? ' chart-line--dimmed' : ''
 
   return <div className="live-shot-chart">
@@ -115,9 +125,8 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
         const y = PLOT.top + ratio * (PLOT.bottom - PLOT.top)
         return <line key={`horizontal-${ratio}`} className="chart-grid chart-grid--tick" x1={PLOT.left} x2={PLOT.left + 10} y1={y} y2={y} />
       })}
-      {timeTicks.map((tick) => {
-        return <g key={`time-${tick.offsetMs}`}><line className="chart-grid chart-grid--vertical" x1={tick.x} x2={tick.x} y1={PLOT.top} y2={PLOT.bottom} /><text className="chart-axis-label" x={tick.x} y={PLOT.bottom + 25} textAnchor="middle">{tick.label}</text></g>
-      })}
+      {gridTimeTicks.map((tick) => <line key={`time-grid-${tick.offsetMs}`} className="chart-grid chart-grid--vertical" x1={tick.x} x2={tick.x} y1={PLOT.top} y2={PLOT.bottom} />)}
+      {timeLabels.map((tick) => <text key={`time-label-${tick.offsetMs}`} className="chart-axis-label" x={tick.x} y={PLOT.bottom + 25} textAnchor="middle">{tick.label}</text>)}
       {gridTicks.map((ratio) => <g key={`axis-${ratio}`}>
         <text className="chart-axis-label" x={PLOT.left - 13} y={PLOT.bottom - ratio * (PLOT.bottom - PLOT.top) + 4} textAnchor="end">{Math.round(12 * ratio)}</text>
       </g>)}

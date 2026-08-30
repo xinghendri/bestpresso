@@ -6,8 +6,15 @@ export interface ChartTimeTick {
 
 const APPROXIMATE_CHARACTER_WIDTH = 6.5
 const LABEL_GAP = 4
+const LONG_TIMELINE_THRESHOLD_MS = 90_000
+const LONG_TIMELINE_LABEL_INTERVAL_MS = 15_000
 
 const estimatedLabelWidth = (label: string) => label.length * APPROXIMATE_CHARACTER_WIDTH
+
+export function shouldShowTimelineLabel(offsetMs: number, startMs: number, durationMs: number, preserveBoundary = false) {
+  if (durationMs <= LONG_TIMELINE_THRESHOLD_MS || preserveBoundary) return true
+  return (startMs + offsetMs) % LONG_TIMELINE_LABEL_INTERVAL_MS === 0
+}
 
 export function removeOverlappingFocusedTimeTicks(ticks: ChartTimeTick[]) {
   const visible: ChartTimeTick[] = []

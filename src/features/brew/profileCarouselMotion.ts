@@ -6,6 +6,16 @@ export function wrappedProfileOffset(index: number, centerIndex: number, length:
   return offset
 }
 
+export function profileCardPosition(offset: number) {
+  const roundedOffset = Math.round(offset)
+  if (roundedOffset === 0) return 'active'
+  if (roundedOffset === -1) return 'left'
+  if (roundedOffset === 1) return 'right'
+  if (roundedOffset === -2) return 'far-left'
+  if (roundedOffset === 2) return 'far-right'
+  return 'hidden'
+}
+
 export function projectedProfileSteps(distance: number, velocity: number, stride: number, length: number) {
   if (length <= 1 || stride <= 0) return 0
   const momentum = Math.max(-stride, Math.min(stride, velocity * 180))
