@@ -154,10 +154,10 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
           '--profile-free-opacity': motion.opacity,
           zIndex: motion.zIndex,
         } as CSSProperties
-        const visuallyActive = Math.abs(offset) < 0.5
+        const graphVisible = Math.abs(offset) < 1.5
         return <button key={profile.id} className={`profile-card profile-card--free profile-card--${position}`} style={style} type="button" onClick={() => { if (suppressClick.current) { suppressClick.current = false; return } void selectIndex(index) }} aria-current={index === activeIndex ? 'true' : undefined} aria-label={`${profile.name}${index === activeIndex ? ', selected' : ''}`}>
           <h1>{profile.name}</h1>
-          {visuallyActive && <ProfileTargetChart profileName={profile.name} points={profile.targetPoints} />}
+          {graphVisible && <ProfileTargetChart profileName={profile.name} points={profile.targetPoints} />}
         </button>
       })}
     </div>
