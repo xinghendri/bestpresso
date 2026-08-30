@@ -3,6 +3,7 @@ import type { MouseEvent } from 'react'
 import skipNext from '../../assets/figma/skip-next.svg'
 import type { LiveShotPoint } from '../../domain/brewing'
 import { DOUBLE_TAP_CONFIRMATION_WINDOW_MS, registerDoubleTap } from './doubleTapConfirmation'
+import { latestStageScrollLeft } from './stageStripScroll'
 
 interface StageSummary {
   key: string
@@ -151,7 +152,10 @@ export function LiveBrewStages({ points, elapsedMs, active = false, showYield = 
     let animationFrame = 0
     const revealLatestStage = () => {
       window.cancelAnimationFrame(animationFrame)
-      animationFrame = window.requestAnimationFrame(() => strip.scrollTo({ left: strip.scrollWidth - strip.clientWidth, behavior: 'smooth' }))
+      animationFrame = window.requestAnimationFrame(() => {
+        const left = latestStageScrollLeft(stages.length, strip.scrollWidth, strip.clientWidth)
+        strip.scrollTo({ left, behavior: stages.length > 1 ? 'smooth' : 'auto' })
+      })
     }
     const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(revealLatestStage)
     resizeObserver?.observe(track)

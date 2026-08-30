@@ -73,7 +73,7 @@ export const VALUE_ADJUSTMENTS = {
   grindSetting: {
     title: 'Grind size',
     min: 0,
-    max: 100,
+    max: 2500,
     step: 0.1,
     mode: 'decimal',
     defaultValue: 20,

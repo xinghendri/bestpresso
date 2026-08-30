@@ -18,8 +18,6 @@ const MAX_LIVE_SHOT_POINTS = 900
 const MIN_SUCCESSFUL_SHOT_MS = 5_000
 const MINIMUM_SCALE_SCAN_MS = 10_000
 const SCALE_SCAN_RETRY_DELAY_MS = 5_000
-const FLUSH_DURATION_SECONDS = 5
-const flushDurationDefaultStorageKey = 'bestpresso.flush-duration-default.v1'
 const fixtureProfiles = profilesWithParsedTitles(brewingFixture.profiles)
 const localScaleFixture = import.meta.env.DEV
   ? scaleFixtureForKey(new URLSearchParams(window.location.search).get('mockScale'))
@@ -200,7 +198,7 @@ export function useBrewingData() {
   const allProfilesRef = useRef(allProfiles)
   const retainedAdHocProfileId = useRef<string | null>(null)
   const latestModel = useRef(model)
-  const latestFlushDuration = useRef(FLUSH_DURATION_SECONDS)
+  const latestFlushDuration = useRef<number | undefined>(undefined)
   const shotHistoryCache = useRef(new Map<string, NonNullable<BrewingScreenModel['previousShot']>>())
 
   useEffect(() => { allProfilesRef.current = allProfiles }, [allProfiles])
@@ -223,21 +221,6 @@ export function useBrewingData() {
     if (typeof duration === 'number' && Number.isFinite(duration)) latestFlushDuration.current = duration
     return workflow
   }
-
-  const getWorkflowWithFlushDurationDefault = () => getWorkflow().then(async (workflow) => {
-    try {
-      if (window.localStorage.getItem(flushDurationDefaultStorageKey) === 'applied') return rememberFlushDuration(workflow)
-      const rinse = workflow.rinseData
-      if (rinse?.targetTemperature === undefined || rinse.flow === undefined) return rememberFlushDuration(workflow)
-      const updated = rinse.duration === FLUSH_DURATION_SECONDS
-        ? workflow
-        : await updateWorkflow({ rinseData: { ...rinse, duration: FLUSH_DURATION_SECONDS } })
-      window.localStorage.setItem(flushDurationDefaultStorageKey, 'applied')
-      return rememberFlushDuration(updated)
-    } catch {
-      return rememberFlushDuration(workflow)
-    }
-  })
 
   const dimDisplay = async () => {
     if (displayDimmed.current) return
@@ -488,7 +471,7 @@ export function useBrewingData() {
       .then((value) => normalizeRememberedProfileId(value) ?? storedLastSelectedProfileId())
       .catch(storedLastSelectedProfileId)
 
-    Promise.all([getWorkflowWithFlushDurationDefault(), getProfiles(), getFavoriteAssignments().catch(() => null), latestShotRequest, shotHistoryRequest, rememberedProfileRequest])
+    Promise.all([getWorkflow().then(rememberFlushDuration), getProfiles(), getFavoriteAssignments().catch(() => null), latestShotRequest, shotHistoryRequest, rememberedProfileRequest])
       .then(async ([initialWorkflow, records, assignments, latestShot, historyResult, rememberedProfileId]) => {
         if (disposed) return
         profileRecords.current = records
