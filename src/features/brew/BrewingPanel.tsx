@@ -5,7 +5,7 @@ import type { BrewProfile, EditableProfileSetting } from '../../domain/brewing'
 import type { FixedValueSuggestion } from '../../domain/valueAdjustments'
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { ProfileTargetChart } from './ProfileTargetChart'
-import { profileCardMotion, projectedProfileSteps, wrappedProfileOffset } from './profileCarouselMotion'
+import { profileCardMotion, profileCardPosition, projectedProfileSteps, wrappedProfileOffset } from './profileCarouselMotion'
 
 interface CarouselDrag {
   pointerId: number
@@ -135,18 +135,7 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
     <div className={`profile-carousel${dragProgress !== 0 ? ' profile-carousel--dragging' : ''}`} aria-label="Profiles" aria-roledescription="carousel" tabIndex={0} onKeyDown={handleKeyDown} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={cancelPointerGesture}>
       {profiles.map((profile, index) => {
         const offset = wrappedProfileOffset(index, activeIndex - dragProgress, profiles.length)
-        const roundedOffset = Math.round(offset)
-        const position = roundedOffset === 0
-          ? 'active'
-          : roundedOffset === -1
-            ? 'left'
-            : roundedOffset === 1
-              ? 'right'
-              : roundedOffset === -2
-                ? 'far-left'
-                : roundedOffset === 2
-                  ? 'far-right'
-                  : 'hidden'
+        const position = profileCardPosition(offset)
         const motion = profileCardMotion(offset)
         const style = {
           '--profile-free-x': `${motion.xPercent}%`,
