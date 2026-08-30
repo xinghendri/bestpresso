@@ -1,9 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { MouseEvent } from 'react'
 import skipNext from '../../assets/figma/skip-next.svg'
 import type { LiveShotPoint } from '../../domain/brewing'
 import { DOUBLE_TAP_CONFIRMATION_WINDOW_MS, registerDoubleTap } from './doubleTapConfirmation'
-import { latestStageScrollLeft, stageTerminalInsets } from './stageStripScroll'
+import { latestStageScrollLeft } from './stageStripScroll'
 
 interface StageSummary {
   key: string
@@ -103,9 +103,6 @@ const reading = (value: number | undefined, digits = 1) => value === undefined ?
 
 export function LiveBrewStages({ points, elapsedMs, active = false, showYield = true, skipPending = false, selectedStageKey, onStageSelect, onSkipStage }: { points: LiveShotPoint[]; elapsedMs: number; active?: boolean; showYield?: boolean; skipPending?: boolean; selectedStageKey?: string; onStageSelect?: (stage: BrewStageSelection | null) => void; onSkipStage?: () => Promise<boolean> }) {
   const stages = summarizeLiveBrewStages(points, elapsedMs)
-  const stageKeys = stages.map((stage) => stage.key).join('|')
-  const firstStageKey = stages[0]?.key
-  const lastStageKey = stages.at(-1)?.key
   const stripRef = useRef<HTMLElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
   const stageRefs = useRef(new Map<string, HTMLElement>())
@@ -129,39 +126,6 @@ export function LiveBrewStages({ points, elapsedMs, active = false, showYield = 
   useEffect(() => {
     if (!active) resetSkipConfirmation()
   }, [active])
-
-  useLayoutEffect(() => {
-    const strip = stripRef.current
-    const track = trackRef.current
-    const firstStage = firstStageKey ? stageRefs.current.get(firstStageKey) : undefined
-    const lastStage = lastStageKey ? stageRefs.current.get(lastStageKey) : undefined
-    if (!strip || !track || !firstStage || !lastStage) return
-
-    let animationFrame = 0
-    const updateTerminalInsets = () => {
-      window.cancelAnimationFrame(animationFrame)
-      animationFrame = window.requestAnimationFrame(() => {
-        const insets = stageTerminalInsets(
-          strip.clientWidth,
-          firstStage.getBoundingClientRect().width,
-          lastStage.getBoundingClientRect().width,
-        )
-        track.style.setProperty('--stage-strip-start-inset', `${insets.start}px`)
-        track.style.setProperty('--stage-strip-end-inset', `${insets.end}px`)
-      })
-    }
-
-    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateTerminalInsets)
-    resizeObserver?.observe(strip)
-    resizeObserver?.observe(firstStage)
-    if (lastStage !== firstStage) resizeObserver?.observe(lastStage)
-    updateTerminalInsets()
-
-    return () => {
-      resizeObserver?.disconnect()
-      window.cancelAnimationFrame(animationFrame)
-    }
-  }, [firstStageKey, lastStageKey, stageKeys, showYield])
 
   const handleSkipTap = async (event: MouseEvent<HTMLButtonElement>) => {
     if (skipPending || !onSkipStage) return

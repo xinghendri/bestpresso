@@ -7,7 +7,7 @@ import type { DecaidProfileRecord, DecaidWorkflow, DecaidWorkflowPatch, Favorite
 import { WATER_TANK_SENSOR_FULL_MM, waterTankLevelState } from '../../domain/brewing'
 import type { AvailableScale, BrewProfile, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, LiveUtilityOperation, MachineReadiness, PreviousShot, PreviousShotStatus, ScaleConnection, SettingFeedback, UtilityOperationKind } from '../../domain/brewing'
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
-import { brewingFixture } from '../../fixtures/brewingFixture'
+import { brewingFixture, demoLiveBrewFixture } from '../../fixtures/brewingFixture'
 import { scaleFixtureForKey } from '../../fixtures/scaleFixtures'
 import { CLEANING_PROFILE_START_STATE, isCleaningSequenceRun, profileForCleaningShortcut } from '../cleaning/cleaningSequence'
 import { observePostShotWeight, reconciledShotYield, type YieldFinalizationState } from '../history/shotYieldFinalization'
@@ -22,6 +22,9 @@ const SCALE_SCAN_RETRY_DELAY_MS = 5_000
 const fixtureProfiles = profilesWithParsedTitles(brewingFixture.profiles)
 const localScaleFixture = import.meta.env.DEV
   ? scaleFixtureForKey(new URLSearchParams(window.location.search).get('mockScale'))
+  : undefined
+const localLiveBrewFixture = import.meta.env.DEV && new URLSearchParams(window.location.search).get('demoShot') === 'live'
+  ? { ...demoLiveBrewFixture, points: [...demoLiveBrewFixture.points] }
   : undefined
 
 interface LiveShotSession {
@@ -169,7 +172,7 @@ export function useBrewingData() {
   const [settingFeedbackVisible, setSettingFeedbackVisible] = useState(false)
   const [previousShotStatus, setPreviousShotStatus] = useState<PreviousShotStatus>('loading')
   const [shotHistory, setShotHistory] = useState<PreviousShot[]>(() => brewingFixture.previousShot ? [{ ...brewingFixture.previousShot, id: 'fixture-latest' }] : [])
-  const [liveBrew, setLiveBrew] = useState<LiveBrewState>({ active: false, visible: false, elapsedMs: 0, points: [] })
+  const [liveBrew, setLiveBrew] = useState<LiveBrewState>(localLiveBrewFixture ?? { active: false, visible: false, elapsedMs: 0, points: [] })
   const [utilityOperation, setUtilityOperation] = useState<LiveUtilityOperation | null>(null)
   const sleepRequestInFlight = useRef(false)
   const wakeScreenDismissed = useRef(false)
