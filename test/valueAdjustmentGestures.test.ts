@@ -13,7 +13,7 @@ test('two fingers move by ten for every adjustment ruler', () => {
   assert.equal(gestureIncrement('integer', 2, true), 10)
 })
 
-test('three fingers move by one hundred only for grind size', () => {
+test('three fingers move by one hundred when the adjustment enables it', () => {
   assert.equal(gestureIncrement('integer', 3, true), 100)
   assert.equal(gestureIncrement('decimal', 3, false), null)
   assert.equal(maximumGesturePointers(true), 3)
@@ -25,6 +25,12 @@ test('grind size keeps the requested default and full reference range', () => {
   assert.equal(VALUE_ADJUSTMENTS.grindSetting.max, 2500)
   assert.equal(VALUE_ADJUSTMENTS.grindSetting.mode, 'decimal')
   assert.equal(VALUE_ADJUSTMENTS.grindSetting.step, 0.1)
+})
+
+test('yield supports the Decaid-compatible reference range', () => {
+  assert.equal(VALUE_ADJUSTMENTS.targetYield.min, 0)
+  assert.equal(VALUE_ADJUSTMENTS.targetYield.max, 1000)
+  assert.equal(VALUE_ADJUSTMENTS.targetYield.step, 0.1)
 })
 
 test('direct numeric entry accepts locale decimal separators', () => {

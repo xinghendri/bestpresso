@@ -90,8 +90,8 @@ export const VALUE_ADJUSTMENTS = {
   },
   targetYield: {
     title: 'Yield',
-    min: 10,
-    max: 200,
+    min: 0,
+    max: 1000,
     step: 0.1,
     mode: 'decimal',
     defaultValue: 36,

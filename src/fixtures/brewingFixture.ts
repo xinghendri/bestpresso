@@ -1,4 +1,46 @@
-import type { BrewingScreenModel } from '../domain/brewing'
+import type { BrewingScreenModel, LiveBrewState, LiveShotPoint } from '../domain/brewing'
+
+export const demoShotPoints: LiveShotPoint[] = [
+  { elapsedMs: 0, stageIndex: 0, stageName: 'Preinfusion', pressure: 0, flow: 4.1, targetPressure: 2, targetFlow: 4, temperature: 88, weight: 0 },
+  { elapsedMs: 2500, stageIndex: 0, stageName: 'Preinfusion', pressure: 0.8, flow: 4, targetPressure: 2, targetFlow: 4, temperature: 89.2, weight: 0.1 },
+  { elapsedMs: 5000, stageIndex: 0, stageName: 'Preinfusion', pressure: 1.6, flow: 3.8, targetPressure: 2, targetFlow: 4, temperature: 90.4, weight: 0.4 },
+  { elapsedMs: 8000, stageIndex: 0, stageName: 'Preinfusion', pressure: 2.1, flow: 3.5, targetPressure: 2, targetFlow: 3.5, temperature: 91.2, weight: 1.1 },
+  { elapsedMs: 8100, stageIndex: 1, stageName: 'Bloom', pressure: 2.1, flow: 0.4, targetPressure: 2, targetFlow: 0.5, temperature: 91.3, weight: 1.1 },
+  { elapsedMs: 10000, stageIndex: 1, stageName: 'Bloom', pressure: 1.8, flow: 0.2, targetPressure: 2, targetFlow: 0.2, temperature: 91.7, weight: 1.5 },
+  { elapsedMs: 12500, stageIndex: 1, stageName: 'Bloom', pressure: 1.5, flow: 0.1, targetPressure: 1.5, targetFlow: 0.1, temperature: 92, weight: 1.8 },
+  { elapsedMs: 15000, stageIndex: 1, stageName: 'Bloom', pressure: 1.4, flow: 0.1, targetPressure: 1.5, targetFlow: 0.1, temperature: 92.1, weight: 2 },
+  { elapsedMs: 15100, stageIndex: 2, stageName: 'Pressure ramp', pressure: 1.5, flow: 3.7, targetPressure: 8.5, targetFlow: 3.5, temperature: 92.1, weight: 2 },
+  { elapsedMs: 17000, stageIndex: 2, stageName: 'Pressure ramp', pressure: 4.2, flow: 3.3, targetPressure: 8.5, targetFlow: 3.2, temperature: 92.3, weight: 3.7 },
+  { elapsedMs: 19000, stageIndex: 2, stageName: 'Pressure ramp', pressure: 6.8, flow: 2.7, targetPressure: 8.5, targetFlow: 2.8, temperature: 92.5, weight: 6.4 },
+  { elapsedMs: 21000, stageIndex: 2, stageName: 'Pressure ramp', pressure: 8.6, flow: 2.2, targetPressure: 8.5, targetFlow: 2.3, temperature: 92.6, weight: 9.6 },
+  { elapsedMs: 21100, stageIndex: 3, stageName: 'Peak extraction', pressure: 8.6, flow: 2.2, targetPressure: 8.5, targetFlow: 2.3, temperature: 92.6, weight: 9.6 },
+  { elapsedMs: 23000, stageIndex: 3, stageName: 'Peak extraction', pressure: 8.9, flow: 2.3, targetPressure: 8.5, targetFlow: 2.4, temperature: 92.7, weight: 12.8 },
+  { elapsedMs: 25000, stageIndex: 3, stageName: 'Peak extraction', pressure: 8.3, flow: 2.5, targetPressure: 8.2, targetFlow: 2.5, temperature: 92.6, weight: 16.4 },
+  { elapsedMs: 27000, stageIndex: 3, stageName: 'Peak extraction', pressure: 8, flow: 2.6, targetPressure: 8, targetFlow: 2.6, temperature: 92.5, weight: 20.1 },
+  { elapsedMs: 27100, stageIndex: 4, stageName: 'Adaptive decline', pressure: 8, flow: 2.6, targetPressure: 7.8, targetFlow: 2.6, temperature: 92.5, weight: 20.1 },
+  { elapsedMs: 28500, stageIndex: 4, stageName: 'Adaptive decline', pressure: 7.1, flow: 2.8, targetPressure: 7.4, targetFlow: 2.7, temperature: 92.4, weight: 22.9 },
+  { elapsedMs: 30000, stageIndex: 4, stageName: 'Adaptive decline', pressure: 7.8, flow: 2.6, targetPressure: 7.1, targetFlow: 2.7, temperature: 92.3, weight: 25.8 },
+  { elapsedMs: 31500, stageIndex: 4, stageName: 'Adaptive decline', pressure: 6.5, flow: 2.9, targetPressure: 6.8, targetFlow: 2.8, temperature: 92.2, weight: 28.7 },
+  { elapsedMs: 33000, stageIndex: 4, stageName: 'Adaptive decline', pressure: 7.2, flow: 2.7, targetPressure: 6.5, targetFlow: 2.8, temperature: 92.2, weight: 31.5 },
+  { elapsedMs: 34500, stageIndex: 4, stageName: 'Adaptive decline', pressure: 5.9, flow: 3, targetPressure: 6.2, targetFlow: 2.9, temperature: 92.1, weight: 34.1 },
+  { elapsedMs: 36000, stageIndex: 4, stageName: 'Adaptive decline', pressure: 6.6, flow: 2.8, targetPressure: 5.9, targetFlow: 2.9, temperature: 92, weight: 36.2 },
+  { elapsedMs: 39000, stageIndex: 4, stageName: 'Adaptive decline', pressure: 5.5, flow: 2.7, targetPressure: 5.5, targetFlow: 2.8, temperature: 91.9, weight: 38.1 },
+  { elapsedMs: 39100, stageIndex: 5, stageName: 'Finish', pressure: 5.5, flow: 2.4, targetPressure: 5.3, targetFlow: 2.4, temperature: 91.9, weight: 38.1 },
+  { elapsedMs: 42000, stageIndex: 5, stageName: 'Finish', pressure: 4.2, flow: 2, targetPressure: 4.2, targetFlow: 2, temperature: 91.8, weight: 39.1 },
+  { elapsedMs: 45000, stageIndex: 5, stageName: 'Finish', pressure: 2.4, flow: 1.3, targetPressure: 2.5, targetFlow: 1.2, temperature: 91.7, weight: 39.8 },
+  { elapsedMs: 48000, stageIndex: 5, stageName: 'Finish', pressure: 0, flow: 0, targetPressure: 0, targetFlow: 0, temperature: 91.6, weight: 40.2 },
+]
+
+export const demoLiveBrewFixture: LiveBrewState = {
+  active: true,
+  visible: true,
+  startedAt: Date.now() - 48_000,
+  kind: 'espresso',
+  profileName: 'Adaptive V2 — stage strip demo',
+  targetYield: 40,
+  elapsedMs: 48_000,
+  points: demoShotPoints,
+}
 
 export const brewingFixture: BrewingScreenModel = {
   readiness: 'ready',
@@ -22,18 +64,9 @@ export const brewingFixture: BrewingScreenModel = {
   previousShot: {
     profileName: 'Adaptive V2',
     timestamp: new Date().toISOString(),
-    totalYield: '33.6',
-    totalTime: '38',
-    targetYield: 34,
-    points: [
-      { elapsedMs: 0, pressure: 0, flow: 0, temperature: 88, weight: 0 },
-      { elapsedMs: 4000, pressure: 2, flow: 0.3, temperature: 90, weight: 0.2 },
-      { elapsedMs: 8000, pressure: 8.5, flow: 1.2, temperature: 92, weight: 1.5 },
-      { elapsedMs: 12000, pressure: 7.8, flow: 3.4, temperature: 92.5, weight: 5.4 },
-      { elapsedMs: 18000, pressure: 6.8, flow: 2.9, temperature: 92.2, weight: 12.8 },
-      { elapsedMs: 24000, pressure: 6.2, flow: 2.6, temperature: 92.1, weight: 20.1 },
-      { elapsedMs: 30000, pressure: 5.7, flow: 2.4, temperature: 92, weight: 27.4 },
-      { elapsedMs: 38000, pressure: 5.2, flow: 2.1, temperature: 91.9, weight: 33.6 },
-    ],
+    totalYield: '40.2',
+    totalTime: '48',
+    targetYield: 40,
+    points: demoShotPoints,
   },
 }

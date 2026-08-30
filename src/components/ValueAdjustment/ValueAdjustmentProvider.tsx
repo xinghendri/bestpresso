@@ -64,6 +64,7 @@ const pointerCenter = (pointers: Map<number, number>) => [...pointers.values()].
 function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentRequest; onClose: () => void }) {
   const mode = request.mode
   const activeRequest = request
+  const allowThreeFingerGesture = request.suggestionKey === 'grindSetting' || request.suggestionKey === 'targetYield'
   const [value, setValue] = useState(() => normalizedValue(request.value, request))
   const [visualValue, setVisualValue] = useState(value)
   const ruler = useRef<HTMLDivElement>(null)
@@ -392,7 +393,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     prepareAudioFeedback()
     stopAnimation()
     fixedSelection.current = null
-    const maximumPointers = maximumGesturePointers(request.suggestionKey === 'grindSetting')
+    const maximumPointers = maximumGesturePointers(allowThreeFingerGesture)
     const currentDrag = drag.current
     if (!currentDrag) {
       const startValue = clampedValue(visualValueRef.current, activeRequest)
@@ -419,7 +420,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     const activeDrag = drag.current
     if (!activeDrag || activeDrag.ended || !activeDrag.pointers.has(event.pointerId)) return
     activeDrag.pointers.set(event.pointerId, event.clientX)
-    const increment = gestureIncrement(mode, activeDrag.pointers.size, request.suggestionKey === 'grindSetting')
+    const increment = gestureIncrement(mode, activeDrag.pointers.size, allowThreeFingerGesture)
     if (increment === null) return
     activeDrag.increment = increment
     const track = event.currentTarget.querySelector<HTMLElement>('.value-adjuster__scrubber-track')
@@ -452,9 +453,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
       completedSingleFingerSwipes.current += 1
       if (completedSingleFingerSwipes.current > 3) {
         gestureTipShown.current = true
-        setGestureTip(request.suggestionKey === 'grindSetting'
-          ? 'Swipe with two fingers for steps of 10, or three fingers for steps of 100.'
-          : 'Swipe with two fingers to move in steps of 10.')
+        setGestureTip('Swipe with two fingers for steps of 10, or three fingers for steps of 100.')
         gestureTipTimer.current = window.setTimeout(() => {
           gestureTipTimer.current = null
           setGestureTip(null)
