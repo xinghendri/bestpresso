@@ -122,6 +122,14 @@ export interface LiveUtilityOperation {
   flow: number
   temperature?: number
   volumeMl: number
+  scaleConnected?: boolean
+  weightGrams?: number
   targetDuration?: number
   targetVolume?: number
+}
+
+export function liveHotWaterMeasurement(operation: Pick<LiveUtilityOperation, 'scaleConnected' | 'weightGrams' | 'volumeMl' | 'targetVolume'>) {
+  return operation.scaleConnected
+    ? { label: 'Weight', value: operation.weightGrams, target: operation.targetVolume, unit: 'g' }
+    : { label: 'Volume', value: operation.volumeMl, target: operation.targetVolume, unit: 'ml' }
 }
