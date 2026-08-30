@@ -110,7 +110,7 @@ export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, o
     contextPoints: selectedStage ? points : undefined,
     elapsedMs: chartElapsedMs,
     startMs: chartStartMs,
-    fitDuration: Boolean(selectedStage),
+    fitDuration: true,
     showWeight: !isCleaning,
   }
 
