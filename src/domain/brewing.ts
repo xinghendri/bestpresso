@@ -110,6 +110,7 @@ export interface LiveBrewState {
   kind?: 'espresso' | 'cleaning'
   profileName?: string
   targetYield?: number
+  scaleWeight?: number
   elapsedMs: number
   points: LiveShotPoint[]
 }
@@ -140,4 +141,14 @@ export function scaleConnectionIsActive(deviceListConnected: boolean, liveStream
 
 export function normalizedLiveScaleWeight(weight: unknown) {
   return typeof weight === 'number' && Number.isFinite(weight) ? Math.max(0, weight) : undefined
+}
+
+export function liveShotYield(scaleWeight: unknown, points: Pick<LiveShotPoint, 'weight'>[]) {
+  const streamedWeight = normalizedLiveScaleWeight(scaleWeight)
+  if (streamedWeight !== undefined) return streamedWeight
+  for (let index = points.length - 1; index >= 0; index -= 1) {
+    const sampledWeight = normalizedLiveScaleWeight(points[index].weight)
+    if (sampledWeight !== undefined) return sampledWeight
+  }
+  return undefined
 }

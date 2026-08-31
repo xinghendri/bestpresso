@@ -34,7 +34,7 @@ test('rejects a sudden positive flow spike after the shot', () => {
   assert.equal(result.finished, true)
 })
 
-test('does not let a persisted under-report replace a settled scale reading', () => {
+test('uses settled scale telemetry instead of the persisted shot yield', () => {
   assert.equal(reconciledShotYield('34.8', 36.1), '36.1')
-  assert.equal(reconciledShotYield('36.3', 36.1), '36.3')
+  assert.equal(reconciledShotYield('36.3', 36.1), '36.1')
 })

@@ -31,7 +31,5 @@ export function observePostShotWeight(state: YieldFinalizationState, weight: num
 
 export function reconciledShotYield(persistedYield: string, settledWeight?: number) {
   if (settledWeight === undefined || !Number.isFinite(settledWeight) || settledWeight <= 0) return persistedYield
-  const persisted = Number(persistedYield)
-  const yieldValue = Number.isFinite(persisted) && persisted > 0 ? Math.max(persisted, settledWeight) : settledWeight
-  return yieldValue.toFixed(1)
+  return settledWeight.toFixed(1)
 }

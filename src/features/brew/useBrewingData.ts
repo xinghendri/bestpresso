@@ -4,7 +4,7 @@ import { connectDevice, DecaidApiError, getDevices, getDisplayState, getFavorite
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, DecaidWorkflow, DecaidWorkflowPatch, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
-import { normalizedLiveScaleWeight, scaleConnectionIsActive, WATER_TANK_SENSOR_FULL_MM, waterTankLevelState } from '../../domain/brewing'
+import { liveShotYield, normalizedLiveScaleWeight, scaleConnectionIsActive, WATER_TANK_SENSOR_FULL_MM, waterTankLevelState } from '../../domain/brewing'
 import type { AvailableScale, BrewProfile, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, LiveUtilityOperation, MachineReadiness, PreviousShot, PreviousShotStatus, ScaleConnection, SettingFeedback, UtilityOperationKind } from '../../domain/brewing'
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { brewingFixture, demoLiveBrewFixture } from '../../fixtures/brewingFixture'
@@ -322,6 +322,12 @@ export function useBrewingData() {
             : current)
           return
         }
+        if (liveShotSession.current?.kind === 'espresso') {
+          setLiveBrew((current) => current.active && current.kind === 'espresso'
+            ? { ...current, scaleWeight: latestWeight }
+            : current)
+          return
+        }
         setDisplayedScaleWeight(latestWeight)
       })
     }
@@ -415,7 +421,7 @@ export function useBrewingData() {
       brewSkipRequestInFlight.current = false
       setBrewStopPending(false)
       setBrewSkipPending(false)
-      const points = [...session.points]
+      let points = [...session.points]
       const elapsedMs = points.at(-1)?.elapsedMs ?? 0
       if (session.kind === 'cleaning') {
         setLiveBrew({ active: false, visible: false, startedAt: session.startedAt, kind: 'cleaning', profileName: session.profileName, elapsedMs, points })
@@ -435,11 +441,14 @@ export function useBrewingData() {
         }
         return
       }
-      setLiveBrew({ active: false, visible: true, startedAt: session.startedAt, kind: 'espresso', profileName: session.profileName, targetYield: session.targetYield, elapsedMs, points })
+      const finalWeight = liveShotYield(connectedScale.current ? latestScaleSnapshot.current.weight : undefined, points)
+      if (finalWeight !== undefined && points.length > 0) {
+        points = points.map((point, index) => index === points.length - 1 ? { ...point, weight: finalWeight } : point)
+      }
+      setLiveBrew({ active: false, visible: true, startedAt: session.startedAt, kind: 'espresso', profileName: session.profileName, targetYield: session.targetYield, scaleWeight: finalWeight, elapsedMs, points })
 
       const hasExtraction = points.some((point) => (point.pressure ?? 0) > 0.5 || (point.flow ?? 0) > 0.1)
       if (elapsedMs < MIN_SUCCESSFUL_SHOT_MS || !hasExtraction) return
-      const finalWeight = [...points].reverse().find((point) => point.weight !== undefined)?.weight
       const localShot = {
         id: `live:${session.startedAt}`,
         profileName: session.profileName,
@@ -664,7 +673,7 @@ export function useBrewingData() {
           })
           if (session.points.length > MAX_LIVE_SHOT_POINTS) session.points.shift()
         }
-        setLiveBrew({ active: true, visible: true, startedAt: session.startedAt, kind: session.kind, profileName: session.profileName, targetYield: session.targetYield, elapsedMs, points: [...session.points] })
+        setLiveBrew({ active: true, visible: true, startedAt: session.startedAt, kind: session.kind, profileName: session.profileName, targetYield: session.targetYield, scaleWeight: session.kind === 'espresso' ? normalizedLiveScaleWeight(latestScaleSnapshot.current.weight) : undefined, elapsedMs, points: [...session.points] })
       } else if (liveShotSession.current) {
         completeLiveShot()
       }
