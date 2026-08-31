@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isCleaningProfile, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotStage, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres } from '../../api/decaid/adapters'
 import { connectDevice, DecaidApiError, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getSettings, getSharedSetting, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineProfile, setMachineState, setScalePowerMode, setSharedSetting, tareScale, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
+import { profileUsesStopAtWeight, workflowValuesForProfile } from '../../api/decaid/profileWorkflow'
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, DecaidWorkflow, DecaidWorkflowPatch, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
 import { liveShotYield, normalizedLiveScaleWeight, scaleConnectionIsActive, WATER_TANK_SENSOR_FULL_MM, waterTankLevelState } from '../../domain/brewing'
-import type { AvailableScale, BrewProfile, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, LiveUtilityOperation, MachineReadiness, PreviousShot, PreviousShotStatus, ScaleConnection, SettingFeedback, UtilityOperationKind } from '../../domain/brewing'
-import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
+import type { AvailableScale, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, LiveUtilityOperation, MachineReadiness, PreviousShot, PreviousShotStatus, ScaleConnection, SettingFeedback, UtilityOperationKind } from '../../domain/brewing'
 import { brewingFixture, demoLiveBrewFixture } from '../../fixtures/brewingFixture'
 import { scaleFixtureForKey } from '../../fixtures/scaleFixtures'
 import { CLEANING_PROFILE_START_STATE, isCleaningSequenceRun, profileForCleaningShortcut } from '../cleaning/cleaningSequence'
@@ -31,7 +31,7 @@ interface LiveShotSession {
   kind: 'espresso' | 'cleaning'
   startedAt: number
   profileName: string
-  targetYield: number
+  targetYield?: number
   stepNames?: string[]
   points: LiveShotPoint[]
 }
@@ -119,36 +119,6 @@ const storedLastSelectedProfileId = () => {
 const storeLastSelectedProfileIdLocally = (profileId: string) => {
   try { window.localStorage.setItem(LAST_SELECTED_PROFILE_LOCAL_KEY, profileId) }
   catch { /* Decaid's shared store remains the durable source. */ }
-}
-
-const workflowValuesForProfile = (record: DecaidProfileRecord, profile: BrewProfile) => {
-  const profileTemperature = Number(profile.temperature)
-  const profileDose = Number(profile.dose)
-  const profileYield = Number(profile.targetYield)
-  const profileGrindSetting = Number(profile.grindSetting)
-  const temperature = Number.isFinite(profileTemperature) ? profileTemperature : Number(record.profile?.steps?.[0]?.temperature) || 92
-  const dose = Number.isFinite(profileDose) ? profileDose : VALUE_ADJUSTMENTS.dose.defaultValue
-  const targetYield = Number.isFinite(profileYield) ? profileYield : VALUE_ADJUSTMENTS.targetYield.defaultValue
-  const grinderSetting = String(Number.isFinite(profileGrindSetting) ? profileGrindSetting : VALUE_ADJUSTMENTS.grindSetting.defaultValue)
-  const workflowProfile = {
-    ...record.profile,
-    target_weight: targetYield,
-    steps: record.profile?.steps?.map((step) => ({ ...step, temperature })) ?? [],
-  }
-  const patch: DecaidWorkflowPatch = {
-    profile: workflowProfile,
-    context: { grinderSetting, targetDoseWeight: dose, targetYield },
-  }
-  return {
-    patch,
-    metadata: {
-      ...(record.metadata ?? {}),
-      temperature,
-      grinderSetting,
-      targetDoseWeight: dose,
-      targetYield,
-    },
-  }
 }
 
 export function useBrewingData() {
@@ -639,7 +609,7 @@ export function useBrewingData() {
             kind: isCleaning ? 'cleaning' : 'espresso',
             startedAt: now,
             profileName: isCleaning ? cleaningSequence?.profileName ?? 'Cleaning' : profile?.name ?? 'Espresso',
-            targetYield: Number(profile?.targetYield) || 36,
+            targetYield: profile && Number.isFinite(Number(profile.targetYield)) ? Number(profile.targetYield) : undefined,
             stepNames: isCleaning ? cleaningSequence?.stepNames : profile?.stepNames,
             points: [],
           }
@@ -1156,6 +1126,10 @@ export function useBrewingData() {
     const currentProfile = allProfiles.find((profile) => profile.id === profileId)
     if (!record?.profile?.steps?.length || !currentProfile) {
       showSettingFeedback({ status: 'error', message: 'This profile is not available for editing.' })
+      return
+    }
+    if (setting === 'targetYield' && !profileUsesStopAtWeight(record.profile)) {
+      showSettingFeedback({ status: 'error', message: `${currentProfile.name} does not use stop at weight.` })
       return
     }
     const nextProfile = { ...currentProfile, [setting]: String(value) }
