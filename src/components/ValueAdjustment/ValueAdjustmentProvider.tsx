@@ -477,7 +477,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
       <p>{request.label}</p>
       <div className="value-adjuster__value" aria-live="polite">
         {editingValue
-          ? <span className="value-adjuster__direct-value" aria-label={`${request.label}, ${draftValue || 'empty'}`}><span ref={directDraftText}>{draftValue || '—'}</span>{request.unit && <small>{request.unit}</small>}</span>
+          ? <span className="value-adjuster__direct-value" aria-label={`${request.label}, ${draftValue || 'empty'}`}><span ref={directDraftText} className="value-adjuster__direct-number">{draftValue || '—'}</span>{request.unit && <small>{request.unit}</small>}</span>
           : <button type="button" onClick={beginDirectEntry} aria-label={`Enter ${request.label} with keypad`}>{formatValue(visualValue, mode)}{request.unit && <small>{request.unit}</small>}</button>}
       </div>
       {directInputError && <p className="value-adjuster__validation" role="alert">{directInputError}</p>}
