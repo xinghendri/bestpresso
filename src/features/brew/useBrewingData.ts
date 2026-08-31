@@ -4,7 +4,7 @@ import { connectDevice, DecaidApiError, getDevices, getDisplayState, getFavorite
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, DecaidWorkflow, DecaidWorkflowPatch, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
-import { WATER_TANK_SENSOR_FULL_MM, waterTankLevelState } from '../../domain/brewing'
+import { normalizedLiveScaleWeight, scaleConnectionIsActive, WATER_TANK_SENSOR_FULL_MM, waterTankLevelState } from '../../domain/brewing'
 import type { AvailableScale, BrewProfile, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, LiveUtilityOperation, MachineReadiness, PreviousShot, PreviousShotStatus, ScaleConnection, SettingFeedback, UtilityOperationKind } from '../../domain/brewing'
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { brewingFixture, demoLiveBrewFixture } from '../../fixtures/brewingFixture'
@@ -188,6 +188,7 @@ export function useBrewingData() {
   const manualScaleSearchInFlight = useRef(false)
   const activeScaleScan = useRef<Promise<Awaited<ReturnType<typeof getDevices>>> | null>(null)
   const connectedScale = useRef(Boolean(localScaleFixture))
+  const scaleStreamConnected = useRef(Boolean(localScaleFixture))
   const scaleTareInFlight = useRef(false)
   const brewStopRequestInFlight = useRef(false)
   const brewSkipRequestInFlight = useRef(false)
@@ -301,7 +302,29 @@ export function useBrewingData() {
     let latestShotRefreshTimeout: number | null = null
     let preferredScaleId: string | null = null
     let pendingYieldFinalization: PendingYieldFinalization | null = null
+    let pendingScaleRenderWeight: number | null = null
+    let scaleRenderFrame: number | null = null
     const settledYieldBySession = new Map<number, number>()
+
+    const scheduleScaleWeightRender = (weight: number) => {
+      pendingScaleRenderWeight = weight
+      if (scaleRenderFrame !== null) return
+      scaleRenderFrame = window.requestAnimationFrame(() => {
+        scaleRenderFrame = null
+        const latestWeight = pendingScaleRenderWeight
+        pendingScaleRenderWeight = null
+        if (latestWeight === null || disposed) return
+        const operation = utilityOperationSession.current
+        if (operation?.kind === 'hotWater') {
+          operation.weightGrams = latestWeight
+          setUtilityOperation((current) => current?.kind === 'hotWater'
+            ? { ...current, scaleConnected: true, weightGrams: latestWeight }
+            : current)
+          return
+        }
+        setDisplayedScaleWeight(latestWeight)
+      })
+    }
 
     const updateMachineConnection = (next: DataConnection) => {
       const previous = machineConnectionRef.current
@@ -322,14 +345,17 @@ export function useBrewingData() {
     const applyConnectedDevices = (devices: Awaited<ReturnType<typeof getDevices>>) => {
       const connectedMachine = devices.find((device) => device.type === 'machine' && device.state === 'connected')
       const activeScale = localScaleFixture ?? devices.find((device) => device.type === 'scale' && device.state === 'connected')
-      connectedScale.current = Boolean(activeScale)
-      if (activeScale) setAvailableScales([])
+      const scaleConnected = scaleConnectionIsActive(Boolean(activeScale), scaleStreamConnected.current)
+      connectedScale.current = scaleConnected
+      if (scaleConnected) setAvailableScales([])
       updateMachineConnection(connectedMachine ? 'connected' : 'disconnected')
       setScale((current) => current.status === 'searching'
         ? current
         : activeScale
           ? { status: 'connected', id: activeScale.id, name: activeScale.name || 'Scale' }
-          : { status: 'disconnected' })
+          : scaleStreamConnected.current
+            ? { ...current, status: 'connected', name: current.name || 'Scale' }
+            : { status: 'disconnected' })
     }
 
     const refreshConnectedDevices = () => getDevices().then((devices) => {
@@ -582,6 +608,10 @@ export function useBrewingData() {
           targetVolume: operationKind === 'hotWater' ? metricNumber(model, 'water', 'Volume') : undefined,
         })
       } else if (utilityOperationSession.current) {
+        if (utilityOperationSession.current.kind === 'hotWater') {
+          const finalWeight = normalizedLiveScaleWeight(latestScaleSnapshot.current.weight)
+          if (finalWeight !== undefined) setDisplayedScaleWeight(finalWeight)
+        }
         utilityOperationSession.current = null
         setUtilityOperation(null)
       }
@@ -679,16 +709,18 @@ export function useBrewingData() {
 
     const scale = subscribe<ScaleSnapshot>('/scale/snapshot', (snapshot) => {
       if (localScaleFixture) return
-      if (snapshot.weight !== undefined || snapshot.weightFlow !== undefined) {
+      const liveWeight = normalizedLiveScaleWeight(snapshot.weight)
+      if (liveWeight !== undefined || snapshot.weightFlow !== undefined) {
         latestScaleSnapshot.current = {
-          weight: snapshot.weight ?? latestScaleSnapshot.current.weight,
+          weight: liveWeight ?? latestScaleSnapshot.current.weight,
           weightFlow: snapshot.weightFlow ?? latestScaleSnapshot.current.weightFlow,
         }
       }
-      if (snapshot.weight !== undefined && utilityOperationSession.current?.kind === 'hotWater') {
-        const weightGrams = Math.max(0, snapshot.weight)
-        utilityOperationSession.current.weightGrams = weightGrams
-        setUtilityOperation((current) => current?.kind === 'hotWater' ? { ...current, scaleConnected: true, weightGrams } : current)
+      if (liveWeight !== undefined) {
+        scaleStreamConnected.current = true
+        connectedScale.current = true
+        if (utilityOperationSession.current?.kind === 'hotWater') utilityOperationSession.current.weightGrams = liveWeight
+        scheduleScaleWeightRender(liveWeight)
       }
       if (pendingYieldFinalization && snapshot.weight !== undefined) {
         const result = observePostShotWeight(pendingYieldFinalization.state, snapshot.weight, snapshot.weightFlow)
@@ -698,6 +730,7 @@ export function useBrewingData() {
         if (result.finished) finishPendingYield()
       }
       if (snapshot.status === 'connected') {
+        scaleStreamConnected.current = true
         connectedScale.current = true
         setUtilityOperation((current) => current?.kind === 'hotWater' ? { ...current, scaleConnected: true } : current)
         refreshConnectedScale()
@@ -705,6 +738,7 @@ export function useBrewingData() {
       }
       if (snapshot.status === 'disconnected') {
         finishPendingYield()
+        scaleStreamConnected.current = false
         connectedScale.current = false
         latestScaleSnapshot.current = {}
         if (utilityOperationSession.current?.kind === 'hotWater') utilityOperationSession.current.weightGrams = undefined
@@ -712,10 +746,9 @@ export function useBrewingData() {
         setScale((current) => current.status === 'searching' ? current : { status: 'disconnected' })
         return
       }
-      if (snapshot.weight === undefined) return
-      connectedScale.current = true
-      setModel((current) => ({ ...current, utilities: current.utilities.map((utility) => utility.id === 'scale' ? { ...utility, metrics: utility.metrics.map((metric) => ({ ...metric, value: snapshot.weight!.toFixed(1) })) } : utility) }))
-    }, () => undefined)
+    }, (socketConnected) => {
+      if (!socketConnected) scaleStreamConnected.current = false
+    })
 
     const water = subscribe<WaterLevels>('/machine/waterLevels', (levels) => {
       if (levels.currentLevel === undefined) return
@@ -807,6 +840,7 @@ export function useBrewingData() {
       if (pendingYieldTimeout !== null && pendingYieldTimeout !== undefined) window.clearTimeout(pendingYieldTimeout)
       if (feedbackTimeout.current !== null) window.clearTimeout(feedbackTimeout.current)
       if (actionErrorTimeout.current !== null) window.clearTimeout(actionErrorTimeout.current)
+      if (scaleRenderFrame !== null) window.cancelAnimationFrame(scaleRenderFrame)
       machine.close(); scale.close(); water.close(); timeToReady.close()
     }
   }, [])

@@ -133,3 +133,11 @@ export function liveHotWaterMeasurement(operation: Pick<LiveUtilityOperation, 's
     ? { label: 'Weight', value: operation.weightGrams, target: operation.targetVolume, unit: 'g' }
     : { label: 'Volume', value: operation.volumeMl, target: operation.targetVolume, unit: 'ml' }
 }
+
+export function scaleConnectionIsActive(deviceListConnected: boolean, liveStreamConnected: boolean) {
+  return deviceListConnected || liveStreamConnected
+}
+
+export function normalizedLiveScaleWeight(weight: unknown) {
+  return typeof weight === 'number' && Number.isFinite(weight) ? Math.max(0, weight) : undefined
+}
