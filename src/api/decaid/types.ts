@@ -40,6 +40,7 @@ export interface ScaleSnapshot { status?: 'connected' | 'disconnected'; timestam
 export interface DecaidDevice { id?: string; name?: string; state?: 'connected' | 'disconnected'; type?: 'machine' | 'scale' | 'sensor'; available?: boolean }
 export type ScalePowerMode = 'disabled' | 'displayOff' | 'disconnect'
 export interface DecaidSettings { preferredScaleId?: string | null; blockTareDuringShot?: boolean; scalePowerMode?: ScalePowerMode }
+export interface DecaidMachineSettings { flushTemp?: number; flushTimeout?: number; flushFlow?: number }
 export interface DisplayState { brightness?: number; requestedBrightness?: number; platformSupported?: { brightness?: boolean; wakeLock?: boolean } }
 export interface WaterLevels { currentLevel?: number; refillLevel?: number }
 export interface TimeToReadyFrame { status?: string; remainingTimeMs?: number; currentTemp?: number; targetTemp?: number }

@@ -1,18 +1,17 @@
-import type { DecaidSettings, ScalePowerMode } from '../../api/decaid/types'
+import type { MachineReadiness } from '../../domain/brewing'
 
 export const SLEEP_DISPLAY_BRIGHTNESS = 7
 
 interface SleepControlApi {
-  getSettings: () => Promise<DecaidSettings>
-  setScalePowerMode: (mode: ScalePowerMode) => Promise<void>
   setMachineState: (state: 'sleeping') => Promise<void>
 }
 
-export async function sleepMachineAndConnectedScale(scaleConnected: boolean, api: SleepControlApi) {
-  if (scaleConnected) {
-    const settings = await api.getSettings()
-    if (settings.scalePowerMode !== 'displayOff') await api.setScalePowerMode('displayOff')
-  }
-
+export async function sleepMachineWithConfiguredScalePolicy(api: SleepControlApi) {
   await api.setMachineState('sleeping')
 }
+
+export const shouldRunBackgroundScaleScan = (
+  preferredScaleId: string | null | undefined,
+  scaleConnected: boolean,
+  readiness: MachineReadiness | null,
+) => Boolean(preferredScaleId) && !scaleConnected && readiness !== 'sleeping'

@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import type { LiveShotPoint, PreviousShot, PreviousShotStatus } from '../../domain/brewing'
 import { LiveBrewStages } from '../brew/LiveBrewStages'
 import type { BrewStageSelection } from '../brew/LiveBrewStages'
 import type { ChartSeries } from '../brew/chartSeries'
 import { toggleDimmedChartSeries } from '../brew/chartSeries'
+import { stageFocusedChartView } from '../brew/chartFocus'
 import { LiveShotChart } from '../brew/LiveShotChart'
 
 interface PreviousShotScreenProps {
@@ -15,7 +16,6 @@ interface PreviousShotScreenProps {
 }
 
 interface HistoryChartView {
-  key: string
   points: LiveShotPoint[]
   contextPoints?: LiveShotPoint[]
   elapsedMs: number
@@ -25,25 +25,9 @@ interface HistoryChartView {
 }
 
 function AnimatedHistoryShotChart({ view, targetYield }: { view: HistoryChartView; targetYield: number }) {
-  const previousView = useRef(view)
-  const [leavingView, setLeavingView] = useState<HistoryChartView | null>(null)
   const [dimmedSeries, setDimmedSeries] = useState<ChartSeries[]>([])
 
-  useEffect(() => {
-    const previous = previousView.current
-    previousView.current = view
-    if (previous.key === view.key) return
-    setLeavingView(previous)
-    const timeout = window.setTimeout(() => setLeavingView((current) => current?.key === previous.key ? null : current), 400)
-    return () => window.clearTimeout(timeout)
-  }, [view])
-
-  const chart = (chartView: HistoryChartView, filterable = true) => <LiveShotChart points={chartView.points} contextPoints={chartView.contextPoints} elapsedMs={chartView.elapsedMs} fitDuration={chartView.fitDuration} startMs={chartView.startMs} targetYield={targetYield} showWeight={chartView.showWeight} legendFilterEnabled={filterable} dimmedSeries={dimmedSeries} onToggleSeries={filterable ? (series) => setDimmedSeries((current) => toggleDimmedChartSeries(current, series)) : undefined} />
-
-  return <>
-    {leavingView && <div className="history-chart-layer history-chart-layer--leaving" aria-hidden="true" key={`leaving:${leavingView.key}`}>{chart(leavingView, false)}</div>}
-    <div className="history-chart-layer history-chart-layer--entering" key={`current:${view.key}`}>{chart(view)}</div>
-  </>
+  return <LiveShotChart points={view.points} contextPoints={view.contextPoints} elapsedMs={view.elapsedMs} fitDuration={view.fitDuration} startMs={view.startMs} targetYield={targetYield} showWeight={view.showWeight} legendFilterEnabled dimmedSeries={dimmedSeries} onToggleSeries={(series) => setDimmedSeries((current) => toggleDimmedChartSeries(current, series))} />
 }
 
 const pullTime = (timestamp: string | undefined) => {
@@ -101,15 +85,12 @@ export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, o
   const points = activeShot?.points ?? []
   const elapsedMs = points.at(-1)?.elapsedMs ?? (Number(activeShot?.totalTime) || 0) * 1000
   const targetYield = activeShot?.targetYield ?? (Number(activeShot?.totalYield) || 36)
-  const chartPoints = selectedStage?.points ?? points
-  const chartElapsedMs = selectedStage ? Math.max(1, selectedStage.endedAt - selectedStage.startedAt) : elapsedMs
-  const chartStartMs = selectedStage?.startedAt ?? 0
+  const focusedView = stageFocusedChartView(points, elapsedMs, selectedStage)
   const chartView: HistoryChartView = {
-    key: `${activeId ?? 'empty'}:${selectedStage?.key ?? 'full'}:${points.length}`,
-    points: chartPoints,
-    contextPoints: selectedStage ? points : undefined,
-    elapsedMs: chartElapsedMs,
-    startMs: chartStartMs,
+    points: focusedView.points,
+    contextPoints: focusedView.contextPoints,
+    elapsedMs: focusedView.elapsedMs,
+    startMs: focusedView.startMs,
     fitDuration: true,
     showWeight: !isCleaning,
   }

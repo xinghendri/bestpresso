@@ -1,24 +1,16 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import type { DecaidSettings, ScalePowerMode } from '../src/api/decaid/types.ts'
-import { SLEEP_DISPLAY_BRIGHTNESS, sleepMachineAndConnectedScale } from '../src/features/brew/sleepControl.ts'
+import { SLEEP_DISPLAY_BRIGHTNESS, sleepMachineWithConfiguredScalePolicy, shouldRunBackgroundScaleScan } from '../src/features/brew/sleepControl.ts'
 
 test('keeps the sleeping display faintly visible', () => {
   assert.equal(SLEEP_DISPLAY_BRIGHTNESS, 7)
 })
 
-function sleepApi(settings: DecaidSettings = {}) {
+function sleepApi() {
   const calls: string[] = []
   return {
     calls,
     api: {
-      getSettings: async () => {
-        calls.push('get settings')
-        return settings
-      },
-      setScalePowerMode: async (mode: ScalePowerMode) => {
-        calls.push(`scale ${mode}`)
-      },
       setMachineState: async () => {
         calls.push('machine sleeping')
       },
@@ -26,39 +18,17 @@ function sleepApi(settings: DecaidSettings = {}) {
   }
 }
 
-test('sleeps the machine directly when no scale is connected', async () => {
+test('lets Decaid apply its configured scale policy when the machine sleeps', async () => {
   const { api, calls } = sleepApi()
 
-  await sleepMachineAndConnectedScale(false, api)
+  await sleepMachineWithConfiguredScalePolicy(api)
 
   assert.deepEqual(calls, ['machine sleeping'])
 })
 
-for (const scalePowerMode of [undefined, 'disabled', 'disconnect'] as const) {
-  test(`enables display-off power management when the current mode is ${scalePowerMode ?? 'missing'}`, async () => {
-    const { api, calls } = sleepApi({ scalePowerMode })
-
-    await sleepMachineAndConnectedScale(true, api)
-
-    assert.deepEqual(calls, ['get settings', 'scale displayOff', 'machine sleeping'])
-  })
-}
-
-test('avoids rewriting an existing display-off preference', async () => {
-  const { api, calls } = sleepApi({ scalePowerMode: 'displayOff' })
-
-  await sleepMachineAndConnectedScale(true, api)
-
-  assert.deepEqual(calls, ['get settings', 'machine sleeping'])
-})
-
-test('does not sleep the machine when connected-scale preparation fails', async () => {
-  const { api, calls } = sleepApi({ scalePowerMode: 'disabled' })
-  api.setScalePowerMode = async () => {
-    calls.push('scale displayOff failed')
-    throw new Error('failed')
-  }
-
-  await assert.rejects(sleepMachineAndConnectedScale(true, api), /failed/)
-  assert.deepEqual(calls, ['get settings', 'scale displayOff failed'])
+test('never starts a preferred-scale scan while the machine is sleeping', () => {
+  assert.equal(shouldRunBackgroundScaleScan('preferred-scale', false, 'sleeping'), false)
+  assert.equal(shouldRunBackgroundScaleScan('preferred-scale', false, 'ready'), true)
+  assert.equal(shouldRunBackgroundScaleScan(null, false, 'ready'), false)
+  assert.equal(shouldRunBackgroundScaleScan('preferred-scale', true, 'ready'), false)
 })

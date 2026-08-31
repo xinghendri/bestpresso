@@ -1,5 +1,5 @@
 import { getDecaidEndpoints } from './config'
-import type { DecaidDevice, DecaidProfile, DecaidProfileRecord, DecaidSettings, DecaidWorkflow, DecaidWorkflowPatch, DisplayState, FavoriteAssignments, PaginatedShots, ScalePowerMode, ShotRecord } from './types'
+import type { DecaidDevice, DecaidMachineSettings, DecaidProfile, DecaidProfileRecord, DecaidSettings, DecaidWorkflow, DecaidWorkflowPatch, DisplayState, FavoriteAssignments, PaginatedShots, ScalePowerMode, ShotRecord } from './types'
 
 export class DecaidApiError extends Error {
   status: number
@@ -33,6 +33,7 @@ export const getDevices = () => getJson<DecaidDevice[]>('/devices')
 export const scanForDevices = () => getJson<unknown[]>('/devices/scan', 30000)
 export const getDisplayState = () => getJson<DisplayState>('/display')
 export const getSettings = () => getJson<DecaidSettings>('/settings')
+export const getMachineSettings = () => getJson<DecaidMachineSettings>('/machine/settings')
 
 export async function connectDevice(deviceId: string) {
   const response = await fetch(`${getDecaidEndpoints().apiBase}/devices/connect`, {

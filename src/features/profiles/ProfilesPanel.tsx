@@ -34,8 +34,10 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const searchInput = useRef<HTMLInputElement>(null)
+  const directoryItems = useRef(new Map<string, HTMLButtonElement>())
   const [pendingProfileId, setPendingProfileId] = useState<string | null>(null)
   const [replacementProfileId, setReplacementProfileId] = useState<string | null>(null)
+  const [scrollTargetProfileId, setScrollTargetProfileId] = useState<string | null>(null)
 
   const favoriteIds = favoriteProfileSlots.filter((id): id is string => Boolean(id))
   const favoriteIdSet = new Set(favoriteIds)
@@ -67,9 +69,26 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
     return () => window.cancelAnimationFrame(frame)
   }, [searchOpen])
 
+  useEffect(() => {
+    if (!scrollTargetProfileId) return
+    const frame = window.requestAnimationFrame(() => {
+      directoryItems.current.get(scrollTargetProfileId)?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
+      setScrollTargetProfileId((current) => current === scrollTargetProfileId ? null : current)
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [scrollTargetProfileId, activeCategory, searchQuery])
+
   const selectPreview = (profileId: string) => {
     setSelectedProfileId(profileId)
     setReplacementProfileId(null)
+  }
+
+  const selectFavoritePreview = (profile: BrewProfile) => {
+    setActiveCategory(profile.category && availableCategories.includes(profile.category) ? profile.category : 'All')
+    setSearchQuery('')
+    setSelectedProfileId(profile.id)
+    setReplacementProfileId(null)
+    setScrollTargetProfileId(profile.id)
   }
 
   const selectCategory = (category: string) => {
@@ -145,7 +164,7 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
             if (!profile) return <div className="favorite-slot favorite-slot--empty" key={`empty-${slot}`}><span>Empty</span></div>
             const pending = pendingProfileId === profile.id || (replacementProfileId !== null && pendingProfileId === replacementProfileId)
             return <article className={`favorite-slot${replacingFavorite ? ' favorite-slot--replace' : ''}`} key={profile.id}>
-              <button className="favorite-slot__profile" type="button" onClick={() => selectPreview(profile.id)} aria-label={`View ${profile.name}`}>
+              <button className="favorite-slot__profile" type="button" onClick={() => selectFavoritePreview(profile)} aria-label={`View and locate ${profile.name} in the profile list`}>
                 <strong>{profile.name}</strong><img src={profileChevronIcon} alt="" />
               </button>
               {replacingFavorite
@@ -167,7 +186,7 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
 
         <div className="profile-catalog">
           <div className="profile-directory" role="listbox" aria-label="Profiles">
-            {visibleProfiles.map((profile) => <button className={selectedProfile?.id === profile.id ? 'profile-directory__item profile-directory__item--selected' : 'profile-directory__item'} type="button" role="option" aria-selected={selectedProfile?.id === profile.id} key={profile.id} onClick={() => selectPreview(profile.id)}><strong>{profile.name}</strong>{profile.category && <small>{profile.category}</small>}</button>)}
+            {visibleProfiles.map((profile) => <button ref={(element) => { if (element) directoryItems.current.set(profile.id, element); else directoryItems.current.delete(profile.id) }} className={selectedProfile?.id === profile.id ? 'profile-directory__item profile-directory__item--selected' : 'profile-directory__item'} type="button" role="option" aria-selected={selectedProfile?.id === profile.id} key={profile.id} onClick={() => selectPreview(profile.id)}><strong>{profile.name}</strong>{profile.category && <small>{profile.category}</small>}</button>)}
             {!visibleProfiles.length && <p className="profile-directory__empty">No profiles found here.</p>}
           </div>
 

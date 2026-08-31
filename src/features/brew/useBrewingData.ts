@@ -1,19 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isCleaningProfile, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotStage, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres } from '../../api/decaid/adapters'
-import { connectDevice, DecaidApiError, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getProfiles, getSettings, getSharedSetting, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineProfile, setMachineState, setScalePowerMode, setSharedSetting, tareScale, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
+import { connectDevice, DecaidApiError, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getMachineSettings, getProfiles, getSettings, getSharedSetting, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineProfile, setMachineState, setSharedSetting, tareScale, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
 import { profileUsesStopAtWeight, workflowValuesForProfile } from '../../api/decaid/profileWorkflow'
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
-import type { DecaidProfileRecord, DecaidWorkflow, DecaidWorkflowPatch, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
+import type { DecaidProfileRecord, DecaidWorkflowPatch, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
 import { liveShotYield, normalizedLiveScaleWeight, scaleConnectionIsActive, WATER_TANK_SENSOR_FULL_MM, waterTankLevelState } from '../../domain/brewing'
 import type { AvailableScale, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, LiveUtilityOperation, MachineReadiness, PreviousShot, PreviousShotStatus, ScaleConnection, SettingFeedback, UtilityOperationKind } from '../../domain/brewing'
 import { brewingFixture, demoLiveBrewFixture } from '../../fixtures/brewingFixture'
 import { scaleFixtureForKey } from '../../fixtures/scaleFixtures'
-import { CLEANING_PROFILE_START_STATE, isCleaningSequenceRun, profileForCleaningShortcut } from '../cleaning/cleaningSequence'
+import { CLEANING_PROFILE_START_STATE, cleaningRestorePatch, isCleaningSequenceRun, profileForCleaningShortcut } from '../cleaning/cleaningSequence'
 import { observePostShotWeight, reconciledShotYield, type YieldFinalizationState } from '../history/shotYieldFinalization'
 import { LAST_SELECTED_PROFILE_LOCAL_KEY, LAST_SELECTED_PROFILE_SHARED_KEY, normalizeRememberedProfileId, resolveRememberedProfileId } from '../profiles/profileSelectionPersistence'
+import { rinseWorkflowPatchFromMachineSettings } from './flushSettings'
 import { isEspressoExtractionSnapshot } from './liveShotState'
-import { SLEEP_DISPLAY_BRIGHTNESS, sleepMachineAndConnectedScale } from './sleepControl'
+import { SLEEP_DISPLAY_BRIGHTNESS, shouldRunBackgroundScaleScan, sleepMachineWithConfiguredScalePolicy } from './sleepControl'
 
 const MAX_LIVE_SHOT_POINTS = 900
 const MIN_SUCCESSFUL_SHOT_MS = 5_000
@@ -73,14 +74,6 @@ const operationKindForSnapshot = (snapshot: MachineSnapshot): UtilityOperationKi
 }
 
 const machineStateForSnapshot = (snapshot: MachineSnapshot) => (typeof snapshot.state === 'string' ? snapshot.state : snapshot.state?.state)?.toLowerCase()
-
-const workflowPatch = (workflow: DecaidWorkflow): DecaidWorkflowPatch => ({
-  profile: workflow.profile,
-  context: workflow.context,
-  steamSettings: workflow.steamSettings,
-  hotWaterData: workflow.hotWaterData,
-  rinseData: workflow.rinseData,
-})
 
 const metricNumber = (model: BrewingScreenModel, utilityId: 'water' | 'steam', label: string) => {
   const value = Number(model.utilities.find((utility) => utility.id === utilityId)?.metrics.find((metric) => metric.label === label)?.value)
@@ -480,13 +473,23 @@ export function useBrewingData() {
     const rememberedProfileRequest = getSharedSetting<unknown>(LAST_SELECTED_PROFILE_SHARED_KEY)
       .then((value) => normalizeRememberedProfileId(value) ?? storedLastSelectedProfileId())
       .catch(storedLastSelectedProfileId)
+    const machineSettingsRequest = getMachineSettings().catch(() => null)
 
-    Promise.all([getWorkflow().then(rememberFlushDuration), getProfiles(), getFavoriteAssignments().catch(() => null), latestShotRequest, shotHistoryRequest, rememberedProfileRequest])
-      .then(async ([initialWorkflow, records, assignments, latestShot, historyResult, rememberedProfileId]) => {
+    Promise.all([getWorkflow(), machineSettingsRequest, getProfiles(), getFavoriteAssignments().catch(() => null), latestShotRequest, shotHistoryRequest, rememberedProfileRequest])
+      .then(async ([initialWorkflow, machineSettings, records, assignments, latestShot, historyResult, rememberedProfileId]) => {
         if (disposed) return
         profileRecords.current = records
         favoriteAssignments.current = assignments
-        let workflow = initialWorkflow
+        let workflow = rememberFlushDuration(initialWorkflow)
+        const rinsePatch = machineSettings && rinseWorkflowPatchFromMachineSettings(workflow, machineSettings)
+        if (rinsePatch) {
+          try {
+            workflow = rememberFlushDuration(await updateWorkflow(rinsePatch))
+            if (disposed) return
+          } catch {
+            workflow = initialWorkflow
+          }
+        }
         let domainProfiles = profileRecordsToDomain(records, workflow, fixtureProfiles)
         const workflowProfile = activeProfileForWorkflow(domainProfiles, records, workflow)
         const restoredProfileId = resolveRememberedProfileId(domainProfiles.map((profile) => profile.id), rememberedProfileId, workflowProfile?.id)
@@ -494,12 +497,13 @@ export function useBrewingData() {
           const restoredProfile = domainProfiles.find((profile) => profile.id === restoredProfileId)
           const restoredRecord = records.find((record) => (record.id || record.profile?.title) === restoredProfileId)
           if (restoredProfile && restoredRecord?.profile?.steps?.length) {
+            const workflowBeforeProfileRestore = workflow
             try {
               workflow = await updateWorkflow(workflowValuesForProfile(restoredRecord, restoredProfile).patch)
               if (disposed) return
               domainProfiles = profileRecordsToDomain(records, workflow, fixtureProfiles)
             } catch {
-              workflow = initialWorkflow
+              workflow = workflowBeforeProfileRestore
               domainProfiles = profileRecordsToDomain(records, workflow, fixtureProfiles)
             }
           }
@@ -796,7 +800,7 @@ export function useBrewingData() {
       backgroundScaleSearchTimeout = window.setTimeout(async () => {
         backgroundScaleSearchTimeout = null
         if (disposed) return
-        if (preferredScaleId && !connectedScale.current) {
+        if (shouldRunBackgroundScaleScan(preferredScaleId, connectedScale.current, previousReadiness.current)) {
           try {
             const devices = await runScaleScan()
             if (devices.some((device) => device.type === 'scale' && device.state === 'connected')) connectedScale.current = true
@@ -848,7 +852,7 @@ export function useBrewingData() {
         void restoreDisplay()
         await setMachineState('idle')
       } else {
-        await sleepMachineAndConnectedScale(connectedScale.current, { getSettings, setScalePowerMode, setMachineState })
+        await sleepMachineWithConfiguredScalePolicy({ setMachineState })
         setSleepScreenActive(true)
         void dimDisplay()
       }
@@ -861,9 +865,7 @@ export function useBrewingData() {
         setSleepScreenActive(false)
         void restoreDisplay()
       }
-      showMachineActionError(connectedScale.current
-        ? 'The machine or connected scale did not accept the sleep command.'
-        : 'The machine did not accept the sleep command.')
+      showMachineActionError('The machine did not accept the sleep command.')
     } finally {
       sleepRequestInFlight.current = false
       setSleepPending(false)
@@ -960,7 +962,7 @@ export function useBrewingData() {
     setCleaningPreparedProfileId(null)
     showMachineActionError(null)
     try {
-      if (!cleaningRestoreWorkflow.current) cleaningRestoreWorkflow.current = workflowPatch(await getWorkflow())
+      if (!cleaningRestoreWorkflow.current) cleaningRestoreWorkflow.current = cleaningRestorePatch(await getWorkflow())
       const executionProfile = profileForCleaningShortcut(record.profile)
       await setMachineProfile(executionProfile)
       const cleaningWorkflow = await updateWorkflow({ profile: executionProfile })

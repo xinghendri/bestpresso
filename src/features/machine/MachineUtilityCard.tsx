@@ -94,7 +94,7 @@ export function MachineUtilityCard({ utility, compact = false, scale, onExpand, 
   const scaleWeight = Number(utility.metrics[0]?.value)
   const scaleCanTare = scaleConnected && Number.isFinite(scaleWeight) && Math.abs(scaleWeight) >= 0.05 && Boolean(onTareScale)
   const title = scaleConnected ? scalePresentation?.displayName ?? withoutGenericScaleSuffix(connectedScaleName) : utility.label
-  const cardClassName = `utility-card utility-card--${utility.id}${compact ? ' utility-card--compact' : ''}${scalePresentation?.imageSrc ? ' utility-card--scale-with-art' : ''}`
+  const cardClassName = `utility-card utility-card--${utility.id}${isSteam && !steamHeatingEnabled ? ' utility-card--steam-off' : ''}${compact ? ' utility-card--compact' : ''}${scalePresentation?.imageSrc ? ' utility-card--scale-with-art' : ''}`
   const expandLabel = `Expand utility panels to view ${title}`
   const sectionIsExpandControl = compact && !isScale
   const expandWithKeyboard = (event: KeyboardEvent<HTMLElement>) => {

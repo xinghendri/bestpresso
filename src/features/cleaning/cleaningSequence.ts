@@ -1,4 +1,4 @@
-import type { DecaidProfile } from '../../api/decaid/types'
+import type { DecaidProfile, DecaidWorkflow, DecaidWorkflowPatch } from '../../api/decaid/types'
 
 export const CLEANING_PROFILE_START_STATE = 'espresso' as const
 
@@ -11,3 +11,8 @@ export const profileForCleaningShortcut = (profile: DecaidProfile): DecaidProfil
 export const isCleaningSequenceRun = (machineState: string | undefined, espressoExtraction: boolean, hasPreparedCleaningProfile: boolean) => (
   machineState === 'cleaning' || (hasPreparedCleaningProfile && espressoExtraction)
 )
+
+export const cleaningRestorePatch = (workflow: DecaidWorkflow): DecaidWorkflowPatch => ({
+  profile: workflow.profile,
+  context: workflow.context,
+})
