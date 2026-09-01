@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { playCompletionSound } from '../../audio/completionSound'
 import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isCleaningProfile, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotStage, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres } from '../../api/decaid/adapters'
 import { connectDevice, DecaidApiError, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getMachineSettings, getProfiles, getSettings, getSharedSetting, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineProfile, setMachineState, setSharedSetting, tareScale, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
 import { profileUsesStopAtWeight, workflowValuesForProfile } from '../../api/decaid/profileWorkflow'
@@ -13,11 +14,11 @@ import { CLEANING_PROFILE_START_STATE, cleaningRestorePatch, isCleaningSequenceR
 import { observePostShotWeight, reconciledShotYield, type YieldFinalizationState } from '../history/shotYieldFinalization'
 import { LAST_SELECTED_PROFILE_LOCAL_KEY, LAST_SELECTED_PROFILE_SHARED_KEY, normalizeRememberedProfileId, resolveRememberedProfileId } from '../profiles/profileSelectionPersistence'
 import { rinseWorkflowPatchFromMachineSettings } from './flushSettings'
+import { isSuccessfulEspressoCompletion, shouldPlayCompletionCue } from './completionCue'
 import { beginSkipTransition, observeSkipTransition, type SkipTransition } from './liveShotState'
 import { SLEEP_DISPLAY_BRIGHTNESS, shouldRunBackgroundScaleScan, sleepMachineWithConfiguredScalePolicy } from './sleepControl'
 
 const MAX_LIVE_SHOT_POINTS = 900
-const MIN_SUCCESSFUL_SHOT_MS = 5_000
 const MINIMUM_SCALE_SCAN_MS = 10_000
 const SCALE_SCAN_RETRY_DELAY_MS = 5_000
 const fixtureProfiles = profilesWithParsedTitles(brewingFixture.profiles)
@@ -377,7 +378,7 @@ export function useBrewingData() {
       schedulePersistedShotRefresh(pending.session)
     }
 
-    const completeLiveShot = () => {
+    const completeLiveShot = (interrupted = false) => {
       const session = liveShotSession.current
       if (!session) return
       liveShotSession.current = null
@@ -389,6 +390,7 @@ export function useBrewingData() {
       let points = [...session.points]
       const elapsedMs = points.at(-1)?.elapsedMs ?? 0
       if (session.kind === 'cleaning') {
+        if (shouldPlayCompletionCue({ kind: session.kind, interrupted, elapsedMs, hasExtraction: false })) void playCompletionSound()
         setLiveBrew({ active: false, visible: false, startedAt: session.startedAt, kind: 'cleaning', profileName: session.profileName, elapsedMs, points })
         pendingCleaningSequence.current = null
         setCleaningPreparedProfileId(null)
@@ -413,7 +415,8 @@ export function useBrewingData() {
       setLiveBrew({ active: false, visible: true, startedAt: session.startedAt, kind: 'espresso', profileName: session.profileName, targetYield: session.targetYield, scaleWeight: finalWeight, elapsedMs, points })
 
       const hasExtraction = points.some((point) => (point.pressure ?? 0) > 0.5 || (point.flow ?? 0) > 0.1)
-      if (elapsedMs < MIN_SUCCESSFUL_SHOT_MS || !hasExtraction) return
+      if (!isSuccessfulEspressoCompletion(elapsedMs, hasExtraction)) return
+      if (shouldPlayCompletionCue({ kind: session.kind, interrupted, elapsedMs, hasExtraction })) void playCompletionSound()
       const localShot = {
         id: `live:${session.startedAt}`,
         profileName: session.profileName,
@@ -687,7 +690,7 @@ export function useBrewingData() {
       if (!connected) {
         readinessTracker.current.reset()
         brewSkipTransition.current = null
-        completeLiveShot()
+        completeLiveShot(true)
         utilityOperationSession.current = null
         setUtilityOperation(null)
       } else if (machineConnectionRef.current === 'fixture') {

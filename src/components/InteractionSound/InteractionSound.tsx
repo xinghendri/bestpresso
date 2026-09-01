@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { primeCompletionSound } from '../../audio/completionSound'
 
 type AudioContextConstructor = typeof AudioContext
 
@@ -41,8 +42,10 @@ export function InteractionSound() {
       }
     }
 
+    document.addEventListener('pointerdown', primeCompletionSound, { capture: true, passive: true })
     document.addEventListener('click', playTap, true)
     return () => {
+      document.removeEventListener('pointerdown', primeCompletionSound, true)
       document.removeEventListener('click', playTap, true)
       if (context?.state !== 'closed') void context?.close().catch(() => undefined)
     }

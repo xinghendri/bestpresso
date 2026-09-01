@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const utilityCard = readFileSync(new URL('../src/features/machine/MachineUtilityCard.tsx', import.meta.url), 'utf8')
+const brewingPanel = readFileSync(new URL('../src/features/brew/BrewingPanel.tsx', import.meta.url), 'utf8')
 const styles = readFileSync(new URL('../src/styles/index.css', import.meta.url), 'utf8')
 const utilityIcons = ['hot-water.svg', 'steam.svg', 'scale.svg'].map((name) => readFileSync(new URL(`../src/assets/figma/${name}`, import.meta.url), 'utf8'))
 
@@ -28,13 +29,25 @@ test('increases collapsed home-screen numeric readouts by one pixel', () => {
 
 test('uses the requested home-screen colors for labels and numbers', () => {
   assert.match(styles, /\.app-shell \.utility-card header,[\s\S]*\.app-shell \.history-card__summary time \{\s*color:#707070;/)
+  assert.match(styles, /\.app-shell \.metric__label \{\s*color:#878787;/)
   assert.match(styles, /\.app-shell \.metric__reading,[\s\S]*\.app-shell \.status-pill--heating span \{\s*color:#f5f5f5;/)
 })
 
 test('preserves contrast and semantic steam colors on the home screen', () => {
-  assert.match(styles, /\.app-shell \.metric__subtext--pill \{\s*color:#202020;/)
+  assert.match(styles, /\.app-shell \.metric__subtext--pill \{\s*color:#c8c8c8;\s*background:#3a3a3a;/)
   assert.match(styles, /\.app-shell \.utility-card--steam \.metric:first-child \.metric__reading--highlight \{\s*color:#e5d55e;/)
   assert.match(styles, /\.app-shell \.utility-card--steam\.utility-card--steam-off \.metric:first-child \.metric__reading \{\s*color:#707070;/)
+})
+
+test('keeps profile metrics in four stable columns while profile values change', () => {
+  assert.match(styles, /\.brew-panel \{ --brew-panel-inline-padding:24px; --brew-metrics-inline-adjustment:2\.4px;/)
+  assert.match(styles, /\.brew-metrics \{ width:calc\(100% \+ var\(--brew-panel-inline-padding\) \+ var\(--brew-panel-inline-padding\)\); display:grid; grid-template-columns:repeat\(4,minmax\(0,1fr\)\);/)
+  assert.match(styles, /\.brew-metrics \{[^}]*margin-inline:calc\(0px - var\(--brew-panel-inline-padding\)\); padding:0 calc\(5% \+ var\(--brew-metrics-inline-adjustment\)\);/)
+  assert.match(styles, /\.brew-metrics \.metric \{[^}]*width:100%;[^}]*text-align:center;/)
+  assert.match(styles, /\.brew-metrics \.metric__label \{ position:absolute; left:50%; top:0; transform:translateX\(-50%\); \}/)
+  assert.doesNotMatch(styles, /\.brew-metrics \.metric:(?:first-child|nth-child\(4\))/)
+  assert.doesNotMatch(styles, /@keyframes metrics-in/)
+  assert.doesNotMatch(brewingPanel, /className="brew-metrics" key=/)
 })
 
 test('keeps utility titles and icons near-white while secondary grey uses 707070', () => {

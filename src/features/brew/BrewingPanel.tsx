@@ -4,6 +4,7 @@ import { Metric } from '../../components/Metric/Metric'
 import type { BrewProfile, EditableProfileSetting } from '../../domain/brewing'
 import type { FixedValueSuggestion } from '../../domain/valueAdjustments'
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
+import { doseToYieldRatio } from './brewRatio'
 import { ProfileTargetChart } from './ProfileTargetChart'
 import { profileCardMotion, profileCardPosition, projectedProfileSteps, wrappedProfileOffset } from './profileCarouselMotion'
 
@@ -15,13 +16,6 @@ interface CarouselDrag {
   velocity: number
   stride: number
   moved: boolean
-}
-
-function doseToYieldRatio(dose: string | number, targetYield: string | number) {
-  const doseValue = Number(dose)
-  const yieldValue = Number(targetYield)
-  if (!Number.isFinite(doseValue) || doseValue <= 0 || !Number.isFinite(yieldValue)) return undefined
-  return `1:${(yieldValue / doseValue).toFixed(1)} ratio`
 }
 
 export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUpdateProfile, onSelectProfile, onManageProfiles }: { profiles: BrewProfile[]; activeProfileId?: string; settingsDisabled?: boolean; onUpdateProfile: (profileId: string, setting: EditableProfileSetting, value: number) => void; onSelectProfile: (profileId: string) => Promise<boolean>; onManageProfiles: () => void }) {
@@ -152,7 +146,7 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
       })}
     </div>
     <button className="manage-profiles" type="button" onClick={onManageProfiles}>See all profiles →</button>
-    <div className="brew-metrics" key={activeProfile.id} aria-live="polite">
+    <div className="brew-metrics" aria-live="polite">
       <Metric metric={{ label: 'Temp.', value: activeProfile.temperature, unit: '°' }} edit={editProfileSetting('temperature')} />
       <Metric metric={{ label: 'Grind size', value: activeProfile.grindSetting }} edit={editProfileSetting('grindSetting')} />
       <Metric metric={{ label: 'Dose', value: activeProfile.dose, unit: 'g' }} edit={editProfileSetting('dose')} />
