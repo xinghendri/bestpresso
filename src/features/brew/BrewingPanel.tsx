@@ -36,6 +36,7 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
   const suppressClick = useRef(false)
   const selectionRequest = useRef(0)
   const activeProfile = profiles[activeIndex] ?? profiles[0]
+  const hasTargetYield = Number.isFinite(Number(activeProfile.targetYield))
   const ratio = doseToYieldRatio(activeProfile.dose, activeProfile.targetYield)
   const doseValue = Number(activeProfile.dose)
   const effectiveDose = Number.isFinite(doseValue) && doseValue >= 0 ? doseValue : VALUE_ADJUSTMENTS.dose.defaultValue
@@ -155,7 +156,7 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
       <Metric metric={{ label: 'Temp.', value: activeProfile.temperature, unit: '°' }} edit={editProfileSetting('temperature')} />
       <Metric metric={{ label: 'Grind size', value: activeProfile.grindSetting }} edit={editProfileSetting('grindSetting')} />
       <Metric metric={{ label: 'Dose', value: activeProfile.dose, unit: 'g' }} edit={editProfileSetting('dose')} />
-      <Metric metric={{ label: 'Yield', value: activeProfile.targetYield, unit: 'g', subtext: ratio, subtextVariant: 'pill' }} edit={editProfileSetting('targetYield', yieldValueHint, fixedYieldSuggestions)} />
+      {hasTargetYield && <Metric metric={{ label: 'Yield', value: activeProfile.targetYield, unit: 'g', subtext: ratio, subtextVariant: 'pill' }} edit={editProfileSetting('targetYield', yieldValueHint, fixedYieldSuggestions)} />}
     </div>
   </section>
 }
