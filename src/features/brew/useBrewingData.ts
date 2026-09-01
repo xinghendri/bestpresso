@@ -782,7 +782,7 @@ export function useBrewingData() {
 
     const refreshWorkflow = window.setInterval(() => {
       getWorkflow().then((workflow) => {
-        if (disposed || (workflow.profile?.beverage_type?.toLowerCase() === 'cleaning' && cleaningRestoreWorkflow.current)) return
+        if (disposed || liveShotSession.current || (workflow.profile?.beverage_type?.toLowerCase() === 'cleaning' && cleaningRestoreWorkflow.current)) return
         setModel((current) => applyWorkflow(current, rememberFlushDuration(workflow), profileRecords.current, favoriteAssignments.current, retainedAdHocProfileId.current))
       }).catch(() => undefined)
     }, 15000)
@@ -1160,6 +1160,7 @@ export function useBrewingData() {
   }
 
   const selectProfile = async (profileId: string) => {
+    if (liveShotSession.current) return false
     const profile = allProfiles.find((candidate) => candidate.id === profileId)
     if (!profile) {
       showSettingFeedback({ status: 'error', message: 'That profile is no longer available.' })
