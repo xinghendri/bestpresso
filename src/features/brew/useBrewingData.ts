@@ -13,7 +13,7 @@ import { CLEANING_PROFILE_START_STATE, cleaningRestorePatch, isCleaningSequenceR
 import { observePostShotWeight, reconciledShotYield, type YieldFinalizationState } from '../history/shotYieldFinalization'
 import { LAST_SELECTED_PROFILE_LOCAL_KEY, LAST_SELECTED_PROFILE_SHARED_KEY, normalizeRememberedProfileId, resolveRememberedProfileId } from '../profiles/profileSelectionPersistence'
 import { rinseWorkflowPatchFromMachineSettings } from './flushSettings'
-import { isEspressoExtractionSnapshot } from './liveShotState'
+import { beginSkipTransition, observeSkipTransition, type SkipTransition } from './liveShotState'
 import { SLEEP_DISPLAY_BRIGHTNESS, shouldRunBackgroundScaleScan, sleepMachineWithConfiguredScalePolicy } from './sleepControl'
 
 const MAX_LIVE_SHOT_POINTS = 900
@@ -155,6 +155,7 @@ export function useBrewingData() {
   const scaleTareInFlight = useRef(false)
   const brewStopRequestInFlight = useRef(false)
   const brewSkipRequestInFlight = useRef(false)
+  const brewSkipTransition = useRef<SkipTransition | null>(null)
   const cleaningStartInFlight = useRef(false)
   const pendingCleaningSequence = useRef<PendingCleaningSequence | null>(null)
   const cleaningRestoreWorkflow = useRef<DecaidWorkflowPatch | null>(null)
@@ -380,6 +381,7 @@ export function useBrewingData() {
       const session = liveShotSession.current
       if (!session) return
       liveShotSession.current = null
+      brewSkipTransition.current = null
       brewStopRequestInFlight.current = false
       brewSkipRequestInFlight.current = false
       setBrewStopPending(false)
@@ -598,7 +600,9 @@ export function useBrewingData() {
         utilityOperationSession.current = null
         setUtilityOperation(null)
       }
-      const isEspressoExtraction = isEspressoExtractionSnapshot(snapshot, liveShotSession.current !== null)
+      const skipObservation = observeSkipTransition(snapshot, brewSkipTransition.current, Date.now(), liveShotSession.current !== null)
+      brewSkipTransition.current = skipObservation.transition
+      const isEspressoExtraction = skipObservation.keepShotActive
       const isCleaning = isCleaningSequenceRun(machineStateForSnapshot(snapshot), isEspressoExtraction, pendingCleaningSequence.current !== null)
       if (isEspressoExtraction || isCleaning) {
         const now = snapshotTime(snapshot.timestamp)
@@ -632,7 +636,8 @@ export function useBrewingData() {
         const session = liveShotSession.current
         const elapsedMs = Math.max(0, now - session.startedAt)
         const lastPoint = session.points.at(-1)
-        if (!lastPoint || elapsedMs > lastPoint.elapsedMs) {
+        const acceptsShotTelemetry = skipObservation.acceptTelemetry || machineState === 'cleaning'
+        if (acceptsShotTelemetry && (!lastPoint || elapsedMs > lastPoint.elapsedMs)) {
           const stage = shotStage(snapshot.profileFrame, typeof snapshot.state === 'object' ? snapshot.state.substate : undefined, session.stepNames)
           session.points.push({
             elapsedMs,
@@ -681,6 +686,7 @@ export function useBrewingData() {
     }, (connected) => {
       if (!connected) {
         readinessTracker.current.reset()
+        brewSkipTransition.current = null
         completeLiveShot()
         utilityOperationSession.current = null
         setUtilityOperation(null)
@@ -1053,6 +1059,7 @@ export function useBrewingData() {
       return
     }
     brewStopRequestInFlight.current = true
+    brewSkipTransition.current = null
     setBrewStopPending(true)
     showMachineActionError(null)
     try {
@@ -1071,12 +1078,14 @@ export function useBrewingData() {
       return false
     }
     brewSkipRequestInFlight.current = true
+    brewSkipTransition.current = beginSkipTransition(liveShotSession.current.points.at(-1)?.stageIndex, Date.now())
     setBrewSkipPending(true)
     showMachineActionError(null)
     try {
       await setMachineState('skipStep')
       return true
     } catch {
+      brewSkipTransition.current = null
       showMachineActionError('The machine did not accept the skip command.')
       return false
     } finally {
