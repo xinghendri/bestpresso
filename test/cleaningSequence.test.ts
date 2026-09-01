@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { CLEANING_PROFILE_START_STATE, cleaningRestorePatch, isCleaningSequenceRun, profileForCleaningShortcut } from '../src/features/cleaning/cleaningSequence.ts'
+
+const picker = readFileSync(new URL('../src/features/cleaning/CleaningSequencePicker.tsx', import.meta.url), 'utf8')
+const brewingData = readFileSync(new URL('../src/features/brew/useBrewingData.ts', import.meta.url), 'utf8')
 
 test('runs an uploaded cleaning profile through the espresso state', () => {
   assert.equal(CLEANING_PROFILE_START_STATE, 'espresso')
@@ -50,4 +54,14 @@ test('restores only profile selection and never rewrites current utility setting
     profile: workflow.profile,
     context: workflow.context,
   })
+})
+
+test('keeps the cup action available after selection without relying on a prepared-prop render', () => {
+  assert.match(picker, /disabled=\{!selectedProfileId \|\| interactionLocked\}/)
+  assert.doesNotMatch(picker, /preparedProfileId !== selectedProfileId \|\| interactionLocked/)
+})
+
+test('prepares the selected cleaning profile inside the start path when needed', () => {
+  assert.match(brewingData, /if \(pendingCleaningSequence\.current\?\.profileId !== profileId\) \{\s*const prepared = await prepareCleaningSequence\(profileId\)\s*if \(!prepared\) return false/)
+  assert.doesNotMatch(brewingData, /cleaningPreparedProfileId !== profileId/)
 })

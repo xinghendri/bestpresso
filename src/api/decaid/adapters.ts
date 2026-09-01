@@ -1,6 +1,6 @@
 import type { BrewProfile, BrewingScreenModel, PreviousShot, ProfileTargetPoint } from '../../domain/brewing'
 import { isSteamHeatingEnabled } from '../../features/machine/steamHeating'
-import { profileTargetYield } from './profileWorkflow'
+import { profileConfiguredTargetYield, profileTargetYield } from './profileWorkflow'
 import type { DecaidProfileRecord, DecaidProfileStep, DecaidWorkflow, FavoriteAssignments, ShotRecord } from './types'
 
 const MM_TO_ML = [0,16,43,70,97,124,151,179,206,233,261,288,316,343,371,398,426,453,481,509,537,564,592,620,648,676,704,732,760,788,816,844,872,900,929,957,985,1013,1042,1070,1104,1138,1172,1207,1242,1277,1312,1347,1382,1417,1453,1488,1523,1559,1594,1630,1665,1701,1736,1772,1808,1843,1879,1915,1951,1986,2022,2058]
@@ -129,7 +129,7 @@ export function profileRecordsToDomain(records: DecaidProfileRecord[], workflow:
       temperature: numberString(isActive ? workflow.profile?.steps?.[0]?.temperature : metadata.temperature ?? profile.steps?.[0]?.temperature, '—'),
       grindSetting: numberString(isActive ? workflow.context?.grinderSetting : metadata.grinderSetting, '—'),
       dose: numberString(isActive ? workflow.context?.targetDoseWeight : metadata.targetDoseWeight ?? profile.dose_weight, '18'),
-      targetYield: numberString(profileTargetYield(profile, isActive ? workflow.profile?.target_weight ?? workflow.context?.targetYield : metadata.targetYield ?? profile.target_weight), '—'),
+      targetYield: numberString(profileConfiguredTargetYield(profile, metadata, isActive ? workflow.profile?.target_weight ?? workflow.context?.targetYield : undefined), '—'),
       targetPoints: profileStepsToTargetPoints(isActive ? workflow.profile?.steps : profile.steps),
       stepNames: (isActive ? workflow.profile?.steps : profile.steps)?.map((step, index) => textValue(step.name) ?? `Stage ${index + 1}`),
     }

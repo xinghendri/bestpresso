@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { playCompletionSound } from '../../audio/completionSound'
 import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isCleaningProfile, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotStage, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres } from '../../api/decaid/adapters'
 import { connectDevice, DecaidApiError, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getMachineSettings, getProfiles, getSettings, getSharedSetting, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineProfile, setMachineState, setSharedSetting, tareScale, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
-import { profileUsesStopAtWeight, workflowValuesForProfile } from '../../api/decaid/profileWorkflow'
+import { profileUserTargetNeedsWorkflowSync, workflowValuesForProfile } from '../../api/decaid/profileWorkflow'
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, DecaidWorkflowPatch, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
@@ -498,10 +498,12 @@ export function useBrewingData() {
         let domainProfiles = profileRecordsToDomain(records, workflow, fixtureProfiles)
         const workflowProfile = activeProfileForWorkflow(domainProfiles, records, workflow)
         const restoredProfileId = resolveRememberedProfileId(domainProfiles.map((profile) => profile.id), rememberedProfileId, workflowProfile?.id)
-        if (restoredProfileId && restoredProfileId !== workflowProfile?.id) {
+        if (restoredProfileId) {
           const restoredProfile = domainProfiles.find((profile) => profile.id === restoredProfileId)
           const restoredRecord = records.find((record) => (record.id || record.profile?.title) === restoredProfileId)
-          if (restoredProfile && restoredRecord?.profile?.steps?.length) {
+          const targetOverrideNeedsSync = profileUserTargetNeedsWorkflowSync(restoredRecord?.metadata, workflow.context?.targetYield)
+          const shouldRestoreProfile = restoredProfileId !== workflowProfile?.id || targetOverrideNeedsSync
+          if (shouldRestoreProfile && restoredProfile && restoredRecord?.profile?.steps?.length) {
             const workflowBeforeProfileRestore = workflow
             try {
               workflow = await updateWorkflow(workflowValuesForProfile(restoredRecord, restoredProfile).patch)
@@ -1004,9 +1006,9 @@ export function useBrewingData() {
 
   const startCleaningSequence = async (profileId: string) => {
     if (cleaningStartInFlight.current || liveShotSession.current) return false
-    if (cleaningPreparedProfileId !== profileId || pendingCleaningSequence.current?.profileId !== profileId) {
-      showMachineActionError('Wait for the selected cleaning sequence to finish loading.')
-      return false
+    if (pendingCleaningSequence.current?.profileId !== profileId) {
+      const prepared = await prepareCleaningSequence(profileId)
+      if (!prepared) return false
     }
     if (connection !== 'connected' || machineConnection !== 'connected') {
       showMachineActionError('Connect to the machine before starting a cleaning sequence.')
@@ -1140,10 +1142,6 @@ export function useBrewingData() {
     const currentProfile = allProfiles.find((profile) => profile.id === profileId)
     if (!record?.profile?.steps?.length || !currentProfile) {
       showSettingFeedback({ status: 'error', message: 'This profile is not available for editing.' })
-      return
-    }
-    if (setting === 'targetYield' && !profileUsesStopAtWeight(record.profile)) {
-      showSettingFeedback({ status: 'error', message: `${currentProfile.name} does not use stop at weight.` })
       return
     }
     const nextProfile = { ...currentProfile, [setting]: String(value) }
