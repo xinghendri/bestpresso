@@ -8,6 +8,27 @@ export const profileForCleaningShortcut = (profile: DecaidProfile): DecaidProfil
     : { ...profile, beverage_type: 'cleaning' }
 )
 
+interface CleaningProfilePreparationOperations {
+  selectWorkflow: (profile: DecaidProfile) => Promise<DecaidWorkflow>
+  uploadProfile: (profile: DecaidProfile) => Promise<void>
+}
+
+export const prepareCleaningProfileForEspressoStart = async (
+  profile: DecaidProfile,
+  operations: CleaningProfilePreparationOperations,
+) => {
+  const workflow = await operations.selectWorkflow(profile)
+  const selectedProfile = workflow.profile
+  if (
+    selectedProfile?.title !== profile.title
+    || selectedProfile?.beverage_type?.trim().toLowerCase() !== 'cleaning'
+  ) {
+    throw new Error('Decaid did not retain the selected cleaning profile')
+  }
+  await operations.uploadProfile(selectedProfile)
+  return workflow
+}
+
 export const isCleaningSequenceRun = (machineState: string | undefined, espressoExtraction: boolean, hasPreparedCleaningProfile: boolean) => (
   machineState === 'cleaning' || (hasPreparedCleaningProfile && espressoExtraction)
 )

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { CLEANING_PROFILE_START_STATE, cleaningRestorePatch, isCleaningSequenceRun, profileForCleaningShortcut } from '../src/features/cleaning/cleaningSequence.ts'
+import { CLEANING_PROFILE_START_STATE, cleaningRestorePatch, isCleaningSequenceRun, prepareCleaningProfileForEspressoStart, profileForCleaningShortcut } from '../src/features/cleaning/cleaningSequence.ts'
 
 const picker = readFileSync(new URL('../src/features/cleaning/CleaningSequencePicker.tsx', import.meta.url), 'utf8')
 const brewingData = readFileSync(new URL('../src/features/brew/useBrewingData.ts', import.meta.url), 'utf8')
@@ -41,6 +41,43 @@ test('preserves an already valid cleaning profile', () => {
   assert.equal(profileForCleaningShortcut(storedProfile), storedProfile)
 })
 
+test('selects the cleaning workflow before awaiting the final machine upload', async () => {
+  const requestedProfile = {
+    title: 'Cleaning/Forward Flush x5',
+    beverage_type: 'cleaning',
+    steps: [{ name: 'Fill', flow: 6 }],
+  }
+  const selectedProfile = { ...requestedProfile, notes: 'Selected by Decaid' }
+  const events: string[] = []
+
+  const workflow = await prepareCleaningProfileForEspressoStart(requestedProfile, {
+    selectWorkflow: async () => {
+      events.push('select workflow')
+      return { profile: selectedProfile }
+    },
+    uploadProfile: async (profile) => {
+      events.push('upload selected profile')
+      assert.equal(profile, selectedProfile)
+    },
+  })
+
+  assert.deepEqual(events, ['select workflow', 'upload selected profile'])
+  assert.equal(workflow.profile, selectedProfile)
+})
+
+test('does not upload a workflow that did not retain the cleaning selection', async () => {
+  let uploadCalled = false
+  await assert.rejects(() => prepareCleaningProfileForEspressoStart({
+    title: 'Cleaning/Forward Flush x5',
+    beverage_type: 'cleaning',
+    steps: [{ name: 'Fill', flow: 6 }],
+  }, {
+    selectWorkflow: async () => ({ profile: { title: 'Adaptive V2', beverage_type: 'espresso' } }),
+    uploadProfile: async () => { uploadCalled = true },
+  }))
+  assert.equal(uploadCalled, false)
+})
+
 test('restores only profile selection and never rewrites current utility settings', () => {
   const workflow = {
     profile: { title: 'Adaptive V2', steps: [{ name: 'Fill' }] },
@@ -64,4 +101,14 @@ test('keeps the cup action available after selection without relying on a prepar
 test('prepares the selected cleaning profile inside the start path when needed', () => {
   assert.match(brewingData, /if \(pendingCleaningSequence\.current\?\.profileId !== profileId\) \{\s*const prepared = await prepareCleaningSequence\(profileId\)\s*if \(!prepared\) return false/)
   assert.doesNotMatch(brewingData, /cleaningPreparedProfileId !== profileId/)
+})
+
+test('uses the Espresso request without a stale frontend connection gate', () => {
+  const startPath = brewingData.slice(
+    brewingData.indexOf('const startCleaningSequence'),
+    brewingData.indexOf('const cancelCleaningSequence'),
+  )
+  assert.match(startPath, /await setMachineState\(CLEANING_PROFILE_START_STATE\)/)
+  assert.doesNotMatch(startPath, /connection !== 'connected'/)
+  assert.doesNotMatch(startPath, /machineConnection !== 'connected'/)
 })

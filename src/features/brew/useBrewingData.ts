@@ -10,7 +10,7 @@ import { liveShotYield, normalizedLiveScaleWeight, scaleConnectionIsActive, WATE
 import type { AvailableScale, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, LiveUtilityOperation, MachineReadiness, PreviousShot, PreviousShotStatus, ScaleConnection, SettingFeedback, UtilityOperationKind } from '../../domain/brewing'
 import { brewingFixture, demoLiveBrewFixture } from '../../fixtures/brewingFixture'
 import { scaleFixtureForKey } from '../../fixtures/scaleFixtures'
-import { CLEANING_PROFILE_START_STATE, cleaningRestorePatch, isCleaningSequenceRun, profileForCleaningShortcut } from '../cleaning/cleaningSequence'
+import { CLEANING_PROFILE_START_STATE, cleaningRestorePatch, isCleaningSequenceRun, prepareCleaningProfileForEspressoStart, profileForCleaningShortcut } from '../cleaning/cleaningSequence'
 import { observePostShotWeight, reconciledShotYield, type YieldFinalizationState } from '../history/shotYieldFinalization'
 import { LAST_SELECTED_PROFILE_LOCAL_KEY, LAST_SELECTED_PROFILE_SHARED_KEY, normalizeRememberedProfileId, resolveRememberedProfileId } from '../profiles/profileSelectionPersistence'
 import { rinseWorkflowPatchFromMachineSettings } from './flushSettings'
@@ -975,12 +975,10 @@ export function useBrewingData() {
     try {
       if (!cleaningRestoreWorkflow.current) cleaningRestoreWorkflow.current = cleaningRestorePatch(await getWorkflow())
       const executionProfile = profileForCleaningShortcut(record.profile)
-      await setMachineProfile(executionProfile)
-      const cleaningWorkflow = await updateWorkflow({ profile: executionProfile })
-      const selectedProfile = cleaningWorkflow.profile
-      if (selectedProfile?.title !== executionProfile.title || selectedProfile?.beverage_type?.toLowerCase() !== 'cleaning') {
-        throw new Error('Decaid did not retain the selected cleaning profile')
-      }
+      await prepareCleaningProfileForEspressoStart(executionProfile, {
+        selectWorkflow: (profileToSelect) => updateWorkflow({ profile: profileToSelect }),
+        uploadProfile: setMachineProfile,
+      })
       pendingCleaningSequence.current = { profileId, profileName: profile.name, stepNames: profile.stepNames }
       setCleaningPreparedProfileId(profileId)
       return true
@@ -1009,10 +1007,6 @@ export function useBrewingData() {
     if (pendingCleaningSequence.current?.profileId !== profileId) {
       const prepared = await prepareCleaningSequence(profileId)
       if (!prepared) return false
-    }
-    if (connection !== 'connected' || machineConnection !== 'connected') {
-      showMachineActionError('Connect to the machine before starting a cleaning sequence.')
-      return false
     }
 
     cleaningStartInFlight.current = true
