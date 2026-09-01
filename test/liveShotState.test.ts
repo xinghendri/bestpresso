@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { isEspressoExtractionSnapshot } from '../src/features/brew/liveShotState.ts'
+import { beginSkipTransition, isEspressoExtractionSnapshot, observeSkipTransition, SKIP_TRANSITION_TIMEOUT_MS } from '../src/features/brew/liveShotState.ts'
 
 test('keeps an active shot alive while Decaid reports the skip-step transition', () => {
   assert.equal(isEspressoExtractionSnapshot({ state: { state: 'skipStep', substate: 'pouring' } }, true), true)
@@ -36,4 +36,48 @@ test('treats espresso to skip-step to the next espresso frame as one uninterrupt
   assert.equal(shotInProgress, true)
   assert.equal(completedShots, 0)
   assert.equal(snapshots.at(-1)?.profileFrame, 3)
+})
+
+test('holds an active shot across the transient stopped frame emitted by skip', () => {
+  const requestedAt = 10_000
+  let transition = beginSkipTransition(2, requestedAt)
+
+  const skipState = observeSkipTransition({ state: { state: 'skipStep', substate: 'pouring' }, profileFrame: 2 }, transition, requestedAt + 100, true)
+  transition = skipState.transition!
+  assert.equal(skipState.keepShotActive, true)
+  assert.equal(skipState.acceptTelemetry, true)
+
+  const transientIdle = observeSkipTransition({ state: { state: 'idle', substate: 'pouringDone' }, profileFrame: 2 }, transition, requestedAt + 250, true)
+  transition = transientIdle.transition!
+  assert.equal(transientIdle.keepShotActive, true)
+  assert.equal(transientIdle.acceptTelemetry, false)
+
+  const nextFrame = observeSkipTransition({ state: { state: 'espresso', substate: 'pouring' }, profileFrame: 3 }, transition, requestedAt + 400, true)
+  assert.equal(nextFrame.keepShotActive, true)
+  assert.equal(nextFrame.acceptTelemetry, true)
+  assert.equal(nextFrame.transition, null)
+})
+
+test('ends the shot if no next frame arrives before the skip transition expires', () => {
+  const requestedAt = 10_000
+  const transition = beginSkipTransition(4, requestedAt)
+  const expiredIdle = observeSkipTransition(
+    { state: { state: 'idle', substate: 'pouringDone' }, profileFrame: 4 },
+    transition,
+    requestedAt + SKIP_TRANSITION_TIMEOUT_MS + 1,
+    true,
+  )
+
+  assert.equal(expiredIdle.keepShotActive, false)
+  assert.equal(expiredIdle.acceptTelemetry, false)
+  assert.equal(expiredIdle.transition, null)
+})
+
+test('does not let a skip latch mask a definitive machine state', () => {
+  const requestedAt = 10_000
+  const transition = beginSkipTransition(2, requestedAt)
+  const error = observeSkipTransition({ state: { state: 'error', substate: 'idle' }, profileFrame: 2 }, transition, requestedAt + 100, true)
+
+  assert.equal(error.keepShotActive, false)
+  assert.equal(error.transition, null)
 })
