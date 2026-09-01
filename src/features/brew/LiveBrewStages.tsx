@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { MouseEvent } from 'react'
+import type { MouseEvent, PointerEvent } from 'react'
 import skipNext from '../../assets/figma/skip-next.svg'
 import type { LiveShotPoint } from '../../domain/brewing'
 import { DOUBLE_TAP_CONFIRMATION_WINDOW_MS, registerDoubleTap } from './doubleTapConfirmation'
@@ -128,8 +128,10 @@ export function LiveBrewStages({ points, elapsedMs, active = false, showYield = 
   }, [active])
 
   const handleSkipTap = async (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
     if (skipPending || !onSkipStage) return
-    const result = registerDoubleTap(previousSkipTap.current, event.timeStamp)
+    const result = registerDoubleTap(previousSkipTap.current, Date.now())
     previousSkipTap.current = result.nextTapAt
     if (result.confirmed) {
       const skippedStageKey = stages.at(-1)?.key
@@ -143,6 +145,15 @@ export function LiveBrewStages({ points, elapsedMs, active = false, showYield = 
     skipButtonRef.current?.setAttribute('aria-pressed', 'true')
     if (skipConfirmationTimeout.current !== null) window.clearTimeout(skipConfirmationTimeout.current)
     skipConfirmationTimeout.current = window.setTimeout(resetSkipConfirmation, DOUBLE_TAP_CONFIRMATION_WINDOW_MS)
+  }
+
+  const consumeSkipPointer = (event: PointerEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+  }
+
+  const consumeSkipDoubleClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
   }
 
   useEffect(() => {
@@ -216,7 +227,7 @@ export function LiveBrewStages({ points, elapsedMs, active = false, showYield = 
         <div><dt>Pressure</dt><dd>{stage.pressureMovements.length ? stage.pressureMovements.map((pressure) => reading(pressure)).join(' → ') : '—'}</dd></div>
       </dl>
     </article>})}
-    {active && onSkipStage && <button className={`live-brew-skip${skipPending ? ' live-brew-skip--pending' : ''}`} type="button" disabled={skipPending} aria-label="Double tap to skip to the next phase" aria-pressed="false" onClick={handleSkipTap} ref={skipButtonRef}>
+    {active && onSkipStage && <button className={`live-brew-skip${skipPending ? ' live-brew-skip--pending' : ''}`} type="button" disabled={skipPending} aria-label="Double tap to skip to the next phase" aria-pressed="false" onPointerDown={consumeSkipPointer} onPointerUp={consumeSkipPointer} onPointerCancel={consumeSkipPointer} onClick={handleSkipTap} onDoubleClick={consumeSkipDoubleClick} ref={skipButtonRef}>
       <img className="live-brew-skip__icon" src={skipNext} alt="" />
       <span>double tap to skip</span>
     </button>}
