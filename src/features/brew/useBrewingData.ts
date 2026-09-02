@@ -10,12 +10,12 @@ import { liveShotYield, normalizedLiveScaleWeight, scaleConnectionIsActive, WATE
 import type { AvailableScale, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, LiveUtilityOperation, MachineReadiness, PreviousShot, PreviousShotStatus, ScaleConnection, SettingFeedback, UtilityOperationKind } from '../../domain/brewing'
 import { brewingFixture, demoLiveBrewFixture } from '../../fixtures/brewingFixture'
 import { scaleFixtureForKey } from '../../fixtures/scaleFixtures'
-import { CLEANING_PROFILE_START_STATE, cleaningRestorePatch, isCleaningSequenceRun, prepareCleaningProfileForEspressoStart, profileForCleaningShortcut } from '../cleaning/cleaningSequence'
+import { cleaningRestorePatch, isCleaningSequenceRun, prepareCleaningProfileForEspressoStart, profileForCleaningShortcut } from '../cleaning/cleaningSequence'
 import { observePostShotWeight, reconciledShotYield, type YieldFinalizationState } from '../history/shotYieldFinalization'
 import { LAST_SELECTED_PROFILE_LOCAL_KEY, LAST_SELECTED_PROFILE_SHARED_KEY, normalizeRememberedProfileId, resolveRememberedProfileId } from '../profiles/profileSelectionPersistence'
 import { rinseWorkflowPatchFromMachineSettings } from './flushSettings'
 import { isSuccessfulEspressoCompletion, shouldPlayCompletionCue } from './completionCue'
-import { beginSkipTransition, observeSkipTransition, type SkipTransition } from './liveShotState'
+import { advanceShotTimeline, beginSkipTransition, isEspressoMonitoringSnapshot, observeSkipTransition, type SkipTransition } from './liveShotState'
 import { SLEEP_DISPLAY_BRIGHTNESS, shouldRunBackgroundScaleScan, sleepMachineWithConfiguredScalePolicy } from './sleepControl'
 
 const MAX_LIVE_SHOT_POINTS = 900
@@ -32,6 +32,7 @@ const localLiveBrewFixture = import.meta.env.DEV && new URLSearchParams(window.l
 interface LiveShotSession {
   kind: 'espresso' | 'cleaning'
   startedAt: number
+  telemetryStartedAt?: number
   profileName: string
   targetYield?: number
   stepNames?: string[]
@@ -408,6 +409,10 @@ export function useBrewingData() {
         }
         return
       }
+      if (points.length === 0) {
+        setLiveBrew({ active: false, visible: false, startedAt: session.startedAt, kind: 'espresso', profileName: session.profileName, targetYield: session.targetYield, elapsedMs: 0, points })
+        return
+      }
       const finalWeight = liveShotYield(connectedScale.current ? latestScaleSnapshot.current.weight : undefined, points)
       if (finalWeight !== undefined && points.length > 0) {
         points = points.map((point, index) => index === points.length - 1 ? { ...point, weight: finalWeight } : point)
@@ -608,8 +613,9 @@ export function useBrewingData() {
       const skipObservation = observeSkipTransition(snapshot, brewSkipTransition.current, Date.now(), liveShotSession.current !== null)
       brewSkipTransition.current = skipObservation.transition
       const isEspressoExtraction = skipObservation.keepShotActive
-      const isCleaning = isCleaningSequenceRun(machineStateForSnapshot(snapshot), isEspressoExtraction, pendingCleaningSequence.current !== null)
-      if (isEspressoExtraction || isCleaning) {
+      const isEspressoMonitoring = isEspressoMonitoringSnapshot(snapshot, isEspressoExtraction)
+      const isCleaning = isCleaningSequenceRun(machineStateForSnapshot(snapshot), isEspressoMonitoring, pendingCleaningSequence.current !== null)
+      if (isEspressoMonitoring || isCleaning) {
         const now = snapshotTime(snapshot.timestamp)
         const currentModel = latestModel.current
         const cleaningSequence = pendingCleaningSequence.current
@@ -639,9 +645,11 @@ export function useBrewingData() {
           }
         }
         const session = liveShotSession.current
-        const elapsedMs = Math.max(0, now - session.startedAt)
-        const lastPoint = session.points.at(-1)
         const acceptsShotTelemetry = skipObservation.acceptTelemetry || machineState === 'cleaning'
+        const timeline = advanceShotTimeline(now, acceptsShotTelemetry, session.telemetryStartedAt)
+        session.telemetryStartedAt = timeline.telemetryStartedAt
+        const elapsedMs = timeline.elapsedMs
+        const lastPoint = session.points.at(-1)
         if (acceptsShotTelemetry && (!lastPoint || elapsedMs > lastPoint.elapsedMs)) {
           const stage = shotStage(snapshot.profileFrame, typeof snapshot.state === 'object' ? snapshot.state.substate : undefined, session.stepNames)
           session.points.push({
@@ -974,9 +982,10 @@ export function useBrewingData() {
     showMachineActionError(null)
     try {
       if (!cleaningRestoreWorkflow.current) cleaningRestoreWorkflow.current = cleaningRestorePatch(await getWorkflow())
-      const executionProfile = profileForCleaningShortcut(record.profile)
+      const selectionPatch = workflowValuesForProfile(record, profile).patch
+      const executionProfile = profileForCleaningShortcut(selectionPatch.profile ?? record.profile)
       await prepareCleaningProfileForEspressoStart(executionProfile, {
-        selectWorkflow: (profileToSelect) => updateWorkflow({ profile: profileToSelect }),
+        selectWorkflow: (profileToSelect) => updateWorkflow({ ...selectionPatch, profile: profileToSelect }),
         uploadProfile: setMachineProfile,
       })
       pendingCleaningSequence.current = { profileId, profileName: profile.name, stepNames: profile.stepNames }
@@ -999,26 +1008,6 @@ export function useBrewingData() {
     } finally {
       cleaningStartInFlight.current = false
       setCleaningStartPending(false)
-    }
-  }
-
-  const startCleaningSequence = async (profileId: string) => {
-    if (cleaningStartInFlight.current || liveShotSession.current) return false
-    if (pendingCleaningSequence.current?.profileId !== profileId) {
-      const prepared = await prepareCleaningSequence(profileId)
-      if (!prepared) return false
-    }
-
-    cleaningStartInFlight.current = true
-    showMachineActionError(null)
-    try {
-      await setMachineState(CLEANING_PROFILE_START_STATE)
-      return true
-    } catch {
-      showMachineActionError('The machine did not start the cleaning sequence.')
-      return false
-    } finally {
-      cleaningStartInFlight.current = false
     }
   }
 
@@ -1288,5 +1277,5 @@ export function useBrewingData() {
   const dismissLiveBrew = () => setLiveBrew((current) => current.active ? current : { ...current, visible: false })
   const favoriteProfileIds = favoriteProfileSlots.filter((id): id is string => Boolean(id))
 
-  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, utilityOperation, previousShotStatus, shotHistory, loadHistoryShot, heatingSeconds, connection, machineConnection, scale, availableScales, scaleConnectPendingId, scaleTarePending, brewStopPending, brewSkipPending, cleaningStartPending, cleaningPreparedProfileId, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, skipBrewStage, prepareCleaningSequence, startCleaningSequence, cancelCleaningSequence, dismissLiveBrew, searchForScale, connectToScale, dismissScalePicker, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
+  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, utilityOperation, previousShotStatus, shotHistory, loadHistoryShot, heatingSeconds, connection, machineConnection, scale, availableScales, scaleConnectPendingId, scaleTarePending, brewStopPending, brewSkipPending, cleaningStartPending, cleaningPreparedProfileId, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, skipBrewStage, prepareCleaningSequence, cancelCleaningSequence, dismissLiveBrew, searchForScale, connectToScale, dismissScalePicker, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
 }

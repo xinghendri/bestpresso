@@ -1,6 +1,23 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { beginSkipTransition, isEspressoExtractionSnapshot, observeSkipTransition, SKIP_TRANSITION_TIMEOUT_MS } from '../src/features/brew/liveShotState.ts'
+import { advanceShotTimeline, beginSkipTransition, isEspressoExtractionSnapshot, isEspressoMonitoringSnapshot, observeSkipTransition, SKIP_TRANSITION_TIMEOUT_MS } from '../src/features/brew/liveShotState.ts'
+
+test('opens monitoring while a normal Espresso shot is preparing', () => {
+  const snapshot = { state: { state: 'espresso', substate: 'preparingForShot' } }
+  assert.equal(isEspressoExtractionSnapshot(snapshot), false)
+  assert.equal(isEspressoMonitoringSnapshot(snapshot), true)
+})
+
+test('starts the graph clock at zero on the first extraction sample', () => {
+  const preparing = advanceShotTimeline(10_000, false)
+  assert.deepEqual(preparing, { telemetryStartedAt: undefined, elapsedMs: 0 })
+
+  const firstPour = advanceShotTimeline(20_000, true, preparing.telemetryStartedAt)
+  assert.deepEqual(firstPour, { telemetryStartedAt: 20_000, elapsedMs: 0 })
+
+  const nextPour = advanceShotTimeline(20_500, true, firstPour.telemetryStartedAt)
+  assert.deepEqual(nextPour, { telemetryStartedAt: 20_000, elapsedMs: 500 })
+})
 
 test('keeps an active shot alive while Decaid reports the skip-step transition', () => {
   assert.equal(isEspressoExtractionSnapshot({ state: { state: 'skipStep', substate: 'pouring' } }, true), true)

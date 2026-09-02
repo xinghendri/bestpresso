@@ -1,17 +1,14 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { CLEANING_PROFILE_START_STATE, cleaningRestorePatch, isCleaningSequenceRun, prepareCleaningProfileForEspressoStart, profileForCleaningShortcut } from '../src/features/cleaning/cleaningSequence.ts'
+import { cleaningRestorePatch, isCleaningSequenceRun, prepareCleaningProfileForEspressoStart, profileForCleaningShortcut } from '../src/features/cleaning/cleaningSequence.ts'
 
 const picker = readFileSync(new URL('../src/features/cleaning/CleaningSequencePicker.tsx', import.meta.url), 'utf8')
 const brewingData = readFileSync(new URL('../src/features/brew/useBrewingData.ts', import.meta.url), 'utf8')
 
-test('runs an uploaded cleaning profile through the espresso state', () => {
-  assert.equal(CLEANING_PROFILE_START_STATE, 'espresso')
-})
-
 test('keeps an espresso-state cleaning profile in the cleaning UI flow', () => {
   assert.equal(isCleaningSequenceRun('espresso', true, true), true)
+  assert.equal(isCleaningSequenceRun('espresso', false, true), true)
   assert.equal(isCleaningSequenceRun('espresso', true, false), false)
   assert.equal(isCleaningSequenceRun('cleaning', false, false), true)
 })
@@ -93,22 +90,16 @@ test('restores only profile selection and never rewrites current utility setting
   })
 })
 
-test('keeps the cup action available after selection without relying on a prepared-prop render', () => {
-  assert.match(picker, /disabled=\{!selectedProfileId \|\| interactionLocked\}/)
-  assert.doesNotMatch(picker, /preparedProfileId !== selectedProfileId \|\| interactionLocked/)
+test('uses the cup icon only as guidance for the physical machine button', () => {
+  assert.match(picker, /Tap <span className="cleaning-picker__brew-guide">/)
+  assert.match(picker, /on your machine to start/)
+  assert.doesNotMatch(picker, /onStart/)
+  assert.doesNotMatch(picker, /startSelected/)
 })
 
-test('prepares the selected cleaning profile inside the start path when needed', () => {
-  assert.match(brewingData, /if \(pendingCleaningSequence\.current\?\.profileId !== profileId\) \{\s*const prepared = await prepareCleaningSequence\(profileId\)\s*if \(!prepared\) return false/)
-  assert.doesNotMatch(brewingData, /cleaningPreparedProfileId !== profileId/)
-})
-
-test('uses the Espresso request without a stale frontend connection gate', () => {
-  const startPath = brewingData.slice(
-    brewingData.indexOf('const startCleaningSequence'),
-    brewingData.indexOf('const cancelCleaningSequence'),
-  )
-  assert.match(startPath, /await setMachineState\(CLEANING_PROFILE_START_STATE\)/)
-  assert.doesNotMatch(startPath, /connection !== 'connected'/)
-  assert.doesNotMatch(startPath, /machineConnection !== 'connected'/)
+test('preloads cleaning without issuing a software Espresso start', () => {
+  assert.match(brewingData, /const prepareCleaningSequence/)
+  assert.match(brewingData, /await prepareCleaningProfileForEspressoStart/)
+  assert.doesNotMatch(brewingData, /const startCleaningSequence/)
+  assert.doesNotMatch(brewingData, /CLEANING_PROFILE_START_STATE/)
 })

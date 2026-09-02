@@ -9,17 +9,14 @@ interface CleaningSequencePickerProps {
   pending: boolean
   preparedProfileId: string | null
   onPrepare: (profileId: string) => Promise<boolean>
-  onStart: (profileId: string) => Promise<boolean>
   onDismiss: () => Promise<void>
 }
 
-export function CleaningSequencePicker({ profiles, pending, preparedProfileId, onPrepare, onStart, onDismiss }: CleaningSequencePickerProps) {
+export function CleaningSequencePicker({ profiles, pending, preparedProfileId, onPrepare, onDismiss }: CleaningSequencePickerProps) {
   const visibleProfiles = profiles.slice(0, 8)
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(visibleProfiles.length === 1 ? visibleProfiles[0].id : null)
-  const [starting, setStarting] = useState(false)
-  const startInFlight = useRef(false)
   const autoPrepareRequested = useRef(false)
-  const interactionLocked = pending || starting
+  const interactionLocked = pending
   const columns = Math.max(1, Math.min(4, visibleProfiles.length || 2))
   const rows = Math.max(1, Math.ceil(visibleProfiles.length / columns))
   const panelStyle = {
@@ -41,18 +38,6 @@ export function CleaningSequencePicker({ profiles, pending, preparedProfileId, o
     if (preparedProfileId !== profileId) await onPrepare(profileId)
   }
 
-  const startSelected = async () => {
-    if (!selectedProfileId || interactionLocked || startInFlight.current) return
-    startInFlight.current = true
-    setStarting(true)
-    try {
-      await onStart(selectedProfileId)
-    } finally {
-      startInFlight.current = false
-      setStarting(false)
-    }
-  }
-
   return <div className="cleaning-picker-overlay" role="presentation" onPointerDown={(event) => {
     if (event.target === event.currentTarget && !interactionLocked) void onDismiss()
   }}>
@@ -60,7 +45,7 @@ export function CleaningSequencePicker({ profiles, pending, preparedProfileId, o
       <header className="cleaning-picker__header">
         <div>
           <h2 id="cleaning-picker-title">Cleaning</h2>
-          <p>Select a sequence and press <button className="cleaning-picker__brew" type="button" aria-label="Start selected cleaning sequence" disabled={!selectedProfileId || interactionLocked} onClick={() => void startSelected()}><img src={brewAction} alt="" /></button></p>
+          <p>Tap <span className="cleaning-picker__brew-guide"><img src={brewAction} alt="cup" /></span> on your machine to start.</p>
         </div>
         <button className="cleaning-picker__close" type="button" disabled={interactionLocked} onClick={() => void onDismiss()}>Close</button>
       </header>

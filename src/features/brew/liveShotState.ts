@@ -19,6 +19,11 @@ export interface SkipTransitionObservation {
   acceptTelemetry: boolean
 }
 
+export interface ShotTimeline {
+  telemetryStartedAt?: number
+  elapsedMs: number
+}
+
 const snapshotState = (snapshot: SnapshotWithState) => (typeof snapshot.state === 'string' ? snapshot.state : snapshot.state?.state)?.toLowerCase()
 
 export function isEspressoExtractionSnapshot(snapshot: SnapshotWithState, shotInProgress = false) {
@@ -28,6 +33,18 @@ export function isEspressoExtractionSnapshot(snapshot: SnapshotWithState, shotIn
   if (state && state !== 'espresso') return false
   if (substate) return ESPRESSO_EXTRACTION_SUBSTATES.has(substate)
   return state === 'espresso'
+}
+
+export function isEspressoMonitoringSnapshot(snapshot: SnapshotWithState, keepShotActive = false) {
+  return snapshotState(snapshot) === 'espresso' || keepShotActive
+}
+
+export function advanceShotTimeline(now: number, acceptsTelemetry: boolean, telemetryStartedAt?: number): ShotTimeline {
+  const startedAt = telemetryStartedAt ?? (acceptsTelemetry ? now : undefined)
+  return {
+    telemetryStartedAt: startedAt,
+    elapsedMs: startedAt === undefined ? 0 : Math.max(0, now - startedAt),
+  }
 }
 
 export function beginSkipTransition(fromFrame: number | undefined, requestedAt: number): SkipTransition {
