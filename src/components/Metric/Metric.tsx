@@ -18,7 +18,7 @@ interface MetricEdit {
   onSave: (value: number) => void
 }
 
-export function Metric({ metric, compact = false, edit }: { metric: DisplayMetric; compact?: boolean; edit?: MetricEdit }) {
+export function Metric({ metric, compact = false, edit, reserveSubtext = false }: { metric: DisplayMetric; compact?: boolean; edit?: MetricEdit; reserveSubtext?: boolean }) {
   const openAdjustment = useValueAdjustment()
   const currentValue = Number(metric.value)
   const adjustmentValue = Number.isFinite(currentValue) ? currentValue : edit?.initialValue
@@ -32,11 +32,13 @@ export function Metric({ metric, compact = false, edit }: { metric: DisplayMetri
     <span className="metric__label">{metric.label}{!editDisabled && <span className="metric__edit-indicator" aria-hidden="true">›</span>}</span>
     <span className={readingClassName}>{metric.value}{metric.unit && <small className={unitClassName}>{metric.unit}</small>}</span>
     {metric.subtext && <span className={subtextClassName}>{metric.subtext}</span>}
+    {!metric.subtext && reserveSubtext && <span className="metric__subtext-spacer" aria-hidden="true" />}
   </button>
 
   return <div className={className}>
     <span className="metric__label">{metric.label}</span>
     <span className={readingClassName}>{metric.value}{metric.unit && <small className={unitClassName}>{metric.unit}</small>}</span>
     {metric.subtext && <span className={subtextClassName}>{metric.subtext}</span>}
+    {!metric.subtext && reserveSubtext && <span className="metric__subtext-spacer" aria-hidden="true" />}
   </div>
 }

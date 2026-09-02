@@ -45,7 +45,9 @@ export function CleaningSequencePicker({ profiles, pending, preparedProfileId, o
       <header className="cleaning-picker__header">
         <div>
           <h2 id="cleaning-picker-title">Cleaning</h2>
-          <p>Tap <span className="cleaning-picker__brew-guide"><img src={brewAction} alt="cup" /></span> on your machine to start.</p>
+          {selectedProfileId
+            ? <p>Tap <span className="cleaning-picker__brew-guide"><img src={brewAction} alt="cup" /></span> on your machine to start.</p>
+            : <p>Select a cleaning profile.</p>}
         </div>
         <button className="cleaning-picker__close" type="button" disabled={interactionLocked} onClick={() => void onDismiss()}>Close</button>
       </header>

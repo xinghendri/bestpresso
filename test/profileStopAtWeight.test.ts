@@ -97,7 +97,7 @@ test('restores the saved user yield when the current workflow lost it', () => {
 
 test('yield remains visible and editable when its current value is unset', () => {
   assert.doesNotMatch(brewingPanel, /hasTargetYield/)
-  assert.match(brewingPanel, /<Metric metric=\{\{ label: 'Yield', value: activeProfile\.targetYield/)
+  assert.match(brewingPanel, /<Metric metric=\{\{ label: 'Yield', value: activeProfile\.targetYield[^\n]+reserveSubtext/)
   assert.match(adapters, /targetYield: numberString\(profileConfiguredTargetYield\(profile, metadata,/)
   assert.doesNotMatch(brewingData, /does not use stop at weight/)
 })

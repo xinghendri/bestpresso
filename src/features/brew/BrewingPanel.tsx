@@ -149,7 +149,7 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
       <Metric metric={{ label: 'Temp.', value: activeProfile.temperature, unit: '°' }} edit={editProfileSetting('temperature')} />
       <Metric metric={{ label: 'Grind size', value: activeProfile.grindSetting }} edit={editProfileSetting('grindSetting')} />
       <Metric metric={{ label: 'Dose', value: activeProfile.dose, unit: 'g' }} edit={editProfileSetting('dose')} />
-      <Metric metric={{ label: 'Yield', value: activeProfile.targetYield, unit: Number.isFinite(Number(activeProfile.targetYield)) ? 'g' : undefined, subtext: ratio, subtextVariant: 'pill' }} edit={editProfileSetting('targetYield', yieldValueHint, fixedYieldSuggestions)} />
+      <Metric metric={{ label: 'Yield', value: activeProfile.targetYield, unit: Number.isFinite(Number(activeProfile.targetYield)) ? 'g' : undefined, subtext: ratio, subtextVariant: 'pill' }} reserveSubtext edit={editProfileSetting('targetYield', yieldValueHint, fixedYieldSuggestions)} />
     </div>
   </section>
 }

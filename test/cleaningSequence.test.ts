@@ -91,6 +91,7 @@ test('restores only profile selection and never rewrites current utility setting
 })
 
 test('uses the cup icon only as guidance for the physical machine button', () => {
+  assert.match(picker, /: <p>Select a cleaning profile\.<\/p>/)
   assert.match(picker, /Tap <span className="cleaning-picker__brew-guide">/)
   assert.match(picker, /on your machine to start/)
   assert.doesNotMatch(picker, /onStart/)
