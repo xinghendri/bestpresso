@@ -68,30 +68,26 @@ export function ProfileBuilderScreen({ onClose }: { onClose: () => void }) {
     setSaved(false)
   }
 
-  return <main className="profile-builder-screen">
-    <header className="profile-builder-header">
-      <div className="profile-builder-header__title"><button type="button" onClick={onClose} aria-label="Back to profiles"><img src={profilesBackIcon} alt="" /></button><div><span>Profiles</span><h1>Build a profile</h1></div><small>Prototype</small></div>
+  return <main className="profile-builder-screen profile-builder-screen--monitor-layout">
+    <header className="profile-builder-header profile-builder-header--monitor">
+      <div className="profile-builder-header__title"><button type="button" onClick={onClose} aria-label="Back to profiles"><img src={profilesBackIcon} alt="" /></button><div><span>Profile builder <small>Prototype</small></span><input aria-label="Profile name" value={draft.title} onChange={(event) => updateDraft('title', event.target.value)} /></div></div>
+      <div className="profile-builder-header__summary" aria-label="Profile summary"><div><span>Stages</span><strong>{draft.stages.length}</strong></div><i /><div><span>Duration</span><strong>{totalDuration}<small>s</small></strong></div><i /><div><span>Yield</span><strong>{draft.targetWeight ?? '—'}<small>g</small></strong></div></div>
       <div className="profile-builder-header__actions"><span>{saved ? 'Draft saved locally' : 'Prototype only — nothing is uploaded'}</span><button className="profile-builder-save" type="button" onClick={() => setSaved(true)}>Save draft</button></div>
     </header>
 
-    <div className="profile-builder-workspace">
-      <aside className="profile-builder-rail">
-        <section className="profile-builder-identity">
-          <header><span>Recipe</span><small>{totalDuration}s</small></header>
-          <label><span>Name</span><input value={draft.title} onChange={(event) => updateDraft('title', event.target.value)} /></label>
-          <div className="profile-builder-inline-fields"><label><span>Dose</span><input type="number" value="18" readOnly /><small>g</small></label><label><span>Yield</span><input type="number" value={draft.targetWeight ?? ''} onChange={(event) => updateDraft('targetWeight', numeric(event.target.value, 0))} /><small>g</small></label></div>
-        </section>
-        <section className="profile-builder-stages">
-          <header><span>Stages</span><small>{draft.stages.length}</small></header>
-          <div className="profile-builder-stage-list">
-            {draft.stages.map((item, index) => <button className={activeStage === index ? 'profile-builder-stage-item profile-builder-stage-item--active' : 'profile-builder-stage-item'} type="button" key={item.id} onClick={() => setActiveStage(index)}><b>{index + 1}</b><span><strong>{item.name}</strong><small>{item.pump} · {item.target}{item.pump === 'pressure' ? ' bar' : ' ml/s'}</small></span><i>›</i></button>)}
-          </div>
-          <button className="profile-builder-add-stage" type="button" onClick={addStage}>＋ Add stage</button>
-        </section>
-      </aside>
+    <section className="profile-builder-chart-panel"><BuilderChart draft={draft} activeStage={activeStage} /></section>
 
-      <section className="profile-builder-canvas">
-        <BuilderChart draft={draft} activeStage={activeStage} />
+    <section className="profile-builder-stage-workspace">
+      <header><div><h2>Brew stages</h2><span>Select a stage to edit how it behaves</span></div><button className="profile-builder-add-stage" type="button" onClick={addStage}>＋ Add stage</button></header>
+      <div className="profile-builder-stage-strip">
+        {draft.stages.map((item, index) => <button className={activeStage === index ? 'profile-builder-stage-card profile-builder-stage-card--active' : 'profile-builder-stage-card'} type="button" key={item.id} onClick={() => setActiveStage(index)}>
+          <header><span>Stage {index + 1}</span><strong>{item.seconds}<small>s</small></strong></header>
+          <h3>{item.name}</h3>
+          <dl><div><dt>Control</dt><dd>{item.target}<small>{item.pump === 'pressure' ? ' bar' : ' ml/s'}</small></dd></div><div><dt>Temperature</dt><dd>{item.temperature}<small>°C</small></dd></div><div><dt>Advance when</dt><dd>{stageConstraintLabel(item)}</dd></div><div><dt>Guardrail</dt><dd>{item.limiter ? `${item.limiter.type} ≤ ${item.limiter.value}` : 'None'}</dd></div></dl>
+        </button>)}
+      </div>
+
+      <section className="profile-builder-canvas profile-builder-canvas--editor">
         <div className="profile-builder-stage-editor">
           <header><div><span>Stage {activeStage + 1} of {draft.stages.length}</span><input aria-label="Stage name" value={stage.name} onChange={(event) => updateStage({ name: event.target.value })} /></div><button type="button" onClick={duplicateStage}>Duplicate</button></header>
           <div className="profile-builder-editor-grid">
@@ -129,6 +125,6 @@ export function ProfileBuilderScreen({ onClose }: { onClose: () => void }) {
           <footer><span>{stageConstraintLabel(stage)}</span><span>Firmware: target, transition, temperature, duration and sensor exit · Decaid: scale exits and final yield</span></footer>
         </div>
       </section>
-    </div>
+    </section>
   </main>
 }
