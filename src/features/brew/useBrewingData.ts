@@ -6,7 +6,7 @@ import { profileUserTargetNeedsWorkflowSync, workflowValuesForProfile } from '..
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfileRecord, DecaidWorkflowPatch, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
-import { liveShotYield, normalizedLiveScaleWeight, scaleConnectionIsActive, WATER_TANK_SENSOR_FULL_MM, waterTankLevelState } from '../../domain/brewing'
+import { liveScaleDisplayWeight, liveShotYield, normalizedLiveScaleWeight, scaleConnectionIsActive, WATER_TANK_SENSOR_FULL_MM, waterTankLevelState } from '../../domain/brewing'
 import type { AvailableScale, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, LiveUtilityOperation, MachineReadiness, PreviousShot, PreviousShotStatus, ScaleConnection, SettingFeedback, UtilityOperationKind } from '../../domain/brewing'
 import { brewingFixture, demoLiveBrewFixture } from '../../fixtures/brewingFixture'
 import { scaleFixtureForKey } from '../../fixtures/scaleFixtures'
@@ -225,7 +225,6 @@ export function useBrewingData() {
   }
 
   const setDisplayedScaleWeight = (weight: number) => {
-    latestScaleSnapshot.current = { ...latestScaleSnapshot.current, weight }
     setModel((current) => ({
       ...current,
       utilities: current.utilities.map((utility) => utility.id === 'scale'
@@ -243,6 +242,7 @@ export function useBrewingData() {
     }
     try {
       await tareScale()
+      latestScaleSnapshot.current = { ...latestScaleSnapshot.current, weight: 0 }
       setDisplayedScaleWeight(0)
       return true
     } catch (error) {
@@ -268,12 +268,12 @@ export function useBrewingData() {
     let latestShotRefreshTimeout: number | null = null
     let preferredScaleId: string | null = null
     let pendingYieldFinalization: PendingYieldFinalization | null = null
-    let pendingScaleRenderWeight: number | null = null
+    let pendingScaleRenderWeight: { display: number; operational: number } | null = null
     let scaleRenderFrame: number | null = null
     const settledYieldBySession = new Map<number, number>()
 
-    const scheduleScaleWeightRender = (weight: number) => {
-      pendingScaleRenderWeight = weight
+    const scheduleScaleWeightRender = (displayWeight: number, operationalWeight: number) => {
+      pendingScaleRenderWeight = { display: displayWeight, operational: operationalWeight }
       if (scaleRenderFrame !== null) return
       scaleRenderFrame = window.requestAnimationFrame(() => {
         scaleRenderFrame = null
@@ -282,19 +282,19 @@ export function useBrewingData() {
         if (latestWeight === null || disposed) return
         const operation = utilityOperationSession.current
         if (operation?.kind === 'hotWater') {
-          operation.weightGrams = latestWeight
+          operation.weightGrams = latestWeight.operational
           setUtilityOperation((current) => current?.kind === 'hotWater'
-            ? { ...current, scaleConnected: true, weightGrams: latestWeight }
+            ? { ...current, scaleConnected: true, weightGrams: latestWeight.operational }
             : current)
           return
         }
         if (liveShotSession.current?.kind === 'espresso') {
           setLiveBrew((current) => current.active && current.kind === 'espresso'
-            ? { ...current, scaleWeight: latestWeight }
+            ? { ...current, scaleWeight: latestWeight.operational }
             : current)
           return
         }
-        setDisplayedScaleWeight(latestWeight)
+        setDisplayedScaleWeight(latestWeight.display)
       })
     }
 
@@ -711,6 +711,7 @@ export function useBrewingData() {
 
     const scale = subscribe<ScaleSnapshot>('/scale/snapshot', (snapshot) => {
       if (localScaleFixture) return
+      const displayWeight = liveScaleDisplayWeight(snapshot.weight)
       const liveWeight = normalizedLiveScaleWeight(snapshot.weight)
       if (liveWeight !== undefined || snapshot.weightFlow !== undefined) {
         latestScaleSnapshot.current = {
@@ -718,11 +719,11 @@ export function useBrewingData() {
           weightFlow: snapshot.weightFlow ?? latestScaleSnapshot.current.weightFlow,
         }
       }
-      if (liveWeight !== undefined) {
+      if (displayWeight !== undefined && liveWeight !== undefined) {
         scaleStreamConnected.current = true
         connectedScale.current = true
         if (utilityOperationSession.current?.kind === 'hotWater') utilityOperationSession.current.weightGrams = liveWeight
-        scheduleScaleWeightRender(liveWeight)
+        scheduleScaleWeightRender(displayWeight, liveWeight)
       }
       if (pendingYieldFinalization && snapshot.weight !== undefined) {
         const result = observePostShotWeight(pendingYieldFinalization.state, snapshot.weight, snapshot.weightFlow)
