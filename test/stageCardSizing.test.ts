@@ -20,8 +20,12 @@ test('ordinary value changes do not alter a pressure chain capacity', () => {
 
 test('reserves numeric slots without assigning a fixed card width', () => {
   assert.match(stages, /Array\.from\(\{ length: stage\.pressureSlotCount \}/)
-  assert.match(styles, /\.live-brew-stage__yield-value \{ min-width:4ch;/)
-  assert.match(styles, /\.live-brew-stage__pressure-reading \{ min-width:3\.75ch;/)
+  assert.match(styles, /\.live-brew-stage__yield-value \{ min-width:4ch;[^}]*text-align:left;/)
+  assert.match(styles, /\.live-brew-stage__pressure-reading \{ min-width:3\.75ch;[^}]*text-align:left;/)
   assert.match(styles, /\.live-brew-stage__pressure-reading--reserved \{ visibility:hidden;/)
   assert.match(styles, /\.live-brew-stage \{ width:max-content;/)
+})
+
+test('keeps the live stage strip flush with both viewport edges', () => {
+  assert.match(styles, /\.live-brew-screen>\.live-brew-stages \{[^}]*width:100vw; margin-left:calc\(50% - 50vw\);/)
 })
