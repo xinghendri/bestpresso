@@ -81,3 +81,10 @@ test('uses three-pixel data lines and matching legend samples across graphs', ()
   assert.match(styles, /\.profile-target-line,[\s\S]*\.profile-detail-chart \.profile-target-line \{\s*stroke-width:3;/)
   assert.match(styles, /\.chart-legend__sample \{ height:3px;/)
 })
+
+test('uses content-sized header metrics with symmetric separator spacing', () => {
+  assert.match(styles, /\.live-pull-header__metrics \{ --header-metric-separator-gap:24px; width:max-content; max-width:100%;[^}]*grid-template-columns:max-content 1px max-content;[^}]*gap:var\(--header-metric-separator-gap\);/)
+  assert.match(styles, /\.history-browser-detail \.live-pull-header__metrics strong \{ font-size:30px; \}/)
+  assert.doesNotMatch(styles, /\.history-browser-detail \.live-pull-header__metrics \{ width:312px;/)
+  assert.match(styles, /@media\(max-width:600px\)[\s\S]*\.live-pull-header__metrics\{--header-metric-separator-gap:12px;grid-template-columns:max-content 1px max-content\}/)
+})
