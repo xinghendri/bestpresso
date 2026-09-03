@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import type { MouseEvent, PointerEvent } from 'react'
 import skipNext from '../../assets/figma/skip-next.svg'
 import type { LiveShotPoint } from '../../domain/brewing'
 import { DOUBLE_TAP_CONFIRMATION_WINDOW_MS, registerDoubleTap } from './doubleTapConfirmation'
 import { canStartStageMouseDrag, latestStageScrollLeft, STAGE_MOUSE_DRAG_THRESHOLD_PX, stageMouseDragScrollLeft } from './stageStripScroll'
-import { pressureChainSlotCount } from './stageCardSizing'
+import { pressureChainMinimumWidth, pressureChainSlotCount } from './stageCardSizing'
 
 interface StageSummary {
   key: string
@@ -271,7 +271,7 @@ export function LiveBrewStages({ points, elapsedMs, active = false, showYield = 
       <dl>
         {showYield && <div><dt>Yield</dt><dd><span className="live-brew-stage__yield-value">{reading(stage.yield)}</span><small>g</small></dd></div>}
         <div><dt>Temperature range</dt><dd>{reading(stage.minimumTemperature, 0)}° – {reading(stage.maximumTemperature, 0)}°</dd></div>
-        <div><dt>Pressure</dt><dd className="live-brew-stage__pressure-value" aria-label={pressureLabel}><span className="live-brew-stage__pressure-chain" aria-hidden="true">{Array.from({ length: stage.pressureSlotCount }, (_, pressureIndex) => <span className="live-brew-stage__pressure-segment" key={pressureIndex}>{pressureIndex > 0 && <span className="live-brew-stage__pressure-arrow">→</span>}<span className={`live-brew-stage__pressure-reading${stage.pressureMovements[pressureIndex] === undefined ? ' live-brew-stage__pressure-reading--reserved' : ''}`}>{stage.pressureMovements[pressureIndex] === undefined ? '0.0' : reading(stage.pressureMovements[pressureIndex])}</span></span>)}</span></dd></div>
+        <div><dt>Pressure</dt><dd className="live-brew-stage__pressure-value" aria-label={pressureLabel}><span className="live-brew-stage__pressure-chain" style={{ minWidth: pressureChainMinimumWidth(stage.pressureSlotCount) }} aria-hidden="true">{stage.pressureMovements.length ? stage.pressureMovements.map((pressure, pressureIndex) => <Fragment key={pressureIndex}>{pressureIndex > 0 && <span className="live-brew-stage__pressure-arrow">→</span>}<span>{reading(pressure)}</span></Fragment>) : '—'}</span></dd></div>
       </dl>
     </article>})}
     {active && onSkipStage && <button className={`live-brew-skip${skipPending ? ' live-brew-skip--pending' : ''}`} type="button" disabled={skipPending} aria-label="Double tap to skip to the next phase" aria-pressed="false" onPointerDown={consumeSkipPointer} onPointerUp={consumeSkipPointer} onPointerCancel={consumeSkipPointer} onClick={handleSkipTap} onDoubleClick={consumeSkipDoubleClick} ref={skipButtonRef}>
