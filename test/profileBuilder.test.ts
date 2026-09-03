@@ -21,6 +21,15 @@ test('default draft demonstrates pressure, flow, exits, and opposite-axis limite
   assert.ok(builderTargetPoints(draft.stages).length > draft.stages.length)
 })
 
+test('builder target points stay chronological across smooth and fast stages', () => {
+  const draft = createDefaultProfileDraft()
+  const points = builderTargetPoints(draft.stages)
+  for (let index = 1; index < points.length; index += 1) {
+    assert.ok(points[index].elapsedMs >= points[index - 1].elapsedMs)
+  }
+  assert.equal(points.at(-1)?.elapsedMs, draft.stages.reduce((total, stage) => total + stage.seconds * 1000, 0))
+})
+
 test('editor distinguishes stage advancement from whole-shot stopping', () => {
   assert.match(screen, /Advance this stage/)
   assert.match(screen, /Whole-shot stop/)

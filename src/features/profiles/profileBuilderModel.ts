@@ -78,15 +78,21 @@ export function builderTargetPoints(stages: BuilderStage[]): ProfileTargetPoint[
   let flow = 0
 
   for (const stage of stages) {
-    const nextPressure = stage.pump === 'pressure' ? stage.target : pressure
-    const nextFlow = stage.pump === 'flow' ? stage.target : flow
+    const nextPressure = stage.pump === 'pressure'
+      ? stage.target
+      : stage.limiter?.type === 'pressure' ? stage.limiter.value : pressure
+    const nextFlow = stage.pump === 'flow'
+      ? stage.target
+      : stage.limiter?.type === 'flow' ? stage.limiter.value : flow
+    const stageEndMs = elapsedMs + stage.seconds * 1000
+
     points.push({ elapsedMs, pressure, flow })
-    if (stage.transition === 'smooth') {
-      points.push({ elapsedMs: elapsedMs + stage.seconds * 500, pressure: (pressure + nextPressure) / 2, flow: (flow + nextFlow) / 2 })
+    if (stage.transition === 'fast') {
+      points.push({ elapsedMs, pressure: nextPressure, flow: nextFlow })
     }
-    points.push({ elapsedMs, pressure: nextPressure, flow: nextFlow })
-    elapsedMs += stage.seconds * 1000
-    points.push({ elapsedMs, pressure: nextPressure, flow: nextFlow })
+    points.push({ elapsedMs: stageEndMs, pressure: nextPressure, flow: nextFlow })
+
+    elapsedMs = stageEndMs
     pressure = nextPressure
     flow = nextFlow
   }
