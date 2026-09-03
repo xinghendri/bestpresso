@@ -5,7 +5,7 @@ import scaleIcon from '../../assets/figma/scale.svg'
 import steamCompactConnector from '../../assets/figma/steam-compact-connector.svg'
 import steamIcon from '../../assets/figma/steam.svg'
 import { Metric } from '../../components/Metric/Metric'
-import { WATER_TANK_CAPACITY_ML, waterTankLevelState } from '../../domain/brewing'
+import { scaleWeightCanTare, WATER_TANK_CAPACITY_ML, waterTankLevelState } from '../../domain/brewing'
 import type { EditableMachineSetting, MachineUtility, ScaleConnection } from '../../domain/brewing'
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { scalePresentationForDevice } from './scaleArtwork'
@@ -92,7 +92,7 @@ export function MachineUtilityCard({ utility, compact = false, scale, onExpand, 
   const connectedScaleName = scaleConnected ? scale.name || 'Scale' : undefined
   const scalePresentation = scaleConnected ? scalePresentationForDevice(connectedScaleName, scale.id) : undefined
   const scaleWeight = Number(utility.metrics[0]?.value)
-  const scaleCanTare = scaleConnected && Number.isFinite(scaleWeight) && Math.abs(scaleWeight) >= 0.05 && Boolean(onTareScale)
+  const scaleCanTare = scaleConnected && scaleWeightCanTare(scaleWeight) && Boolean(onTareScale)
   const title = scaleConnected ? scalePresentation?.displayName ?? withoutGenericScaleSuffix(connectedScaleName) : utility.label
   const cardClassName = `utility-card utility-card--${utility.id}${isSteam && !steamHeatingEnabled ? ' utility-card--steam-off' : ''}${compact ? ' utility-card--compact' : ''}${scalePresentation?.imageSrc ? ' utility-card--scale-with-art' : ''}`
   const expandLabel = `Expand utility panels to view ${title}`

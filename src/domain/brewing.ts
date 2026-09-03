@@ -139,8 +139,18 @@ export function scaleConnectionIsActive(deviceListConnected: boolean, liveStream
   return deviceListConnected || liveStreamConnected
 }
 
+export function liveScaleDisplayWeight(weight: unknown) {
+  return typeof weight === 'number' && Number.isFinite(weight) ? weight : undefined
+}
+
+export function scaleWeightCanTare(weight: unknown) {
+  const displayWeight = liveScaleDisplayWeight(weight)
+  return displayWeight !== undefined && Math.abs(displayWeight) >= 0.05
+}
+
 export function normalizedLiveScaleWeight(weight: unknown) {
-  return typeof weight === 'number' && Number.isFinite(weight) ? Math.max(0, weight) : undefined
+  const displayWeight = liveScaleDisplayWeight(weight)
+  return displayWeight === undefined ? undefined : Math.max(0, displayWeight)
 }
 
 export function liveShotYield(scaleWeight: unknown, points: Pick<LiveShotPoint, 'weight'>[]) {

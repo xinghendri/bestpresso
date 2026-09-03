@@ -69,3 +69,15 @@ test('uses 32px standard home-screen metric readings', () => {
   assert.match(styles, /\.metric__reading \{ color:#707070; font-size:32px;/)
   assert.match(styles, /\.brew-metrics \.metric__reading \{ font-size:32px; \}/)
 })
+
+test('lets the home history summary hug its content while preserving a contractible chart', () => {
+  assert.match(styles, /\.history-card \{ --history-chart-min-width:180px;[^}]*grid-template-columns:minmax\(0,max-content\) minmax\(var\(--history-chart-min-width\),1fr\);/)
+  assert.match(styles, /\.history-card__summary>div \{ width:max-content; max-width:100%;/)
+  assert.match(styles, /@media\(max-width:760px\)[\s\S]*\.history-card\{--history-chart-min-width:120px;/)
+  assert.match(styles, /@media\(min-width:761px\) and \(max-height:680px\)[\s\S]*\.history-card\{--history-chart-min-width:140px;/)
+})
+
+test('uses three-pixel data lines and matching legend samples across graphs', () => {
+  assert.match(styles, /\.profile-target-line,[\s\S]*\.profile-detail-chart \.profile-target-line \{\s*stroke-width:3;/)
+  assert.match(styles, /\.chart-legend__sample \{ height:3px;/)
+})

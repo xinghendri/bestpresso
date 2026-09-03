@@ -3,7 +3,7 @@ import type { MouseEvent, PointerEvent } from 'react'
 import skipNext from '../../assets/figma/skip-next.svg'
 import type { LiveShotPoint } from '../../domain/brewing'
 import { DOUBLE_TAP_CONFIRMATION_WINDOW_MS, registerDoubleTap } from './doubleTapConfirmation'
-import { latestStageScrollLeft } from './stageStripScroll'
+import { canStartStageMouseDrag, latestStageScrollLeft, STAGE_MOUSE_DRAG_THRESHOLD_PX, stageMouseDragScrollLeft } from './stageStripScroll'
 
 interface StageSummary {
   key: string
@@ -109,6 +109,9 @@ export function LiveBrewStages({ points, elapsedMs, active = false, showYield = 
   const previousSkipTap = useRef<number | null>(null)
   const skipConfirmationTimeout = useRef<number | null>(null)
   const skipButtonRef = useRef<HTMLButtonElement>(null)
+  const mouseDrag = useRef<{ pointerId: number; startClientX: number; startScrollLeft: number; moved: boolean } | null>(null)
+  const suppressStageClick = useRef(false)
+  const suppressStageClickTimeout = useRef<number | null>(null)
   const [skippedStageKeys, setSkippedStageKeys] = useState<Set<string>>(() => new Set())
 
   const resetSkipConfirmation = () => {
@@ -121,6 +124,7 @@ export function LiveBrewStages({ points, elapsedMs, active = false, showYield = 
 
   useEffect(() => () => {
     if (skipConfirmationTimeout.current !== null) window.clearTimeout(skipConfirmationTimeout.current)
+    if (suppressStageClickTimeout.current !== null) window.clearTimeout(suppressStageClickTimeout.current)
   }, [])
 
   useEffect(() => {
@@ -156,12 +160,45 @@ export function LiveBrewStages({ points, elapsedMs, active = false, showYield = 
     event.stopPropagation()
   }
 
+  const handleStagePointerDown = (event: PointerEvent<HTMLElement>) => {
+    if (!canStartStageMouseDrag(active, event.pointerType, event.button) || (event.target as Element).closest('.live-brew-skip')) return
+    mouseDrag.current = { pointerId: event.pointerId, startClientX: event.clientX, startScrollLeft: event.currentTarget.scrollLeft, moved: false }
+  }
+
+  const handleStagePointerMove = (event: PointerEvent<HTMLElement>) => {
+    const drag = mouseDrag.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    if (!drag.moved && Math.abs(event.clientX - drag.startClientX) < STAGE_MOUSE_DRAG_THRESHOLD_PX) return
+    if (!drag.moved) event.currentTarget.setPointerCapture(event.pointerId)
+    drag.moved = true
+    event.currentTarget.classList.add('live-brew-stages--mouse-dragging')
+    event.currentTarget.scrollLeft = stageMouseDragScrollLeft(drag.startScrollLeft, drag.startClientX, event.clientX)
+    event.preventDefault()
+  }
+
+  const finishStagePointerDrag = (event: PointerEvent<HTMLElement>) => {
+    const drag = mouseDrag.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    event.currentTarget.classList.remove('live-brew-stages--mouse-dragging')
+    mouseDrag.current = null
+    if (!drag.moved) return
+    suppressStageClick.current = true
+    if (suppressStageClickTimeout.current !== null) window.clearTimeout(suppressStageClickTimeout.current)
+    suppressStageClickTimeout.current = window.setTimeout(() => {
+      suppressStageClick.current = false
+      suppressStageClickTimeout.current = null
+    }, 0)
+    event.preventDefault()
+  }
+
   useEffect(() => {
     const strip = stripRef.current
     const track = trackRef.current
     if (!active || !strip || !track) return
     let animationFrame = 0
     const revealLatestStage = () => {
+      if (mouseDrag.current) return
       window.cancelAnimationFrame(animationFrame)
       animationFrame = window.requestAnimationFrame(() => {
         const left = latestStageScrollLeft(stages.length, strip.scrollWidth, strip.clientWidth)
@@ -204,14 +241,20 @@ export function LiveBrewStages({ points, elapsedMs, active = false, showYield = 
 
   if (!stages.length) return <section className="live-brew-stages live-brew-stages--empty" aria-label="Pull stages"><p>Waiting for the first stage…</p></section>
 
-  return <section className={`live-brew-stages${active ? ' live-brew-stages--active' : ''}${showYield ? '' : ' live-brew-stages--no-yield'}`} aria-label="Pull stages" ref={stripRef}>
+  return <section className={`live-brew-stages${active ? ' live-brew-stages--active' : ''}${showYield ? '' : ' live-brew-stages--no-yield'}`} aria-label="Pull stages" ref={stripRef} onPointerDown={handleStagePointerDown} onPointerMove={handleStagePointerMove} onPointerUp={finishStagePointerDrag} onPointerCancel={finishStagePointerDrag}>
     <div className="live-brew-stages__track" ref={trackRef}>
     {stages.map((stage, index) => {
       const isActive = active && index === stages.length - 1
       const isSelected = selectedStageKey === stage.key
       const wasSkipped = skippedStageKeys.has(stage.key)
       const selectable = Boolean(onStageSelect)
-      const toggleSelection = () => onStageSelect?.(isSelected ? null : { key: stage.key, name: stage.name, startedAt: stage.startedAt, endedAt: stage.endedAt, points: stage.points })
+      const toggleSelection = () => {
+        if (suppressStageClick.current) {
+          suppressStageClick.current = false
+          return
+        }
+        onStageSelect?.(isSelected ? null : { key: stage.key, name: stage.name, startedAt: stage.startedAt, endedAt: stage.endedAt, points: stage.points })
+      }
       return <article className={`live-brew-stage${isActive ? ' live-brew-stage--active' : ''}${isSelected ? ' live-brew-stage--selected' : ''}`} aria-current={isActive ? 'step' : undefined} aria-pressed={selectable ? isSelected : undefined} key={stage.key} onClick={selectable ? toggleSelection : undefined} onKeyDown={selectable ? (event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return
         event.preventDefault()
