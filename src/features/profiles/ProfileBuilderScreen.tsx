@@ -91,7 +91,7 @@ function StageEditorCard({ stage, index, active, onActivate, onChange, onDuplica
 
     <div className="profile-builder-stage-row profile-builder-stage-row--limiter">
       <label>{stage.pump === 'pressure' ? 'Flow limiter' : 'Pressure limiter'}</label>
-      <button className="profile-builder-stage-enable" type="button" onClick={() => onChange({ limiter: stage.limiter ? undefined : { type: stage.pump === 'pressure' ? 'flow' : 'pressure', value: stage.pump === 'pressure' ? 2.5 : 6, range: 0.4 } })}>{stage.limiter ? 'On' : 'Off'}</button>
+      <button className={stage.limiter ? 'profile-builder-stage-enable is-active' : 'profile-builder-stage-enable'} type="button" onClick={() => onChange({ limiter: stage.limiter ? undefined : { type: stage.pump === 'pressure' ? 'flow' : 'pressure', value: stage.pump === 'pressure' ? 2.5 : 6, range: 0.4 } })}>{stage.limiter ? 'On' : 'Off'}</button>
       {stage.limiter && <>
         <NumberField label="Limiter value" value={stage.limiter.value} unit={limiterUnit} step="0.1" onChange={(value) => onChange({ limiter: stage.limiter ? { ...stage.limiter, value } : undefined })} />
         <NumberField label="Limiter range" value={stage.limiter.range} unit="range" step="0.1" onChange={(range) => onChange({ limiter: stage.limiter ? { ...stage.limiter, range } : undefined })} />
@@ -119,7 +119,7 @@ function StageEditorCard({ stage, index, active, onActivate, onChange, onDuplica
       </div>
       <div className="profile-builder-stage-field">
         <span>Sensor threshold</span>
-        <button className="profile-builder-stage-enable" type="button" onClick={() => onChange({ exit: stage.exit ? undefined : { type: stage.pump === 'flow' ? 'pressure' : 'flow', condition: 'over', value: stage.pump === 'flow' ? 4 : 2.5 } })}>{stage.exit ? 'On' : 'Off'}</button>
+        <button className={stage.exit ? 'profile-builder-stage-enable is-active' : 'profile-builder-stage-enable'} type="button" onClick={() => onChange({ exit: stage.exit ? undefined : { type: stage.pump === 'flow' ? 'pressure' : 'flow', condition: 'over', value: stage.pump === 'flow' ? 4 : 2.5 } })}>{stage.exit ? 'On' : 'Off'}</button>
         {stage.exit && <div className="profile-builder-threshold">
           <select aria-label="Threshold axis" value={stage.exit.type} onChange={(event) => onChange({ exit: stage.exit ? { ...stage.exit, type: event.target.value as BuilderExitType } : undefined })}><option value="pressure">Pressure</option><option value="flow">Flow</option></select>
           <select aria-label="Threshold direction" value={stage.exit.condition} onChange={(event) => onChange({ exit: stage.exit ? { ...stage.exit, condition: event.target.value as BuilderExitCondition } : undefined })}><option value="over">Above</option><option value="under">Below</option></select>
@@ -128,7 +128,7 @@ function StageEditorCard({ stage, index, active, onActivate, onChange, onDuplica
       </div>
       <div className="profile-builder-stage-field">
         <span>Stage scale weight</span>
-        <button className="profile-builder-stage-enable" type="button" onClick={() => onChange({ weight: stage.weight === undefined ? 8 : undefined })}>{stage.weight === undefined ? 'Off' : 'On'}</button>
+        <button className={stage.weight === undefined ? 'profile-builder-stage-enable' : 'profile-builder-stage-enable is-active'} type="button" onClick={() => onChange({ weight: stage.weight === undefined ? 8 : undefined })}>{stage.weight === undefined ? 'Off' : 'On'}</button>
         {stage.weight !== undefined && <NumberField label="Stage scale weight" value={stage.weight} unit="g" step="0.1" onChange={(weight) => onChange({ weight })} />}
       </div>
       <div className="profile-builder-stage-field">
