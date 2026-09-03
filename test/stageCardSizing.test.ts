@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { pressureChainMinimumWidth, pressureChainSlotCount } from '../src/features/brew/stageCardSizing.ts'
+import { pressureChainSlotCount } from '../src/features/brew/stageCardSizing.ts'
 
 const stages = readFileSync(new URL('../src/features/brew/LiveBrewStages.tsx', import.meta.url), 'utf8')
 const styles = readFileSync(new URL('../src/styles/index.css', import.meta.url), 'utf8')
@@ -18,17 +18,15 @@ test('ordinary value changes do not alter a pressure chain capacity', () => {
   assert.equal(pressureChainSlotCount([2, 8.1, 10], 0.4), 2)
 })
 
-test('reserves predictable chain width without controlling separator placement', () => {
-  assert.equal(pressureChainMinimumWidth(1), '3.75ch')
-  assert.equal(pressureChainMinimumWidth(3), '15.85ch')
-  assert.equal(pressureChainMinimumWidth(9), '52.15ch')
-})
-
-test('reserves numeric slots without assigning a fixed card width', () => {
-  assert.match(stages, /pressureChainMinimumWidth\(stage\.pressureSlotCount\)/)
+test('sizes each pressure capacity with the same structure as visible readings', () => {
+  assert.match(stages, /Array\.from\(\{ length: slotCount \}, \(\) => PRESSURE_WIDTH_SAMPLE\)/)
+  assert.match(stages, /<PressureSequence values=\{values\} \/>/)
+  assert.match(stages, /<PressureSequence values=\{sizingValues\} sizing \/>/)
   assert.match(styles, /\.live-brew-stage__yield-value \{ min-width:4ch;[^}]*text-align:left;/)
-  assert.match(styles, /\.live-brew-stage__pressure-chain \{[^}]*text-align:left;/)
-  assert.match(styles, /\.live-brew-stage__pressure-arrow \{[^}]*margin-inline:\.65ch;[^}]*text-align:center;/)
+  assert.match(styles, /\.live-brew-stage__pressure-chain \{ display:inline-grid;[^}]*text-align:left;/)
+  assert.match(styles, /\.live-brew-stage__pressure-sequence \{ grid-area:1\/1;[^}]*width:max-content;/)
+  assert.match(styles, /\.live-brew-stage__pressure-sequence--sizing \{ visibility:hidden;/)
+  assert.match(styles, /\.live-brew-stage__pressure-arrow \{[^}]*margin-inline:\.8ch;[^}]*text-align:center;[^}]*translateX\(-\.08em\);/)
   assert.match(styles, /\.live-brew-stage \{ width:max-content;/)
 })
 

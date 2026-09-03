@@ -1,6 +1,3 @@
-const PRESSURE_READING_WIDTH_CH = 3.75
-const PRESSURE_SEPARATOR_WIDTH_CH = 2.3
-
 export function pressureChainSlotCount(pressures: number[], reversalThreshold: number) {
   if (pressures.length <= 1) return 1
 
@@ -30,9 +27,4 @@ export function pressureChainSlotCount(pressures: number[], reversalThreshold: n
   }
 
   return slots
-}
-
-export function pressureChainMinimumWidth(slotCount: number) {
-  const count = Math.max(1, slotCount)
-  return `${count * PRESSURE_READING_WIDTH_CH + (count - 1) * PRESSURE_SEPARATOR_WIDTH_CH}ch`
 }
