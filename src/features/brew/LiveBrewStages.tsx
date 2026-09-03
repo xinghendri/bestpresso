@@ -4,6 +4,7 @@ import skipNext from '../../assets/figma/skip-next.svg'
 import type { LiveShotPoint } from '../../domain/brewing'
 import { DOUBLE_TAP_CONFIRMATION_WINDOW_MS, registerDoubleTap } from './doubleTapConfirmation'
 import { canStartStageMouseDrag, latestStageScrollLeft, STAGE_MOUSE_DRAG_THRESHOLD_PX, stageMouseDragScrollLeft } from './stageStripScroll'
+import { pressureChainSlotCount } from './stageCardSizing'
 
 interface StageSummary {
   key: string
@@ -14,6 +15,7 @@ interface StageSummary {
   minimumTemperature: number | undefined
   maximumTemperature: number | undefined
   pressureMovements: number[]
+  pressureSlotCount: number
   points: LiveShotPoint[]
 }
 
@@ -94,6 +96,7 @@ function summarizeLiveBrewStages(points: LiveShotPoint[], elapsedMs: number): St
       minimumTemperature: temperatures.length ? Math.min(...temperatures) : undefined,
       maximumTemperature: temperatures.length ? Math.max(...temperatures) : undefined,
       pressureMovements: pressureMovementReadings(pressures),
+      pressureSlotCount: pressureChainSlotCount(pressures, PRESSURE_REVERSAL_THRESHOLD_BAR),
       points: group.points,
     }
   })
@@ -248,6 +251,7 @@ export function LiveBrewStages({ points, elapsedMs, active = false, showYield = 
       const isSelected = selectedStageKey === stage.key
       const wasSkipped = skippedStageKeys.has(stage.key)
       const selectable = Boolean(onStageSelect)
+      const pressureLabel = stage.pressureMovements.length ? stage.pressureMovements.map((pressure) => reading(pressure)).join(' to ') : 'No pressure reading'
       const toggleSelection = () => {
         if (suppressStageClick.current) {
           suppressStageClick.current = false
@@ -265,9 +269,9 @@ export function LiveBrewStages({ points, elapsedMs, active = false, showYield = 
       }} role={selectable ? 'button' : undefined} tabIndex={selectable ? 0 : undefined}>
       <header><h2>{stage.name}</h2><div className="live-brew-stage__time"><time>{timedLabel(stage.endedAt - stage.startedAt)}</time>{wasSkipped && <span className="live-brew-stage__skipped" aria-label="Skipped phase"><img src={skipNext} alt="" /></span>}</div></header>
       <dl>
-        {showYield && <div><dt>Yield</dt><dd>{reading(stage.yield)}<small>g</small></dd></div>}
+        {showYield && <div><dt>Yield</dt><dd><span className="live-brew-stage__yield-value">{reading(stage.yield)}</span><small>g</small></dd></div>}
         <div><dt>Temperature range</dt><dd>{reading(stage.minimumTemperature, 0)}° – {reading(stage.maximumTemperature, 0)}°</dd></div>
-        <div><dt>Pressure</dt><dd>{stage.pressureMovements.length ? stage.pressureMovements.map((pressure) => reading(pressure)).join(' → ') : '—'}</dd></div>
+        <div><dt>Pressure</dt><dd className="live-brew-stage__pressure-value" aria-label={pressureLabel}><span className="live-brew-stage__pressure-chain" aria-hidden="true">{Array.from({ length: stage.pressureSlotCount }, (_, pressureIndex) => <span className="live-brew-stage__pressure-segment" key={pressureIndex}>{pressureIndex > 0 && <span className="live-brew-stage__pressure-arrow">→</span>}<span className={`live-brew-stage__pressure-reading${stage.pressureMovements[pressureIndex] === undefined ? ' live-brew-stage__pressure-reading--reserved' : ''}`}>{stage.pressureMovements[pressureIndex] === undefined ? '0.0' : reading(stage.pressureMovements[pressureIndex])}</span></span>)}</span></dd></div>
       </dl>
     </article>})}
     {active && onSkipStage && <button className={`live-brew-skip${skipPending ? ' live-brew-skip--pending' : ''}`} type="button" disabled={skipPending} aria-label="Double tap to skip to the next phase" aria-pressed="false" onPointerDown={consumeSkipPointer} onPointerUp={consumeSkipPointer} onPointerCancel={consumeSkipPointer} onClick={handleSkipTap} onDoubleClick={consumeSkipDoubleClick} ref={skipButtonRef}>
