@@ -31,7 +31,7 @@ test('chart stage markers use the same minimal, single-digit pattern everywhere'
   assert.match(markers, /stageMarkerCanShowName\(stage\.name, stage\.normalizedWidth\)/)
   assert.match(markers, /--chart-stage-width/)
   assert.match(styles, /\.chart-stage-marker__badge \{[^}]*font-size:11px/)
-  assert.match(styles, /\.chart-stage-marker__name \{[^}]*font-size:12px/)
+  assert.match(styles, /\.chart-stage-marker__name \{[^}]*font-size:11px/)
   assert.match(builder, /<ChartStageMarkers/)
 })
 
