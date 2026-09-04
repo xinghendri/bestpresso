@@ -1,4 +1,4 @@
-import completionSoundUrl from '../assets/audio/brew-complete.wav'
+import completionSoundUrl from '../assets/audio/brew-complete.ogg'
 
 type AudioContextConstructor = typeof AudioContext
 
