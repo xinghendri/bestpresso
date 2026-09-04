@@ -27,7 +27,6 @@ interface LiveShotChartProps {
 const VIEW_WIDTH = 1000
 const VIEW_HEIGHT = 376
 const PLOT = { left: 42, right: 978, top: 64, bottom: 340 }
-const STAGE_MAP = { top: 34, bottom: 58 }
 const PLOT_TOP_STROKE_ALLOWANCE = 4
 const PLOT_BOTTOM_STROKE_ALLOWANCE = 4
 const NORMAL_CHART_TRANSFORM: ChartFocusTransform = { scaleX: 1, translateX: 0 }
@@ -164,9 +163,9 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
 
   return <div className="live-shot-chart">
     <ChartLegend showWeight={showWeight} interactive={legendFilterEnabled} dimmedSeries={dimmedSeries} onToggleSeries={onToggleSeries} />
+    <ChartStageMarkers stages={stageMarkers} highlightedKey={highlightedStage?.key} xForElapsedMs={xForElapsedMs} plotLeft={PLOT.left} plotRight={PLOT.right} />
     <svg viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`} role="img" aria-label={showWeight ? 'Pressure, flow, yield weight, and temperature chart' : 'Pressure, flow, and temperature chart'} preserveAspectRatio="none">
       <defs><clipPath id="live-shot-plot"><rect x={PLOT.left} y={PLOT.top - PLOT_TOP_STROKE_ALLOWANCE} width={PLOT.right - PLOT.left} height={PLOT.bottom - PLOT.top + PLOT_TOP_STROKE_ALLOWANCE + PLOT_BOTTOM_STROKE_ALLOWANCE} /></clipPath></defs>
-      <ChartStageMarkers stages={stageMarkers} highlightedKey={highlightedStage?.key} xForElapsedMs={xForElapsedMs} plotLeft={PLOT.left} plotRight={PLOT.right} top={STAGE_MAP.top} bottom={STAGE_MAP.bottom} />
       {horizontalGridLines.map((line) => <line key={`horizontal-${line.ratio}`} className="chart-grid chart-grid--horizontal" x1={line.x1} x2={line.x2} y1={line.y} y2={line.y} />)}
       {gridTimeTicks.map((tick) => <line key={`time-grid-${tick.offsetMs}`} className="chart-grid chart-grid--vertical" x1={tick.x} x2={tick.x} y1={PLOT.top} y2={PLOT.bottom} />)}
       {timeLabels.map((tick) => <text key={`time-label-${tick.offsetMs}`} className="chart-axis-label" x={tick.x} y={PLOT.bottom + 25} textAnchor="middle">{tick.label}</text>)}

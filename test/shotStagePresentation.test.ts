@@ -24,10 +24,14 @@ test('live monitoring and history share the same numbered stage presentation', (
 
 test('chart stage markers use the same minimal, single-digit pattern everywhere', () => {
   assert.match(markers, /sequence: index \+ 1/)
-  assert.match(markers, /chart-stage-marker__separator/)
+  assert.match(markers, /chart-stage-marker--first/)
   assert.match(markers, /chart-stage-marker__badge/)
   assert.match(markers, /chart-stage-marker--highlighted/)
   assert.doesNotMatch(markers, /padStart/)
+  assert.match(markers, /stageMarkerCanShowName\(stage\.name, stage\.normalizedWidth\)/)
+  assert.match(markers, /--chart-stage-width/)
+  assert.match(styles, /\.chart-stage-marker__badge \{[^}]*font-size:11px/)
+  assert.match(styles, /\.chart-stage-marker__name \{[^}]*font-size:12px/)
   assert.match(builder, /<ChartStageMarkers/)
 })
 

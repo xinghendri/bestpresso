@@ -68,9 +68,9 @@ function BuilderChart({ draft, activeStage }: { draft: ProfileDraft; activeStage
       <span>bar / ml/s</span>
       {[12, 9, 6, 3, 0].map((value) => <i key={value} style={{ top: `${(PLOT_TOP + (12 - value) / 12 * (PLOT_BOTTOM - PLOT_TOP)) / CHART_HEIGHT * 100}%` }}>{value}</i>)}
     </div>
+    <ChartStageMarkers stages={stageMarkers} highlightedKey={activeStage === null ? undefined : draft.stages[activeStage]?.id} xForElapsedMs={(elapsedMs) => elapsedMs / maximumDurationMs * CHART_WIDTH} plotLeft={0} plotRight={CHART_WIDTH} />
     <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} preserveAspectRatio="none" role="img" aria-label="Flow, pressure, and temperature targets across the profile stages">
       <defs><clipPath id="pb-active-stage"><rect x={clipX} y="0" width={clipWidth} height={CHART_HEIGHT} /></clipPath></defs>
-      <ChartStageMarkers stages={stageMarkers} highlightedKey={activeStage === null ? undefined : draft.stages[activeStage]?.id} xForElapsedMs={(elapsedMs) => elapsedMs / maximumDurationMs * CHART_WIDTH} plotLeft={0} plotRight={CHART_WIDTH} top={34} bottom={58} />
       {[12, 9, 6, 3, 0].map((value) => {
         const y = PLOT_TOP + (12 - value) / 12 * (PLOT_BOTTOM - PLOT_TOP)
         return <line key={value} className="pb-chart__tick" x1="0" x2="10" y1={y} y2={y} />
