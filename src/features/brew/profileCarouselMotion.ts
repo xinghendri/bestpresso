@@ -23,6 +23,8 @@ export function projectedProfileSteps(distance: number, velocity: number, stride
   let steps = Math.round(-projectedDistance / stride)
   if (steps === 0 && Math.abs(distance) >= 42) steps = distance < 0 ? 1 : -1
   const maximum = length - 1
+  // Cap to one profile per swipe (either -1 or 1)
+  steps = Math.max(-1, Math.min(1, steps))
   return Math.max(-maximum, Math.min(maximum, steps))
 }
 

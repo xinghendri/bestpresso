@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useMemo, useEffect, useRef, useState } from 'react'
 import type { LiveShotPoint } from '../../domain/brewing'
 import { ChartLegend } from './ChartLegend'
 import { ChartStageMarkers } from './ChartStageMarkers'
@@ -129,36 +129,36 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
   const animatedFocusTransform = useAnimatedChartFocus(targetFocusTransform)
   const layerOpacity = chartFocusLayerOpacity(animatedFocusTransform.scaleX)
   const xForElapsedMs = (pointElapsedMs: number) => animatedFocusTransform.translateX + baseXForElapsedMs(pointElapsedMs) * animatedFocusTransform.scaleX
-  const stageMarkers = stageMarkersForPoints(plottedPoints, domainEndMs)
-  const highlightedStage = contextPoints
+  const stageMarkers = useMemo(() => stageMarkersForPoints(plottedPoints, domainEndMs), [plottedPoints, domainEndMs])
+  const highlightedStage = useMemo(() => contextPoints
     ? stageMarkers.find((stage) => startMs >= stage.startMs && startMs < stage.endMs)
-    : fitDuration ? undefined : stageMarkers[stageMarkers.length - 1]
-  const intervalTicks = Array.from({ length: Math.floor(durationMs / 5_000) }, (_, index) => (index + 1) * 5_000)
-  const candidateTimeTicks = fitDuration
+    : fitDuration ? undefined : stageMarkers[stageMarkers.length - 1], [contextPoints, stageMarkers, startMs, fitDuration])
+  const intervalTicks = useMemo(() => Array.from({ length: Math.floor(durationMs / 5_000) }, (_, index) => (index + 1) * 5_000), [durationMs])
+  const candidateTimeTicks = useMemo(() => fitDuration
     ? [0, ...intervalTicks, ...(durationMs % 5_000 ? [durationMs] : [])]
-    : intervalTicks
-  const horizontalGridLines = horizontalChartGridLines(PLOT)
+    : intervalTicks, [fitDuration, intervalTicks, durationMs])
+  const horizontalGridLines = useMemo(() => horizontalChartGridLines(PLOT), [])
   const timeLabel = (tick: number) => {
     const seconds = (startMs + tick) / 1000
     return `${Number.isInteger(seconds) ? seconds : seconds.toFixed(1)}s`
   }
-  const gridTimeTicks = candidateTimeTicks.map((offsetMs) => ({
+  const gridTimeTicks = useMemo(() => candidateTimeTicks.map((offsetMs) => ({
     offsetMs,
     x: xForElapsedMs(startMs + offsetMs),
-  }))
-  const labelTimeTicks = gridTimeTicks.filter(({ offsetMs }) => shouldShowTimelineLabel(
+  })), [candidateTimeTicks, startMs, xForElapsedMs])
+  const labelTimeTicks = useMemo(() => gridTimeTicks.filter(({ offsetMs }) => shouldShowTimelineLabel(
     offsetMs,
     startMs,
     durationMs,
     fitDuration && (offsetMs === 0 || offsetMs === durationMs),
-  )).map((tick) => ({ ...tick, label: timeLabel(tick.offsetMs) }))
-  const timeLabels = fitDuration
+  )).map((tick) => ({ ...tick, label: timeLabel(tick.offsetMs) })), [gridTimeTicks, startMs, durationMs, fitDuration])
+  const timeLabels = useMemo(() => fitDuration
     ? removeOverlappingFocusedTimeTicks(labelTimeTicks.map(({ offsetMs, x, label }) => ({
       offsetMs,
       x,
       label,
     })))
-    : labelTimeTicks
+    : labelTimeTicks, [fitDuration, labelTimeTicks])
   const lineClass = (series: ChartSeries) => dimmedSeries.includes(series) ? ' chart-line--dimmed' : ''
 
   return <div className="live-shot-chart">
