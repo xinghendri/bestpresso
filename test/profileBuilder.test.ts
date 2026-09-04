@@ -4,13 +4,15 @@ import test from 'node:test'
 import { builderTargetPoints, createDefaultProfileDraft, nextBuilderStage, profileDraftFromDecaidProfile, profileDraftToDecaidProfile, profileMaximumDurationMs, stageConstraintLabel } from '../src/features/profiles/profileBuilderModel.ts'
 
 const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
+const profilesPanel = readFileSync(new URL('../src/features/profiles/ProfilesPanel.tsx', import.meta.url), 'utf8')
 const screen = readFileSync(new URL('../src/features/profiles/ProfileBuilderScreen.tsx', import.meta.url), 'utf8')
 const styles = readFileSync(new URL('../src/styles/index.css', import.meta.url), 'utf8')
 
-test('routes profile creation into an isolated builder screen', () => {
-  assert.match(app, /'profile-builder'/)
-  assert.match(app, /<ProfileBuilderScreen/)
-  assert.match(app, /onAddProfile=\{\(\) => navigate\('profile-builder'\)\}/)
+test('keeps the unfinished profile builder inaccessible from the application routes', () => {
+  assert.doesNotMatch(app, /'profile-builder'/)
+  assert.doesNotMatch(app, /<ProfileBuilderScreen/)
+  assert.match(profilesPanel, /const PROFILE_CREATION_DEMO_ENABLED = false/)
+  assert.match(profilesPanel, /const PROFILE_EDITING_ENABLED = false/)
 })
 
 test('default draft mirrors the Streamline new-profile template', () => {

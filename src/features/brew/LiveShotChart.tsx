@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { LiveShotPoint } from '../../domain/brewing'
+import { ChartLegend } from './ChartLegend'
+import { ChartStageMarkers } from './ChartStageMarkers'
+import type { ChartStageMarker } from './ChartStageMarkers'
 import type { ChartSeries } from './chartSeries'
 import { chartSeriesForLine } from './chartSeries'
 import type { ChartFocusTransform } from './chartFocus'
@@ -23,24 +26,25 @@ interface LiveShotChartProps {
 
 const VIEW_WIDTH = 1000
 const VIEW_HEIGHT = 376
-const PLOT = { left: 42, right: 978, top: 38, bottom: 340 }
+const PLOT = { left: 42, right: 978, top: 64, bottom: 340 }
+const STAGE_MAP = { top: 34, bottom: 58 }
 const PLOT_TOP_STROKE_ALLOWANCE = 4
 const PLOT_BOTTOM_STROKE_ALLOWANCE = 4
 const NORMAL_CHART_TRANSFORM: ChartFocusTransform = { scaleX: 1, translateX: 0 }
 const CHART_FOCUS_TRANSITION_MS = 460
 
-const chartLegend = [
-  { series: 'flow', label: 'Flow and target flow', items: [
-    { label: 'Flow', className: 'chart-legend__sample--flow' },
-    { label: 'Target', accessibleLabel: 'Target flow', className: 'chart-legend__sample--target-flow' },
-  ] },
-  { series: 'pressure', label: 'Pressure and target pressure', items: [
-    { label: 'Pressure', className: 'chart-legend__sample--pressure' },
-    { label: 'Target', accessibleLabel: 'Target pressure', className: 'chart-legend__sample--target-pressure' },
-  ] },
-  { series: 'temperature', label: 'Temperature', items: [{ label: 'Temperature', className: 'chart-legend__sample--temperature' }] },
-  { series: 'weight', label: 'Weight', items: [{ label: 'Weight', className: 'chart-legend__sample--weight' }] },
-]
+const stageMarkersForPoints = (points: LiveShotPoint[], elapsedMs: number): ChartStageMarker[] => {
+  const stages: ChartStageMarker[] = []
+  for (const point of points) {
+    const name = point.stageName?.trim() || 'Extraction'
+    const identity = point.stageIndex === undefined ? `name:${name}` : `frame:${point.stageIndex}`
+    const current = stages[stages.length - 1]
+    if (current?.key.startsWith(`${identity}:`)) continue
+    if (current) current.endMs = point.elapsedMs
+    stages.push({ key: `${identity}:${stages.length}`, name, startMs: point.elapsedMs, endMs: elapsedMs })
+  }
+  return stages
+}
 
 const linePath = (points: LiveShotPoint[], key: keyof LiveShotPoint, xForElapsedMs: (elapsedMs: number) => number, minimum: number, maximum: number) => {
   let path = ''
@@ -126,6 +130,10 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
   const animatedFocusTransform = useAnimatedChartFocus(targetFocusTransform)
   const layerOpacity = chartFocusLayerOpacity(animatedFocusTransform.scaleX)
   const xForElapsedMs = (pointElapsedMs: number) => animatedFocusTransform.translateX + baseXForElapsedMs(pointElapsedMs) * animatedFocusTransform.scaleX
+  const stageMarkers = stageMarkersForPoints(plottedPoints, domainEndMs)
+  const highlightedStage = contextPoints
+    ? stageMarkers.find((stage) => startMs >= stage.startMs && startMs < stage.endMs)
+    : fitDuration ? undefined : stageMarkers[stageMarkers.length - 1]
   const intervalTicks = Array.from({ length: Math.floor(durationMs / 5_000) }, (_, index) => (index + 1) * 5_000)
   const candidateTimeTicks = fitDuration
     ? [0, ...intervalTicks, ...(durationMs % 5_000 ? [durationMs] : [])]
@@ -155,28 +163,17 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
   const lineClass = (series: ChartSeries) => dimmedSeries.includes(series) ? ' chart-line--dimmed' : ''
 
   return <div className="live-shot-chart">
-    <div className={`chart-legend${legendFilterEnabled ? ' chart-legend--filterable' : ''}`} aria-label="Chart legend">
-      {chartLegend.filter((group) => showWeight || group.series !== 'weight').map((group) => {
-        const series = group.series as ChartSeries
-        const dimmed = dimmedSeries.includes(series)
-        const content = group.items.map((item) => <span className="chart-legend__item" aria-label={item.accessibleLabel} key={`${item.label}:${item.className}`}>
-          <small>{item.label}</small>
-          <i className={`chart-legend__sample ${item.className}`} aria-hidden="true" />
-        </span>)
-        return legendFilterEnabled
-          ? <button className={`chart-legend__group${dimmed ? ' chart-legend__group--dimmed' : ''}`} type="button" aria-label={`${dimmed ? 'Show' : 'Dim'} ${group.label}`} aria-pressed={!dimmed} onClick={() => onToggleSeries?.(series)} key={group.series}>{content}</button>
-          : <span className="chart-legend__group" key={group.series}>{content}</span>
-      })}
-    </div>
+    <ChartLegend showWeight={showWeight} interactive={legendFilterEnabled} dimmedSeries={dimmedSeries} onToggleSeries={onToggleSeries} />
     <svg viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`} role="img" aria-label={showWeight ? 'Pressure, flow, yield weight, and temperature chart' : 'Pressure, flow, and temperature chart'} preserveAspectRatio="none">
       <defs><clipPath id="live-shot-plot"><rect x={PLOT.left} y={PLOT.top - PLOT_TOP_STROKE_ALLOWANCE} width={PLOT.right - PLOT.left} height={PLOT.bottom - PLOT.top + PLOT_TOP_STROKE_ALLOWANCE + PLOT_BOTTOM_STROKE_ALLOWANCE} /></clipPath></defs>
+      <ChartStageMarkers stages={stageMarkers} highlightedKey={highlightedStage?.key} xForElapsedMs={xForElapsedMs} plotLeft={PLOT.left} plotRight={PLOT.right} top={STAGE_MAP.top} bottom={STAGE_MAP.bottom} />
       {horizontalGridLines.map((line) => <line key={`horizontal-${line.ratio}`} className="chart-grid chart-grid--horizontal" x1={line.x1} x2={line.x2} y1={line.y} y2={line.y} />)}
       {gridTimeTicks.map((tick) => <line key={`time-grid-${tick.offsetMs}`} className="chart-grid chart-grid--vertical" x1={tick.x} x2={tick.x} y1={PLOT.top} y2={PLOT.bottom} />)}
       {timeLabels.map((tick) => <text key={`time-label-${tick.offsetMs}`} className="chart-axis-label" x={tick.x} y={PLOT.bottom + 25} textAnchor="middle">{tick.label}</text>)}
       {horizontalGridLines.map((line) => <g key={`axis-${line.ratio}`}>
         <text className="chart-axis-label" x={PLOT.left - 13} y={PLOT.bottom - line.ratio * (PLOT.bottom - PLOT.top) + 4} textAnchor="end">{Math.round(12 * line.ratio)}</text>
       </g>)}
-      <text className="chart-axis-title" x={PLOT.left - 13} y={PLOT.top - 14}>bar / ml/s</text>
+      <text className="chart-axis-title" x={PLOT.left - 13} y="18">bar / ml/s</text>
       <g clipPath="url(#live-shot-plot)">
         <g className="live-shot-chart__context-lines" opacity={layerOpacity.contextOpacity} aria-hidden="true">
           <path className={`chart-line chart-line--target-pressure${lineClass(chartSeriesForLine.targetPressure)}`} d={linePath(plottedPoints, 'targetPressure', xForElapsedMs, 0, 12)} />

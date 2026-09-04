@@ -13,8 +13,8 @@ import { isCleaningProfile, sortProfilesForDirectory } from '../../api/decaid/ad
 import type { BrewProfile, SettingFeedback } from '../../domain/brewing'
 import { ProfileTargetChart } from '../brew/ProfileTargetChart'
 
-const PROFILE_CREATION_DEMO_ENABLED = true
-const PROFILE_EDITING_ENABLED = true
+const PROFILE_CREATION_DEMO_ENABLED = false
+const PROFILE_EDITING_ENABLED = false
 
 interface ProfilesPanelProps {
   profiles: BrewProfile[]
