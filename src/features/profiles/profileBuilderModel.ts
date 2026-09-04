@@ -47,19 +47,18 @@ export interface ProfileDraft {
 
 export function createDefaultProfileDraft(): ProfileDraft {
   return {
-    title: 'My espresso profile',
+    title: 'New Profile',
     beverageType: 'espresso',
     author: '',
-    notes: 'A balanced four-stage starting point.',
-    targetWeight: 36,
-    targetVolume: 42,
-    targetVolumeCountStart: 1,
+    notes: '',
+    targetWeight: 0,
+    targetVolume: 0,
+    targetVolumeCountStart: 0,
     tankTemperature: 0,
     stages: [
-      { id: 'wet', name: 'Wet the puck', pump: 'flow', transition: 'fast', target: 3.5, temperature: 92, sensor: 'coffee', seconds: 12, volume: 100, weight: 4, exit: { type: 'pressure', condition: 'over', value: 4 }, limiter: { type: 'pressure', value: 6, range: 0.6 } },
-      { id: 'rise', name: 'Build pressure', pump: 'pressure', transition: 'smooth', target: 9, temperature: 92, sensor: 'coffee', seconds: 6, volume: 100, limiter: { type: 'flow', value: 2.5, range: 0.4 } },
-      { id: 'hold', name: 'Hold', pump: 'pressure', transition: 'fast', target: 9, temperature: 92, sensor: 'coffee', seconds: 18, volume: 100, limiter: { type: 'flow', value: 2.2, range: 0.4 } },
-      { id: 'decline', name: 'Decline', pump: 'pressure', transition: 'smooth', target: 6, temperature: 92, sensor: 'coffee', seconds: 12, volume: 100, limiter: { type: 'flow', value: 2, range: 0.4 } },
+      { id: 'preinfusion', name: 'Preinfusion', pump: 'flow', transition: 'fast', target: 2, temperature: 93, sensor: 'coffee', seconds: 10, weight: 0, volume: 0, exit: { type: 'pressure', condition: 'over', value: 4 }, limiter: { type: 'pressure', value: 4, range: 0.6 } },
+      { id: 'ramp', name: 'Ramp', pump: 'flow', transition: 'fast', target: 6, temperature: 93, sensor: 'coffee', seconds: 20, weight: 0, volume: 0, exit: { type: 'pressure', condition: 'over', value: 9 }, limiter: { type: 'pressure', value: 9, range: 0.6 } },
+      { id: 'extraction', name: 'Extraction', pump: 'pressure', transition: 'fast', target: 9, temperature: 93, sensor: 'coffee', seconds: 40, weight: 37, volume: 0 },
     ],
   }
 }
@@ -76,6 +75,7 @@ export function builderTargetPoints(stages: BuilderStage[]): ProfileTargetPoint[
   let elapsedMs = 0
   let pressure = 0
   let flow = 0
+  let temperature = stages[0]?.temperature ?? 0
 
   for (const stage of stages) {
     const nextPressure = stage.pump === 'pressure'
@@ -86,15 +86,16 @@ export function builderTargetPoints(stages: BuilderStage[]): ProfileTargetPoint[
       : stage.limiter?.type === 'flow' ? stage.limiter.value : flow
     const stageEndMs = elapsedMs + stage.seconds * 1000
 
-    points.push({ elapsedMs, pressure, flow })
+    points.push({ elapsedMs, pressure, flow, temperature })
     if (stage.transition === 'fast') {
-      points.push({ elapsedMs, pressure: nextPressure, flow: nextFlow })
+      points.push({ elapsedMs, pressure: nextPressure, flow: nextFlow, temperature: stage.temperature })
     }
-    points.push({ elapsedMs: stageEndMs, pressure: nextPressure, flow: nextFlow })
+    points.push({ elapsedMs: stageEndMs, pressure: nextPressure, flow: nextFlow, temperature: stage.temperature })
 
     elapsedMs = stageEndMs
     pressure = nextPressure
     flow = nextFlow
+    temperature = stage.temperature
   }
   return points
 }
@@ -102,13 +103,15 @@ export function builderTargetPoints(stages: BuilderStage[]): ProfileTargetPoint[
 export function nextBuilderStage(index: number): BuilderStage {
   return {
     id: `stage-${Date.now()}-${index}`,
-    name: `Stage ${index + 1}`,
-    pump: 'pressure',
+    name: 'New Step',
+    pump: 'flow',
     transition: 'fast',
     target: 6,
-    temperature: 92,
+    temperature: 93,
     sensor: 'coffee',
-    seconds: 10,
-    volume: 100,
+    seconds: 30,
+    weight: 0,
+    volume: 0,
+    exit: { type: 'pressure', condition: 'over', value: 9 },
   }
 }

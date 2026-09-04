@@ -1,220 +1,221 @@
 import { useMemo, useState } from 'react'
-import profilesBackIcon from '../../assets/figma/profiles-back.svg'
+import builderCategoryChevron from '../../assets/figma/builder-category-chevron.svg'
+import builderStepMinus from '../../assets/figma/builder-step-minus.svg'
+import builderStepMinusMuted from '../../assets/figma/builder-step-minus-muted.svg'
+import builderStepPlus from '../../assets/figma/builder-step-plus.svg'
+import builderTransitionFast from '../../assets/figma/builder-transition-fast.svg'
+import builderTransitionSmooth from '../../assets/figma/builder-transition-smooth.svg'
+import builderValueChevron from '../../assets/figma/builder-value-chevron.svg'
+import { useValueAdjustment } from '../../components/ValueAdjustment/ValueAdjustmentContext'
 import type { ProfileTargetPoint } from '../../domain/brewing'
+import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { builderTargetPoints, createDefaultProfileDraft, nextBuilderStage } from './profileBuilderModel'
-import type { BuilderExitCondition, BuilderExitType, BuilderStage, ProfileDraft } from './profileBuilderModel'
+import type { BuilderExitType, BuilderStage, ProfileDraft } from './profileBuilderModel'
 
-const CHART_WIDTH = 760
-const CHART_HEIGHT = 188
-const CHART_TOP = 18
-const CHART_BOTTOM = 26
+const CHART_WIDTH = 1090
+const CHART_HEIGHT = 270
+const PLOT_TOP = 58
+const PLOT_BOTTOM = 260
 
-const pathFor = (points: ProfileTargetPoint[], key: 'pressure' | 'flow', maximum: number, duration: number) => points.reduce((path, point, index) => {
-  const x = (point.elapsedMs / duration) * CHART_WIDTH
-  const value = point[key] ?? 0
-  const y = CHART_HEIGHT - CHART_BOTTOM - Math.max(0, Math.min(1, value / maximum)) * (CHART_HEIGHT - CHART_TOP - CHART_BOTTOM)
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
+const rounded = (value: number) => Math.round(value * 10) / 10
+const formatValue = (value: number | undefined) => value === undefined || value <= 0 ? '-' : Number.isInteger(value) ? String(value) : value.toFixed(1)
+
+const pathFor = (points: ProfileTargetPoint[], key: 'pressure' | 'flow' | 'temperature', duration: number, minimum: number, maximum: number) => points.reduce((path, point, index) => {
+  const x = duration > 0 ? point.elapsedMs / duration * CHART_WIDTH : 0
+  const value = point[key] ?? minimum
+  const y = PLOT_BOTTOM - clamp((value - minimum) / (maximum - minimum), 0, 1) * (PLOT_BOTTOM - PLOT_TOP)
   return `${path}${index === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`
 }, '')
-
-const numeric = (value: string, fallback: number) => {
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : fallback
-}
 
 function BuilderChart({ draft, activeStage }: { draft: ProfileDraft; activeStage: number }) {
   const points = builderTargetPoints(draft.stages)
   const duration = Math.max(1, points.at(-1)?.elapsedMs ?? 1)
-  const spans = draft.stages.map((stage, index) => {
-    const start = draft.stages.slice(0, index).reduce((total, item) => total + item.seconds * 1000, 0)
-    return { start, end: start + stage.seconds * 1000, id: stage.id }
-  })
+  const stageStart = draft.stages.slice(0, activeStage).reduce((total, stage) => total + stage.seconds * 1000, 0)
+  const stageEnd = stageStart + (draft.stages[activeStage]?.seconds ?? 0) * 1000
+  const clipX = stageStart / duration * CHART_WIDTH
+  const clipWidth = Math.max(1, (stageEnd - stageStart) / duration * CHART_WIDTH)
+  const pressurePath = pathFor(points, 'pressure', duration, 0, 12)
+  const flowPath = pathFor(points, 'flow', duration, 0, 12)
+  const temperaturePath = pathFor(points, 'temperature', duration, 70, 100)
 
-  return <section className="profile-builder-chart" aria-label="Profile target preview">
-    <header>
-      <div><span>Target preview</span><strong>{Math.round(duration / 1000)} seconds</strong></div>
-      <div className="profile-builder-chart__legend">
-        <span><i className="profile-builder-chart__pressure" />Pressure</span>
-        <span><i className="profile-builder-chart__flow" />Flow</span>
-      </div>
-    </header>
-    <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} preserveAspectRatio="none" role="img" aria-label="Pressure and flow targets across the profile stages">
-      {[0, 1, 2, 3].map((line) => <line key={line} className="profile-builder-chart__grid" x1="0" x2={CHART_WIDTH} y1={CHART_TOP + line * 44} y2={CHART_TOP + line * 44} />)}
-      {spans.map((span, index) => <rect key={span.id} className={index === activeStage ? 'profile-builder-chart__stage profile-builder-chart__stage--active' : 'profile-builder-chart__stage'} x={span.start / duration * CHART_WIDTH} y="0" width={(span.end - span.start) / duration * CHART_WIDTH} height={CHART_HEIGHT - CHART_BOTTOM} />)}
-      <path className="profile-builder-chart__line profile-builder-chart__line--pressure" d={pathFor(points, 'pressure', 12, duration)} />
-      <path className="profile-builder-chart__line profile-builder-chart__line--flow" d={pathFor(points, 'flow', 6, duration)} />
-      {spans.map((span, index) => <text key={`${span.id}-label`} x={(span.start + span.end) / 2 / duration * CHART_WIDTH} y={CHART_HEIGHT - 7} textAnchor="middle">{index + 1}</text>)}
+  return <section className="pb-chart" aria-label="Profile target preview">
+    <div className="pb-chart__axis" aria-hidden="true">
+      <span>Bar <b>/</b> ml/s</span>
+      {[12, 9, 6, 3, 0].map((value) => <i key={value} style={{ top: `${(PLOT_TOP + (12 - value) / 12 * (PLOT_BOTTOM - PLOT_TOP)) / CHART_HEIGHT * 100}%` }}>{value}</i>)}
+    </div>
+    <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} preserveAspectRatio="none" role="img" aria-label="Flow, pressure, and temperature targets across the profile stages">
+      <defs><clipPath id="pb-active-stage"><rect x={clipX} y="0" width={clipWidth} height={CHART_HEIGHT} /></clipPath></defs>
+      {[12, 9, 6, 3, 0].map((value) => {
+        const y = PLOT_TOP + (12 - value) / 12 * (PLOT_BOTTOM - PLOT_TOP)
+        return <line key={value} className="pb-chart__tick" x1="0" x2="10" y1={y} y2={y} />
+      })}
+      <path className="pb-chart__line pb-chart__line--pressure pb-chart__line--muted" d={pressurePath} />
+      <path className="pb-chart__line pb-chart__line--flow pb-chart__line--muted" d={flowPath} />
+      <path className="pb-chart__line pb-chart__line--temperature pb-chart__line--muted" d={temperaturePath} />
+      <g clipPath="url(#pb-active-stage)">
+        <path className="pb-chart__line pb-chart__line--pressure" d={pressurePath} />
+        <path className="pb-chart__line pb-chart__line--flow" d={flowPath} />
+        <path className="pb-chart__line pb-chart__line--temperature" d={temperaturePath} />
+      </g>
     </svg>
   </section>
 }
 
-interface StageEditorCardProps {
+function SegmentControl({ value, onChange }: { value: BuilderStage['pump']; onChange: (value: BuilderStage['pump']) => void }) {
+  return <div className="pb-segmented pb-segmented--pump" role="group" aria-label="Stage control">
+    <button type="button" className={value === 'flow' ? 'is-selected is-flow' : ''} onClick={() => onChange('flow')}>Flow</button>
+    <button type="button" className={value === 'pressure' ? 'is-selected is-pressure' : ''} onClick={() => onChange('pressure')}>Pressure</button>
+  </div>
+}
+
+function TransitionControl({ value, onChange }: { value: BuilderStage['transition']; onChange: (value: BuilderStage['transition']) => void }) {
+  return <div className="pb-segmented pb-segmented--choice" role="group" aria-label="Stage transition">
+    <button type="button" className={value === 'fast' ? 'is-selected' : ''} onClick={() => onChange('fast')}><img src={builderTransitionFast} alt="" />Fast</button>
+    <button type="button" className={value === 'smooth' ? 'is-selected' : ''} onClick={() => onChange('smooth')}><img src={builderTransitionSmooth} alt="" />Smooth</button>
+  </div>
+}
+
+function SensorControl({ value, onChange }: { value: BuilderStage['sensor']; onChange: (value: BuilderStage['sensor']) => void }) {
+  return <div className="pb-segmented pb-segmented--choice" role="group" aria-label="Temperature sensor">
+    <button type="button" className={value === 'water' ? 'is-selected' : ''} onClick={() => onChange('water')}>Water</button>
+    <button type="button" className={value === 'coffee' ? 'is-selected' : ''} onClick={() => onChange('coffee')}>Coffee</button>
+  </div>
+}
+
+function Stepper({ label, value, unit, step, min = 0, max = 1000, onChange }: {
+  label: string
+  value?: number
+  unit: string
+  step: number
+  min?: number
+  max?: number
+  onChange: (value: number | undefined) => void
+}) {
+  const enabled = value !== undefined && value > 0
+  const change = (direction: -1 | 1) => {
+    if (!enabled && direction < 0) return
+    const base = enabled ? value : min > 0 ? min : step
+    const next = rounded(clamp((base ?? 0) + (enabled ? direction * step : 0), min, max))
+    onChange(next <= 0 ? undefined : next)
+  }
+  return <div className="pb-stepper" aria-label={`${label}, ${formatValue(value)} ${unit}`}>
+    <button type="button" onClick={() => change(-1)} aria-label={`Reduce ${label}`}><img src={enabled ? builderStepMinus : builderStepMinusMuted} alt="" /></button>
+    <span>{formatValue(value)}{unit && <small>{unit}</small>}</span>
+    <button type="button" onClick={() => change(1)} aria-label={`Increase ${label}`}><img src={builderStepPlus} alt="" /></button>
+  </div>
+}
+
+function ExitControl({ type, stage, onChange }: { type: BuilderExitType; stage: BuilderStage; onChange: (patch: Partial<BuilderStage>) => void }) {
+  const value = stage.exit?.type === type ? stage.exit.value : undefined
+  return <div className="pb-condition">
+    <div className="pb-condition__label"><span>{type === 'flow' ? 'Flow' : 'Pressure'} is <em>above</em></span><img src={builderValueChevron} alt="" /></div>
+    <Stepper label={`${type} exit`} value={value} unit={type === 'flow' ? 'ml/s' : 'bar'} step={0.1} onChange={(next) => onChange({ exit: next === undefined ? undefined : { type, condition: 'over', value: next } })} />
+  </div>
+}
+
+function StageEditorCard({ stage, index, active, onActivate, onChange }: {
   stage: BuilderStage
   index: number
   active: boolean
   onActivate: () => void
   onChange: (patch: Partial<BuilderStage>) => void
-  onDuplicate: () => void
-}
-
-function StageEditorCard({ stage, index, active, onActivate, onChange, onDuplicate }: StageEditorCardProps) {
+}) {
   const setPump = (pump: BuilderStage['pump']) => onChange({
     pump,
-    target: pump === stage.pump ? stage.target : pump === 'pressure' ? 9 : 3,
+    target: pump === stage.pump ? stage.target : 6,
     limiter: stage.limiter ? { ...stage.limiter, type: pump === 'pressure' ? 'flow' : 'pressure' } : undefined,
   })
-  const targetUnit = stage.pump === 'pressure' ? 'bar' : 'ml/s'
-  const limiterUnit = stage.limiter?.type === 'pressure' ? 'bar' : 'ml/s'
-  const thresholdUnit = stage.exit?.type === 'pressure' ? 'bar' : 'ml/s'
+  const limiterLabel = stage.pump === 'pressure' ? 'Max flow' : 'Max pressure'
+  const limiterUnit = stage.pump === 'pressure' ? 'ml/s' : 'bar'
+  const limiterValue = stage.limiter?.value
 
-  return <article className={active ? 'profile-builder-stage-editor-card is-active' : 'profile-builder-stage-editor-card'} onPointerDownCapture={onActivate}>
+  return <article className={active ? 'pb-stage is-active' : 'pb-stage'} onClick={onActivate} aria-label={`Stage ${index + 1}: ${stage.name}`}>
     <header>
-      <div><span>Stage {index + 1}</span><input aria-label={`Stage ${index + 1} name`} value={stage.name} onChange={(event) => onChange({ name: event.target.value })} /></div>
-      <strong>{stage.seconds}<small>s</small></strong>
+      <input aria-label={`Stage ${index + 1} name`} value={stage.name} onChange={(event) => onChange({ name: event.target.value })} />
+      <Stepper label="Duration" value={stage.seconds} unit="s" step={1} min={1} max={120} onChange={(seconds) => onChange({ seconds: seconds ?? 1 })} />
     </header>
-
-    <div className="profile-builder-stage-row profile-builder-stage-row--control">
-      <label>Control</label>
-      <div className="profile-builder-stage-segmented" role="group" aria-label={`Stage ${index + 1} controlled axis`}>
-        <button type="button" className={stage.pump === 'flow' ? 'is-active is-flow' : ''} onClick={() => setPump('flow')}>Flow</button>
-        <button type="button" className={stage.pump === 'pressure' ? 'is-active is-pressure' : ''} onClick={() => setPump('pressure')}>Pressure</button>
-      </div>
-      <NumberField label="Control target" value={stage.target} unit={targetUnit} step="0.1" onChange={(value) => onChange({ target: value })} />
+    <div className="pb-stage__control-row">
+      <SegmentControl value={stage.pump} onChange={setPump} />
+      <Stepper label={`${stage.pump} target`} value={stage.target} unit={stage.pump === 'pressure' ? 'bar' : 'ml/s'} step={0.1} max={stage.pump === 'pressure' ? 12 : 8} onChange={(target) => onChange({ target: target ?? 0 })} />
     </div>
-
-    <div className="profile-builder-stage-row">
-      <label>Transition</label>
-      <div className="profile-builder-stage-segmented profile-builder-stage-segmented--neutral" role="group" aria-label="Target transition">
-        <button type="button" className={stage.transition === 'fast' ? 'is-active' : ''} onClick={() => onChange({ transition: 'fast' })}>Fast</button>
-        <button type="button" className={stage.transition === 'smooth' ? 'is-active' : ''} onClick={() => onChange({ transition: 'smooth' })}>Smooth</button>
+    <div className="pb-stage__row pb-stage__row--transition"><span>Transition</span><TransitionControl value={stage.transition} onChange={(transition) => onChange({ transition })} /></div>
+    <div className="pb-stage__row pb-stage__row--limiter"><span>{limiterLabel}</span><Stepper label={limiterLabel} value={limiterValue} unit={limiterUnit} step={0.1} max={stage.pump === 'pressure' ? 8 : 12} onChange={(value) => onChange({ limiter: value === undefined ? undefined : { type: stage.pump === 'pressure' ? 'flow' : 'pressure', value, range: stage.limiter?.range ?? 0.4 } })} /></div>
+    <div className="pb-stage__divider pb-stage__divider--upper" />
+    <div className="pb-stage__row pb-stage__row--temperature"><span>Temperature</span><Stepper label="Temperature" value={stage.temperature} unit="°" step={0.5} min={80} max={100} onChange={(temperature) => onChange({ temperature: temperature ?? 80 })} /></div>
+    <div className="pb-stage__row pb-stage__row--sensor"><span>Measure from</span><SensorControl value={stage.sensor} onChange={(sensor) => onChange({ sensor })} /></div>
+    <div className="pb-stage__divider pb-stage__divider--lower" />
+    <section className="pb-stage__conditions" aria-label="Move to next stage if">
+      <h2>Move to next stage if</h2>
+      <div className="pb-condition-grid">
+        <ExitControl type="flow" stage={stage} onChange={onChange} />
+        <ExitControl type="pressure" stage={stage} onChange={onChange} />
+        <div className="pb-condition">
+          <div className="pb-condition__label"><span>Yield</span><img src={builderValueChevron} alt="" /></div>
+          <Stepper label="Stage yield" value={stage.weight} unit="g" step={0.1} onChange={(weight) => onChange({ weight })} />
+        </div>
+        <div className="pb-condition">
+          <div className="pb-condition__label"><span>Volume</span><img src={builderValueChevron} alt="" /></div>
+          <Stepper label="Stage volume" value={stage.volume > 0 ? stage.volume : undefined} unit="ml" step={1} onChange={(volume) => onChange({ volume: volume ?? 0 })} />
+        </div>
       </div>
-    </div>
-
-    <div className="profile-builder-stage-row profile-builder-stage-row--limiter">
-      <label>{stage.pump === 'pressure' ? 'Flow limiter' : 'Pressure limiter'}</label>
-      <button className={stage.limiter ? 'profile-builder-stage-enable is-active' : 'profile-builder-stage-enable'} type="button" onClick={() => onChange({ limiter: stage.limiter ? undefined : { type: stage.pump === 'pressure' ? 'flow' : 'pressure', value: stage.pump === 'pressure' ? 2.5 : 6, range: 0.4 } })}>{stage.limiter ? 'On' : 'Off'}</button>
-      {stage.limiter && <>
-        <NumberField label="Limiter value" value={stage.limiter.value} unit={limiterUnit} step="0.1" onChange={(value) => onChange({ limiter: stage.limiter ? { ...stage.limiter, value } : undefined })} />
-        <NumberField label="Limiter range" value={stage.limiter.range} unit="range" step="0.1" onChange={(range) => onChange({ limiter: stage.limiter ? { ...stage.limiter, range } : undefined })} />
-      </>}
-    </div>
-
-    <div className="profile-builder-stage-row">
-      <label>Temperature</label>
-      <NumberField label="Temperature" value={stage.temperature} unit="°C" step="0.5" onChange={(temperature) => onChange({ temperature })} />
-    </div>
-
-    <div className="profile-builder-stage-row">
-      <label>Temperature sensor</label>
-      <div className="profile-builder-stage-segmented profile-builder-stage-segmented--neutral" role="group" aria-label="Temperature sensor">
-        <button type="button" className={stage.sensor === 'water' ? 'is-active' : ''} onClick={() => onChange({ sensor: 'water' })}>Water</button>
-        <button type="button" className={stage.sensor === 'coffee' ? 'is-active' : ''} onClick={() => onChange({ sensor: 'coffee' })}>Coffee</button>
-      </div>
-    </div>
-
-    <section className="profile-builder-stage-advance" aria-label="Advance this stage when">
-      <h3>Move on if</h3>
-      <div className="profile-builder-stage-field">
-        <span>Time limit</span>
-        <NumberField label="Stage time limit" value={stage.seconds} unit="sec" min="1" onChange={(seconds) => onChange({ seconds: Math.max(1, seconds) })} />
-      </div>
-      <div className="profile-builder-stage-field">
-        <span>Sensor threshold</span>
-        <button className={stage.exit ? 'profile-builder-stage-enable is-active' : 'profile-builder-stage-enable'} type="button" onClick={() => onChange({ exit: stage.exit ? undefined : { type: stage.pump === 'flow' ? 'pressure' : 'flow', condition: 'over', value: stage.pump === 'flow' ? 4 : 2.5 } })}>{stage.exit ? 'On' : 'Off'}</button>
-        {stage.exit && <div className="profile-builder-threshold">
-          <select aria-label="Threshold axis" value={stage.exit.type} onChange={(event) => onChange({ exit: stage.exit ? { ...stage.exit, type: event.target.value as BuilderExitType } : undefined })}><option value="pressure">Pressure</option><option value="flow">Flow</option></select>
-          <select aria-label="Threshold direction" value={stage.exit.condition} onChange={(event) => onChange({ exit: stage.exit ? { ...stage.exit, condition: event.target.value as BuilderExitCondition } : undefined })}><option value="over">Above</option><option value="under">Below</option></select>
-          <NumberField label="Threshold value" value={stage.exit.value} unit={thresholdUnit} step="0.1" onChange={(value) => onChange({ exit: stage.exit ? { ...stage.exit, value } : undefined })} />
-        </div>}
-      </div>
-      <div className="profile-builder-stage-field">
-        <span>Stage scale weight</span>
-        <button className={stage.weight === undefined ? 'profile-builder-stage-enable' : 'profile-builder-stage-enable is-active'} type="button" onClick={() => onChange({ weight: stage.weight === undefined ? 8 : undefined })}>{stage.weight === undefined ? 'Off' : 'On'}</button>
-        {stage.weight !== undefined && <NumberField label="Stage scale weight" value={stage.weight} unit="g" step="0.1" onChange={(weight) => onChange({ weight })} />}
-      </div>
-      <div className="profile-builder-stage-field">
-        <span>Volume safety limit</span>
-        <NumberField label="Stage volume safety limit" value={stage.volume} unit="ml" min="0" onChange={(volume) => onChange({ volume: Math.max(0, volume) })} />
-      </div>
-      <p>Scale weight advances this stage only. Whole-shot stop is configured above.</p>
     </section>
-
-    <footer><button type="button" onClick={onDuplicate}>Duplicate stage</button></footer>
   </article>
 }
 
-interface NumberFieldProps {
-  label: string
-  value: number
-  unit: string
-  step?: string
-  min?: string
-  onChange: (value: number) => void
-}
-
-function NumberField({ label, value, unit, step, min, onChange }: NumberFieldProps) {
-  return <div className="profile-builder-stage-number">
-    <input aria-label={label} type="number" min={min} step={step} value={value} onChange={(event) => onChange(numeric(event.target.value, 0))} />
-    <small>{unit}</small>
-  </div>
-}
-
 export function ProfileBuilderScreen({ onClose }: { onClose: () => void }) {
+  const openAdjustment = useValueAdjustment()
   const [draft, setDraft] = useState(createDefaultProfileDraft)
   const [activeStage, setActiveStage] = useState(0)
-  const [category, setCategory] = useState('Espresso')
-  const [saved, setSaved] = useState(false)
-  const totalDuration = useMemo(() => draft.stages.reduce((total, stage) => total + stage.seconds, 0), [draft.stages])
+  const [category, setCategory] = useState<string | undefined>()
+  const categories = useMemo(() => [undefined, 'Espresso', 'Filter', 'Tea', 'Cleaning'] as const, [])
 
-  const updateDraft = <Key extends keyof ProfileDraft>(key: Key, value: ProfileDraft[Key]) => {
-    setSaved(false)
-    setDraft((current) => ({ ...current, [key]: value }))
-  }
-  const updateStage = (index: number, patch: Partial<BuilderStage>) => {
-    setSaved(false)
-    setDraft((current) => ({ ...current, stages: current.stages.map((stage, stageIndex) => stageIndex === index ? { ...stage, ...patch } : stage) }))
-  }
+  const updateDraft = <Key extends keyof ProfileDraft>(key: Key, value: ProfileDraft[Key]) => setDraft((current) => ({ ...current, [key]: value }))
+  const updateStage = (index: number, patch: Partial<BuilderStage>) => setDraft((current) => ({ ...current, stages: current.stages.map((stage, stageIndex) => stageIndex === index ? { ...stage, ...patch } : stage) }))
   const addStage = () => {
-    const nextIndex = draft.stages.length
-    setDraft((current) => ({ ...current, stages: [...current.stages, nextBuilderStage(current.stages.length)] }))
-    setActiveStage(nextIndex)
-    setSaved(false)
+    const index = draft.stages.length
+    updateDraft('stages', [...draft.stages, nextBuilderStage(index)])
+    setActiveStage(index)
   }
-  const duplicateStage = (index: number) => {
-    const source = draft.stages[index]
-    const copy = { ...source, id: `${source.id}-copy-${draft.stages.length}`, name: `${source.name} copy`, exit: source.exit ? { ...source.exit } : undefined, limiter: source.limiter ? { ...source.limiter } : undefined }
-    setDraft((current) => ({ ...current, stages: [...current.stages.slice(0, index + 1), copy, ...current.stages.slice(index + 1)] }))
-    setActiveStage(index + 1)
-    setSaved(false)
+  const cycleCategory = () => {
+    const index = categories.findIndex((item) => item === category)
+    setCategory(categories[(index + 1) % categories.length])
   }
-
-  return <main className="profile-builder-screen profile-builder-screen--figma-flow">
-    <header className="profile-builder-topbar">
-      <div className="profile-builder-profile-identity">
-        <button type="button" onClick={onClose} aria-label="Back to profiles"><img src={profilesBackIcon} alt="" /></button>
-        <div><span>Profile name</span><input aria-label="Profile name" value={draft.title} onChange={(event) => updateDraft('title', event.target.value)} /></div>
+  const cycleType = () => {
+    const types: ProfileDraft['beverageType'][] = ['espresso', 'pourover', 'manual', 'cleaning']
+    const index = types.indexOf(draft.beverageType)
+    updateDraft('beverageType', types[(index + 1) % types.length])
+  }
+  const editTargetYield = () => openAdjustment({
+    label: 'Target yield',
+    value: draft.targetWeight ?? 0,
+    unit: 'g',
+    ...VALUE_ADJUSTMENTS.targetYield,
+    suggestionKey: 'targetYield',
+    onSave: (targetWeight) => updateDraft('targetWeight', targetWeight > 0 ? targetWeight : undefined),
+  })
+  return <main className="profile-builder-screen pb-screen">
+    <header className="pb-topbar">
+      <div className="pb-topbar__identity">
+        <input aria-label="Profile name" value={draft.title} onChange={(event) => updateDraft('title', event.target.value)} />
+        <button className="pb-category" type="button" onClick={cycleCategory}>{category ?? 'Category (optional)'}<img src={builderCategoryChevron} alt="" /></button>
       </div>
-      <div className="profile-builder-topbar-metrics">
-        <label><span>Category</span><select value={category} onChange={(event) => setCategory(event.target.value)}><option>Espresso</option><option>Filter</option><option>Tea</option><option>Cleaning</option></select></label>
-        <label><span>Type</span><select value={draft.beverageType} onChange={(event) => updateDraft('beverageType', event.target.value as ProfileDraft['beverageType'])}><option value="espresso">Espresso</option><option value="pourover">Pour over</option><option value="manual">Manual</option><option value="cleaning">Cleaning</option></select></label>
-        <label><span>Whole-shot stop at weight</span><div><input aria-label="Whole-shot target yield" type="number" step="0.1" value={draft.targetWeight ?? ''} onChange={(event) => updateDraft('targetWeight', event.target.value === '' ? undefined : numeric(event.target.value, 0))} /><small>g</small></div></label>
-        <label><span>Volume fallback</span><div><input aria-label="Whole-shot target volume" type="number" value={draft.targetVolume ?? ''} onChange={(event) => updateDraft('targetVolume', event.target.value === '' ? undefined : numeric(event.target.value, 0))} /><small>ml</small></div></label>
-        <label><span>Count volume from</span><div><input aria-label="Target volume count start" type="number" value={draft.targetVolumeCountStart} onChange={(event) => updateDraft('targetVolumeCountStart', numeric(event.target.value, 0))} /><small>stage</small></div></label>
-        <div className="profile-builder-total"><span>Duration</span><strong>{totalDuration}<small>s</small></strong></div>
+      <div className="pb-topbar__metadata">
+        <button type="button" className="pb-meta" onClick={cycleType}><span>Type <img src={builderValueChevron} alt="" /></span><strong>{draft.beverageType === 'pourover' ? 'Pour over' : `${draft.beverageType[0].toUpperCase()}${draft.beverageType.slice(1)}`}</strong></button>
+        <button type="button" className="pb-meta" onClick={editTargetYield}><span>Target yield <img src={builderValueChevron} alt="" /></span><strong>{formatValue(draft.targetWeight)} <small>g</small></strong></button>
       </div>
-      <div className="profile-builder-topbar-actions">
-        <span>{saved ? 'Draft saved locally' : 'Prototype only — nothing is uploaded'}</span>
-        <button className="profile-builder-cancel" type="button" onClick={onClose}>Cancel</button>
-        <button className="profile-builder-save" type="button" onClick={() => setSaved(true)}>Save</button>
+      <div className="pb-topbar__actions">
+        <button className="pb-cancel" type="button" onClick={onClose}>Cancel</button>
+        <button className="pb-save" type="button">Save</button>
       </div>
     </header>
-
-    <section className="profile-builder-figma-chart"><BuilderChart draft={draft} activeStage={activeStage} /></section>
-
-    <section className="profile-builder-editor-strip" aria-label="Editable brew stages">
-      {draft.stages.map((stage, index) => <StageEditorCard key={stage.id} stage={stage} index={index} active={index === activeStage} onActivate={() => setActiveStage(index)} onChange={(patch) => updateStage(index, patch)} onDuplicate={() => duplicateStage(index)} />)}
-      <button className="profile-builder-add-editor-card" type="button" onClick={addStage}><span>＋</span><strong>Add stage</strong><small>Continue the profile</small></button>
+    <BuilderChart draft={draft} activeStage={activeStage} />
+    <section className="pb-stage-strip" aria-label="Editable brew stages">
+      {draft.stages.map((stage, index) => <StageEditorCard key={stage.id} stage={stage} index={index} active={index === activeStage} onActivate={() => setActiveStage(index)} onChange={(patch) => updateStage(index, patch)} />)}
+      <button className="pb-add-stage" type="button" aria-label="Add stage" onClick={addStage}>
+        <span><img src={builderStepPlus} alt="" /></span>
+        <strong>Add stage</strong>
+      </button>
     </section>
-
-    <footer className="profile-builder-ownership-note"><span>Machine-owned</span> target, transition, temperature, duration and sensor exits <i /> <span>Decaid-owned</span> stage weight exits and final yield</footer>
   </main>
 }

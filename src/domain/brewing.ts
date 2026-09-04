@@ -50,6 +50,7 @@ export interface ProfileTargetPoint {
   elapsedMs: number
   pressure?: number
   flow?: number
+  temperature?: number
 }
 
 export interface BrewProfile {
