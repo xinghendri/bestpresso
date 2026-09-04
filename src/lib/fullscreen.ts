@@ -25,11 +25,21 @@ export function isFullscreenSupported() {
   return Boolean(doc.fullscreenEnabled || doc.webkitFullscreenEnabled || doc.mozFullScreenEnabled || doc.msFullscreenEnabled)
 }
 
-// Accounts for both the browser fullscreen API and webviews that start fullscreen
-// without ever setting fullscreenElement (viewport already matches screen size).
-export function isFullscreenActive() {
+// Strictly reflects the Fullscreen API's own state. Use this to drive UI that acts on
+// fullscreen (like a toggle button) — a regular tab can reach near-screen viewport size
+// without ever calling requestFullscreen, which would make isFullscreenActive's heuristic
+// below report a false positive and leave a toggle stuck offering the wrong action.
+export function isFullscreenElementActive() {
   const doc = document as DocumentWithVendorFullscreen
-  if (doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement) return true
+  return Boolean(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement)
+}
+
+// Accounts for both the browser fullscreen API and webviews that start fullscreen
+// without ever setting fullscreenElement (viewport already matches screen size). Only
+// suitable for one-shot checks like "should the load prompt even appear" — not for
+// state that drives a toggle (see isFullscreenElementActive).
+export function isFullscreenActive() {
+  if (isFullscreenElementActive()) return true
   const widthRatio = window.innerWidth / screen.width
   const heightRatio = window.innerHeight / screen.height
   return widthRatio >= 0.95 && heightRatio >= 0.95
