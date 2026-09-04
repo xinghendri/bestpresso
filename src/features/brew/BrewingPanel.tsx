@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useMemo, memo, useEffect } from 'react'
 import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react'
 import { Metric } from '../../components/Metric/Metric'
 import type { BrewProfile, EditableProfileSetting } from '../../domain/brewing'
@@ -6,7 +6,7 @@ import type { FixedValueSuggestion } from '../../domain/valueAdjustments'
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { doseToYieldRatio } from './brewRatio'
 import { ProfileTargetChart } from './ProfileTargetChart'
-import { profileCardMotion, profileCardPosition, projectedProfileSteps, wrappedProfileOffset } from './profileCarouselMotion'
+import { profileCardMotion, profileCardPosition, wrappedProfileOffset } from './profileCarouselMotion'
 
 interface CarouselDrag {
   pointerId: number
@@ -18,6 +18,31 @@ interface CarouselDrag {
   moved: boolean
 }
 
+interface ProfileCardProps {
+  profile: BrewProfile
+  offset: number
+  activeIndex: string | undefined
+  isAdjacent: boolean
+  onSelectIndex: () => void
+}
+
+const ProfileCard = memo(function ProfileCard({ profile, offset, activeIndex, isAdjacent, onSelectIndex }: ProfileCardProps) {
+  const motion = useMemo(() => profileCardMotion(offset), [offset])
+  const position = useMemo(() => profileCardPosition(offset), [offset])
+  const graphVisible = Math.abs(offset) < 1.5
+  const style = {
+    '--profile-free-x': `${motion.xPercent}%`,
+    '--profile-free-scale': motion.scale,
+    '--profile-free-opacity': motion.opacity,
+    zIndex: motion.zIndex,
+  } as CSSProperties
+
+  return <button className={`profile-card profile-card--free profile-card--${position}${isAdjacent ? ' profile-card--clickable' : ''}`} style={style} type="button" onClick={onSelectIndex} aria-current={profile.id === activeIndex ? 'true' : undefined} aria-label={`${profile.name}${profile.id === activeIndex ? ', selected' : ''}`}>
+    <h1>{profile.name}</h1>
+    {graphVisible && <ProfileTargetChart profileName={profile.name} points={profile.targetPoints} />}
+  </button>
+})
+
 export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUpdateProfile, onSelectProfile, onManageProfiles }: { profiles: BrewProfile[]; activeProfileId?: string; settingsDisabled?: boolean; onUpdateProfile: (profileId: string, setting: EditableProfileSetting, value: number) => void; onSelectProfile: (profileId: string) => Promise<boolean>; onManageProfiles: () => void }) {
   const selectedIndex = profiles.findIndex((profile) => profile.id === activeProfileId)
   const fallbackIndex = profiles.findIndex((profile) => profile.id === 'adaptive-v2')
@@ -26,9 +51,11 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
   const optimisticIndex = profiles.findIndex((profile) => profile.id === optimisticProfileId)
   const activeIndex = optimisticIndex >= 0 ? optimisticIndex : initialIndex
   const [dragProgress, setDragProgress] = useState(0)
+  const [animatingToIndex, setAnimatingToIndex] = useState<number | null>(null)
   const pointerStart = useRef<CarouselDrag | null>(null)
   const suppressClick = useRef(false)
   const selectionRequest = useRef(0)
+  const animationFrameId = useRef<number | null>(null)
   const activeProfile = profiles[activeIndex] ?? profiles[0]
   const ratio = doseToYieldRatio(activeProfile.dose, activeProfile.targetYield)
   const doseValue = Number(activeProfile.dose)
@@ -61,13 +88,35 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
     }
   }
 
-  const selectIndex = async (index: number) => {
+  const selectIndex = async (index: number, animate = false) => {
     const profile = profiles[index]
     if (!profile) return
     if (profile.id === activeProfileId) {
       setOptimisticProfileId(null)
       return
     }
+    if (animate && Math.abs(index - activeIndex) === 1) {
+      setAnimatingToIndex(index)
+      const direction = index > activeIndex ? -1 : 1
+      const animationDuration = 300
+      const startTime = Date.now()
+
+      const animate = () => {
+        const elapsed = Date.now() - startTime
+        const progress = Math.min(1, elapsed / animationDuration)
+        setDragProgress(progress * direction)
+
+        if (progress < 1) {
+          animationFrameId.current = window.requestAnimationFrame(animate)
+        } else {
+          setDragProgress(0)
+          setAnimatingToIndex(null)
+        }
+      }
+
+      animationFrameId.current = window.requestAnimationFrame(animate)
+    }
+
     setOptimisticProfileId(profile.id)
     const request = ++selectionRequest.current
     await onSelectProfile(profile.id)
@@ -102,14 +151,18 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
   const handlePointerUp = (event: PointerEvent<HTMLDivElement>) => {
     const gesture = pointerStart.current
     if (!gesture || gesture.pointerId !== event.pointerId) return
-    const distance = event.clientX - gesture.startX
     pointerStart.current = null
-    setDragProgress(0)
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
-    if (gesture.moved) {
-      suppressClick.current = true
-      const steps = projectedProfileSteps(distance, gesture.velocity, gesture.stride, profiles.length)
-      if (steps !== 0) void selectIndex((activeIndex + steps + profiles.length) % profiles.length)
+
+    suppressClick.current = gesture.moved
+
+    // Always snap to the nearest profile based on current drag progress
+    const snappedIndex = Math.round(dragProgress)
+    const targetIndex = (activeIndex - snappedIndex + profiles.length) % profiles.length
+    setDragProgress(0)
+
+    if (snappedIndex !== 0) {
+      void selectIndex(targetIndex)
     }
   }
 
@@ -125,23 +178,25 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
     if (event.key === 'ArrowLeft') selectRelative(-1)
   }
 
+  useEffect(() => {
+    return () => {
+      if (animationFrameId.current !== null) {
+        window.cancelAnimationFrame(animationFrameId.current)
+      }
+    }
+  }, [])
+
   return <section className="brew-panel">
     <div className={`profile-carousel${dragProgress !== 0 ? ' profile-carousel--dragging' : ''}`} aria-label="Profiles" aria-roledescription="carousel" tabIndex={0} onKeyDown={handleKeyDown} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={cancelPointerGesture}>
       {profiles.map((profile, index) => {
         const offset = wrappedProfileOffset(index, activeIndex - dragProgress, profiles.length)
-        const position = profileCardPosition(offset)
-        const motion = profileCardMotion(offset)
-        const style = {
-          '--profile-free-x': `${motion.xPercent}%`,
-          '--profile-free-scale': motion.scale,
-          '--profile-free-opacity': motion.opacity,
-          zIndex: motion.zIndex,
-        } as CSSProperties
-        const graphVisible = Math.abs(offset) < 1.5
-        return <button key={profile.id} className={`profile-card profile-card--free profile-card--${position}`} style={style} type="button" onClick={() => { if (suppressClick.current) { suppressClick.current = false; return } void selectIndex(index) }} aria-current={index === activeIndex ? 'true' : undefined} aria-label={`${profile.name}${index === activeIndex ? ', selected' : ''}`}>
-          <h1>{profile.name}</h1>
-          {graphVisible && <ProfileTargetChart profileName={profile.name} points={profile.targetPoints} />}
-        </button>
+        const isAdjacent = Math.abs(index - activeIndex) === 1 && animatingToIndex === null
+        const handleSelectIndex = () => {
+          if (suppressClick.current && !isAdjacent) { suppressClick.current = false; return }
+          suppressClick.current = false
+          void selectIndex(index, true)
+        }
+        return <ProfileCard key={profile.id} profile={profile} offset={offset} activeIndex={activeProfileId} isAdjacent={isAdjacent} onSelectIndex={handleSelectIndex} />
       })}
     </div>
     <button className="manage-profiles" type="button" onClick={onManageProfiles}>See all profiles →</button>

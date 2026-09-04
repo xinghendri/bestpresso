@@ -2,15 +2,15 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { profileCardMotion, profileCardPosition, projectedProfileSteps, wrappedProfileOffset } from '../src/features/brew/profileCarouselMotion.ts'
 
-test('a long swipe can traverse several profiles', () => {
-  assert.equal(projectedProfileSteps(-290, 0, 120, 6), 2)
-  assert.equal(projectedProfileSteps(370, 0, 120, 6), -3)
+test('a long swipe moves only one profile', () => {
+  assert.equal(projectedProfileSteps(-290, 0, 120, 6), 1)
+  assert.equal(projectedProfileSteps(370, 0, 120, 6), -1)
 })
 
-test('a quick flick projects beyond its raw drag distance', () => {
-  assert.equal(projectedProfileSteps(-100, -0.8, 120, 6), 2)
+test('a quick flick with momentum also moves only one profile', () => {
+  assert.equal(projectedProfileSteps(-100, -0.8, 120, 6), 1)
   assert.equal(projectedProfileSteps(-55, 0, 120, 6), 1)
-  assert.equal(projectedProfileSteps(-290, -20, 120, 6), 3)
+  assert.equal(projectedProfileSteps(-290, -20, 120, 6), 1)
 })
 
 test('profile offsets and motion remain continuous around the carousel', () => {

@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useMemo, useEffect, useRef, useState } from 'react'
 import type { MouseEvent, PointerEvent } from 'react'
 import skipNext from '../../assets/figma/skip-next.svg'
 import type { LiveShotPoint } from '../../domain/brewing'
@@ -121,7 +121,7 @@ function PressureChain({ pressures, slotCount }: { pressures: number[]; slotCoun
 }
 
 export function LiveBrewStages({ points, elapsedMs, active = false, showYield = true, skipPending = false, selectedStageKey, onStageSelect, onSkipStage }: { points: LiveShotPoint[]; elapsedMs: number; active?: boolean; showYield?: boolean; skipPending?: boolean; selectedStageKey?: string; onStageSelect?: (stage: BrewStageSelection | null) => void; onSkipStage?: () => Promise<boolean> }) {
-  const stages = summarizeLiveBrewStages(points, elapsedMs)
+  const stages = useMemo(() => summarizeLiveBrewStages(points, elapsedMs), [points, elapsedMs])
   const stripRef = useRef<HTMLElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
   const stageRefs = useRef(new Map<string, HTMLElement>())

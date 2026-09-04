@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { DisplayMetric } from '../../domain/brewing'
 import type { FixedValueSuggestion, ValueAdjustmentKey } from '../../domain/valueAdjustments'
 import { useValueAdjustment } from '../ValueAdjustment/ValueAdjustmentContext'
@@ -18,7 +19,7 @@ interface MetricEdit {
   onSave: (value: number) => void
 }
 
-export function Metric({ metric, compact = false, edit, reserveSubtext = false }: { metric: DisplayMetric; compact?: boolean; edit?: MetricEdit; reserveSubtext?: boolean }) {
+function MetricComponent({ metric, compact = false, edit, reserveSubtext = false }: { metric: DisplayMetric; compact?: boolean; edit?: MetricEdit; reserveSubtext?: boolean }) {
   const openAdjustment = useValueAdjustment()
   const currentValue = Number(metric.value)
   const adjustmentValue = Number.isFinite(currentValue) ? currentValue : edit?.initialValue
@@ -42,3 +43,5 @@ export function Metric({ metric, compact = false, edit, reserveSubtext = false }
     {!metric.subtext && reserveSubtext && <span className="metric__subtext-spacer" aria-hidden="true" />}
   </div>
 }
+
+export const Metric = memo(MetricComponent)

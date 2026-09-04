@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react'
 import type { CSSProperties } from 'react'
 import { stageMarkerCanShowName } from './chartStageMarkerLayout'
 
@@ -16,9 +17,9 @@ interface ChartStageMarkersProps {
   plotRight: number
 }
 
-export function ChartStageMarkers({ stages, highlightedKey, xForElapsedMs, plotLeft, plotRight }: ChartStageMarkersProps) {
+function ChartStageMarkersComponent({ stages, highlightedKey, xForElapsedMs, plotLeft, plotRight }: ChartStageMarkersProps) {
   const plotWidth = Math.max(1, plotRight - plotLeft)
-  const visibleStages = stages.map((stage, index) => {
+  const visibleStages = useMemo(() => stages.map((stage, index) => {
     const startX = Math.max(plotLeft, Math.min(plotRight, xForElapsedMs(stage.startMs)))
     const endX = Math.max(plotLeft, Math.min(plotRight, xForElapsedMs(stage.endMs)))
     const width = Math.max(0, endX - startX)
@@ -32,7 +33,7 @@ export function ChartStageMarkers({ stages, highlightedKey, xForElapsedMs, plotL
         '--chart-stage-width': `${width / plotWidth * 100}%`,
       } as CSSProperties,
     }
-  }).filter((stage) => stage.width > 0)
+  }).filter((stage) => stage.width > 0), [stages, plotLeft, plotRight, xForElapsedMs, plotWidth])
 
   return <div className="chart-stage-markers" aria-label="Shot stages">
     {visibleStages.map((stage, visibleIndex) => {
@@ -44,3 +45,5 @@ export function ChartStageMarkers({ stages, highlightedKey, xForElapsedMs, plotL
     })}
   </div>
 }
+
+export const ChartStageMarkers = memo(ChartStageMarkersComponent)
