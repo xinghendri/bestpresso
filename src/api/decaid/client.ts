@@ -35,6 +35,16 @@ export const getDisplayState = () => getJson<DisplayState>('/display')
 export const getSettings = () => getJson<DecaidSettings>('/settings')
 export const getMachineSettings = () => getJson<DecaidMachineSettings>('/machine/settings')
 
+export async function createProfile(profile: DecaidProfile, parentId?: string, metadata?: Record<string, unknown> | null) {
+  const response = await fetch(`${getDecaidEndpoints().apiBase}/profiles`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ profile, parentId: parentId ?? null, metadata: metadata ?? null }),
+  })
+  if (!response.ok) throw new Error(`Decaid profile creation returned ${response.status}: ${await response.text()}`)
+  return await response.json() as DecaidProfileRecord
+}
+
 export async function connectDevice(deviceId: string) {
   const response = await fetch(`${getDecaidEndpoints().apiBase}/devices/connect`, {
     method: 'PUT',

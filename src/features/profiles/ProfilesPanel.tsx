@@ -14,7 +14,7 @@ import type { BrewProfile, SettingFeedback } from '../../domain/brewing'
 import { ProfileTargetChart } from '../brew/ProfileTargetChart'
 
 const PROFILE_CREATION_DEMO_ENABLED = true
-const PROFILE_EDITING_ENABLED = false
+const PROFILE_EDITING_ENABLED = true
 
 interface ProfilesPanelProps {
   profiles: BrewProfile[]

@@ -16,6 +16,8 @@ const currentPage = (): AppPage => {
   return page === 'profiles' || page === 'profile-builder' || page === 'previous-pull' ? page : 'home'
 }
 
+const editingProfileId = () => new URLSearchParams(window.location.search).get('profileId') ?? undefined
+
 export default function App() {
   const data = useBrewingData()
   const [, setPage] = useState(currentPage)
@@ -35,18 +37,20 @@ export default function App() {
     window.history.replaceState({ page: 'home' }, '', url)
   }, [utilityOperationKind])
 
-  const navigate = (nextPage: AppPage) => {
+  const navigate = (nextPage: AppPage, profileId?: string) => {
     const url = new URL(window.location.href)
     if (nextPage === 'home') url.searchParams.delete('page')
     else url.searchParams.set('page', nextPage)
+    if (nextPage === 'profile-builder' && profileId) url.searchParams.set('profileId', profileId)
+    else url.searchParams.delete('profileId')
     window.history.pushState({ page: nextPage }, '', url)
     setPage(nextPage)
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
   }
 
   let screen
-  if (page === 'profiles' && !data.liveBrew.visible) screen = <ProfilesPanel profiles={data.allProfiles} favoriteProfileSlots={data.favoriteProfileSlots} activeProfileId={data.model.activeProfileId} feedback={data.settingFeedback} onSelectProfile={async (profileId) => { const selected = await data.selectProfile(profileId); if (selected) navigate('home'); return selected }} onSetFavoriteSlot={data.setFavoriteProfileSlot} onRemoveFavorite={data.removeFavoriteProfile} onClose={() => navigate('home')} onAddProfile={() => navigate('profile-builder')} />
-  else if (page === 'profile-builder' && !data.liveBrew.visible) screen = <ProfileBuilderScreen onClose={() => navigate('profiles')} />
+  if (page === 'profiles' && !data.liveBrew.visible) screen = <ProfilesPanel profiles={data.allProfiles} favoriteProfileSlots={data.favoriteProfileSlots} activeProfileId={data.model.activeProfileId} feedback={data.settingFeedback} onSelectProfile={async (profileId) => { const selected = await data.selectProfile(profileId); if (selected) navigate('home'); return selected }} onSetFavoriteSlot={data.setFavoriteProfileSlot} onRemoveFavorite={data.removeFavoriteProfile} onClose={() => navigate('home')} onAddProfile={() => navigate('profile-builder')} onEditProfile={(profileId) => navigate('profile-builder', profileId)} />
+  else if (page === 'profile-builder' && !data.liveBrew.visible) screen = <ProfileBuilderScreen initialRecord={editingProfileId() ? data.profileRecordForEditing(editingProfileId()!) : undefined} existingTitles={data.allProfiles.map((profile) => profile.category ? `${profile.category} / ${profile.name}` : profile.name)} onSave={data.saveProfileCopy} onClose={() => navigate('profiles')} />
   else if (page === 'previous-pull' && !data.liveBrew.visible) screen = <PreviousShotScreen shots={data.shotHistory} initialShot={data.model.previousShot} status={data.previousShotStatus} onSelectShot={data.loadHistoryShot} onDismiss={() => navigate('home')} />
   else screen = <AppShell {...data} onSleep={data.toggleSleep} onWake={data.wakeMachine} onStopEspresso={data.stopEspresso} onSkipBrewStage={data.skipBrewStage} onPrepareCleaning={data.prepareCleaningSequence} onCancelCleaning={data.cancelCleaningSequence} onDismissLiveBrew={data.dismissLiveBrew} onSearchScale={data.searchForScale} onConnectScale={data.connectToScale} onDismissScalePicker={data.dismissScalePicker} onTareScale={data.tareConnectedScale} onUpdateMachineSetting={data.updateMachineSetting} onUpdateProfileSetting={data.updateProfileSetting} onSelectProfile={data.selectProfile} onOpenSettings={() => window.location.assign(getDecaidSettingsUrl())} onManageProfiles={() => navigate('profiles')} onOpenPreviousShot={() => navigate('previous-pull')} />
 

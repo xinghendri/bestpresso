@@ -3,14 +3,35 @@ export interface DecaidProfileStep {
   temperature?: number
   seconds?: number
   duration?: number
+  volume?: number
+  weight?: number | null
   pressure?: number
   flow?: number
   pump?: string | { target?: string; pressure?: number; flow?: number }
   transition?: string | { type?: string; duration?: number; adaptive?: boolean }
+  sensor?: 'coffee' | 'water' | string
+  exit?: { type?: 'pressure' | 'flow' | string; condition?: 'over' | 'under' | string; value?: number } | null
+  limiter?: { value?: number; range?: number } | null
   [key: string]: unknown
 }
-export interface DecaidProfile { title?: string; category?: string; beverage_type?: 'espresso' | 'calibrate' | 'cleaning' | 'manual' | 'pourover' | string; description?: string; notes?: string; profile_notes?: string; steps?: DecaidProfileStep[]; target_weight?: number | null; dose_weight?: number | null }
-export interface DecaidProfileRecord { id?: string; profile?: DecaidProfile; visibility?: string; metadata?: Record<string, unknown> | null; isDefault?: boolean }
+export interface DecaidProfile {
+  version?: string | null
+  title?: string
+  category?: string
+  beverage_type?: 'espresso' | 'calibrate' | 'cleaning' | 'manual' | 'pourover' | string
+  description?: string
+  notes?: string
+  author?: string
+  profile_notes?: string
+  steps?: DecaidProfileStep[]
+  target_weight?: number | null
+  target_volume?: number | null
+  target_volume_count_start?: number
+  tank_temperature?: number
+  dose_weight?: number | null
+  [key: string]: unknown
+}
+export interface DecaidProfileRecord { id?: string; parentId?: string | null; profile?: DecaidProfile; visibility?: string; metadata?: Record<string, unknown> | null; isDefault?: boolean }
 export type FavoriteAssignments = Record<string, string | null>
 export interface DecaidWorkflowContext { targetDoseWeight?: number | null; targetYield?: number | null; grinderSetting?: string | null }
 export interface DecaidWorkflow {
