@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { playCompletionSound } from '../../audio/completionSound'
 import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isCleaningProfile, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotStage, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres } from '../../api/decaid/adapters'
-import { connectDevice, DecaidApiError, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getMachineSettings, getProfiles, getSettings, getSharedSetting, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineProfile, setMachineState, setSharedSetting, tareScale, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
+import { connectDevice, createProfile, DecaidApiError, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getMachineSettings, getProfiles, getSettings, getSharedSetting, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineProfile, setMachineState, setSharedSetting, tareScale, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
 import { profileUserTargetNeedsWorkflowSync, workflowValuesForProfile } from '../../api/decaid/profileWorkflow'
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
-import type { DecaidProfileRecord, DecaidWorkflowPatch, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
+import type { DecaidProfile, DecaidProfileRecord, DecaidWorkflowPatch, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
 import { liveScaleDisplayWeight, liveShotYield, normalizedLiveScaleWeight, scaleConnectionIsActive, WATER_TANK_SENSOR_FULL_MM, waterTankLevelState } from '../../domain/brewing'
 import type { AvailableScale, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, LiveUtilityOperation, MachineReadiness, PreviousShot, PreviousShotStatus, ScaleConnection, SettingFeedback, UtilityOperationKind } from '../../domain/brewing'
 import { brewingFixture, demoLiveBrewFixture } from '../../fixtures/brewingFixture'
@@ -1153,6 +1153,82 @@ export function useBrewingData() {
     }
   }
 
+  const profileRecordForEditing = (profileId: string) => {
+    const stored = profileRecords.current.find((candidate) => candidate.id === profileId)
+    if (stored?.profile?.steps?.length) return stored
+    const profile = allProfilesRef.current.find((candidate) => candidate.id === profileId)
+    if (!profile) return undefined
+    const targetYield = Number(profile.targetYield)
+    const temperature = Number(profile.temperature)
+    return {
+      id: profile.id,
+      profile: {
+        version: '2.1',
+        title: profile.category ? `${profile.category} / ${profile.name}` : profile.name,
+        notes: profile.description ?? '',
+        author: '',
+        beverage_type: profile.beverageType ?? 'espresso',
+        target_weight: Number.isFinite(targetYield) ? targetYield : null,
+        target_volume: 0,
+        target_volume_count_start: 0,
+        tank_temperature: 0,
+        steps: [{
+          name: profile.stepNames?.[0] ?? 'Extraction',
+          pump: 'pressure',
+          transition: 'fast',
+          pressure: 9,
+          temperature: Number.isFinite(temperature) ? temperature : 93,
+          sensor: 'coffee',
+          seconds: Math.max(1, Math.round((profile.targetPoints?.at(-1)?.elapsedMs ?? 30_000) / 1000)),
+          volume: 0,
+          weight: Number.isFinite(targetYield) ? targetYield : null,
+        }],
+      },
+      visibility: 'visible',
+      metadata: { description: profile.description },
+      isDefault: false,
+    } satisfies DecaidProfileRecord
+  }
+
+  const saveProfileCopy = async (profile: DecaidProfile, parentId?: string, metadata?: Record<string, unknown> | null) => {
+    if (!profile.title?.trim() || !profile.steps?.length) {
+      showSettingFeedback({ status: 'error', message: 'A profile name and at least one stage are required.' })
+      return false
+    }
+    showSettingFeedback({ status: 'saving', message: `Saving ${profile.title}…` })
+    try {
+      if (connection === 'fixture') {
+        const createdRecord: DecaidProfileRecord = { id: `local-${crypto.randomUUID()}`, parentId: parentId ?? null, profile, metadata: metadata ?? null, visibility: 'visible', isDefault: false }
+        profileRecords.current = [...profileRecords.current, createdRecord]
+        const createdProfile = profileRecordsToDomain([createdRecord], {}, [])[0]
+        if (createdProfile) {
+          allProfilesRef.current = [...allProfilesRef.current, createdProfile]
+          setAllProfiles(allProfilesRef.current)
+        }
+        showSettingFeedback({ status: 'saved', message: `${profile.title} saved as a new profile.` })
+        return true
+      }
+      if (connection !== 'connected') {
+        showSettingFeedback({ status: 'error', message: 'Connect to Decaid before saving this profile.' })
+        return false
+      }
+      const createdRecord = await createProfile(profile, parentId, metadata)
+      const records = [...profileRecords.current.filter((candidate) => candidate.id !== createdRecord.id), createdRecord]
+      const workflow = await getWorkflow()
+      profileRecords.current = records
+      const domainProfiles = profileRecordsToDomain(records, workflow, fixtureProfiles)
+      allProfilesRef.current = domainProfiles
+      setAllProfiles(domainProfiles)
+      setFavoriteProfileSlots(resolveFavoriteProfileSlots(domainProfiles, favoriteAssignments.current))
+      setModel((current) => applyWorkflow(current, workflow, records, favoriteAssignments.current, retainedAdHocProfileId.current))
+      showSettingFeedback({ status: 'saved', message: `${profile.title} saved as a new profile.` })
+      return true
+    } catch {
+      showSettingFeedback({ status: 'error', message: `${profile.title} could not be saved.` })
+      return false
+    }
+  }
+
   const selectProfile = async (profileId: string) => {
     if (liveShotSession.current) return false
     const profile = allProfiles.find((candidate) => candidate.id === profileId)
@@ -1278,5 +1354,5 @@ export function useBrewingData() {
   const dismissLiveBrew = () => setLiveBrew((current) => current.active ? current : { ...current, visible: false })
   const favoriteProfileIds = favoriteProfileSlots.filter((id): id is string => Boolean(id))
 
-  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, utilityOperation, previousShotStatus, shotHistory, loadHistoryShot, heatingSeconds, connection, machineConnection, scale, availableScales, scaleConnectPendingId, scaleTarePending, brewStopPending, brewSkipPending, cleaningStartPending, cleaningPreparedProfileId, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, skipBrewStage, prepareCleaningSequence, cancelCleaningSequence, dismissLiveBrew, searchForScale, connectToScale, dismissScalePicker, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
+  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, utilityOperation, previousShotStatus, shotHistory, loadHistoryShot, heatingSeconds, connection, machineConnection, scale, availableScales, scaleConnectPendingId, scaleTarePending, brewStopPending, brewSkipPending, cleaningStartPending, cleaningPreparedProfileId, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, skipBrewStage, prepareCleaningSequence, cancelCleaningSequence, dismissLiveBrew, searchForScale, connectToScale, dismissScalePicker, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, profileRecordForEditing, saveProfileCopy, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
 }

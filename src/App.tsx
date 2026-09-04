@@ -38,6 +38,7 @@ export default function App() {
     const url = new URL(window.location.href)
     if (nextPage === 'home') url.searchParams.delete('page')
     else url.searchParams.set('page', nextPage)
+    url.searchParams.delete('profileId')
     window.history.pushState({ page: nextPage }, '', url)
     setPage(nextPage)
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })

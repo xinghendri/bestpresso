@@ -13,7 +13,8 @@ import { isCleaningProfile, sortProfilesForDirectory } from '../../api/decaid/ad
 import type { BrewProfile, SettingFeedback } from '../../domain/brewing'
 import { ProfileTargetChart } from '../brew/ProfileTargetChart'
 
-const PROFILE_AUTHORING_ENABLED = false
+const PROFILE_CREATION_DEMO_ENABLED = false
+const PROFILE_EDITING_ENABLED = false
 
 interface ProfilesPanelProps {
   profiles: BrewProfile[]
@@ -148,7 +149,7 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
           <button className="profiles-icon-button profiles-search" type="button" aria-controls="profiles-search-input" aria-expanded={searchOpen} onClick={() => { setSearchOpen((current) => !current); if (searchOpen) setSearchQuery('') }} aria-label={searchOpen ? 'Close profile search' : 'Search profiles'}><img src={profilesSearchIcon} alt="" /></button>
         </div>
         {/* Future profile creation is scaffolded but intentionally unavailable until Decaid authoring is designed. */}
-        {PROFILE_AUTHORING_ENABLED && <button className="profiles-icon-button profiles-add" type="button" onClick={onAddProfile} aria-label="Add profile"><img src={profilesAddIcon} alt="" /></button>}
+        {PROFILE_CREATION_DEMO_ENABLED && <button className="profiles-icon-button profiles-add" type="button" onClick={onAddProfile} aria-label="Build a profile"><img src={profilesAddIcon} alt="" /></button>}
       </div>
     </header>
 
@@ -172,7 +173,7 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
                 : <div className="favorite-slot__actions">
                   <button type="button" disabled={pending} onClick={() => void removeFavorite(profile.id)}><img src={favoriteRemoveIcon} alt="" /><span>{pending ? 'Removing…' : 'Remove'}</span></button>
                   {/* Future profile editing stays compiled behind the authoring flag for the next phase. */}
-                  {PROFILE_AUTHORING_ENABLED && <button type="button" onClick={() => onEditProfile?.(profile.id)}><img src={profileEditIcon} alt="" /><span>Edit</span></button>}
+                  {PROFILE_EDITING_ENABLED && <button type="button" onClick={() => onEditProfile?.(profile.id)}><img src={profileEditIcon} alt="" /><span>Edit</span></button>}
                 </div>}
             </article>
           })}
@@ -198,7 +199,7 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
                 <div className="profile-detail__actions">
                   <button type="button" disabled={pendingProfileId === selectedProfile.id} onClick={() => void applyProfile(selectedProfile.id)} aria-label={`Use ${selectedProfile.name}`} title="Use profile"><img src={profileUseIcon} alt="" /></button>
                   {/* Future editing is intentionally hidden while retaining its integration point. */}
-                  {PROFILE_AUTHORING_ENABLED && <button type="button" onClick={() => onEditProfile?.(selectedProfile.id)} aria-label={`Edit ${selectedProfile.name}`} title="Edit profile"><img src={profileDetailEditIcon} alt="" /></button>}
+                  {PROFILE_EDITING_ENABLED && <button type="button" onClick={() => onEditProfile?.(selectedProfile.id)} aria-label={`Edit ${selectedProfile.name}`} title="Edit profile"><img src={profileDetailEditIcon} alt="" /></button>}
                   {!favoriteIdSet.has(selectedProfile.id) && <button className={`profile-detail__favorite${replacementProfileId === selectedProfile.id ? ' profile-detail__favorite--replacing' : ''}`} type="button" disabled={pendingProfileId === selectedProfile.id} aria-pressed="false" onClick={() => void requestFavorite()} aria-label={replacementProfileId === selectedProfile.id ? 'Cancel favorite replacement' : `Favorite ${selectedProfile.name}`} title={replacementProfileId === selectedProfile.id ? 'Cancel replacement' : 'Add to favorites'}><img src={profileFavoriteIcon} alt="" /></button>}
                 </div>
               </div>
