@@ -1,66 +1,11 @@
 import { useEffect, useState } from 'react'
+import { isFullscreenActive, isIOSBrowser, isIOSDevice, isWebViewHost, requestFullscreen } from '../../lib/fullscreen'
 
 const dismissedKey = 'fullscreenPromptDismissed'
-
-type DocumentWithVendorFullscreen = Document & {
-  webkitFullscreenElement?: Element | null
-  webkitExitFullscreen?: () => Promise<void>
-  mozFullScreenElement?: Element | null
-  mozCancelFullScreen?: () => Promise<void>
-  msFullscreenElement?: Element | null
-  msExitFullscreen?: () => Promise<void>
-}
-
-type ElementWithVendorFullscreen = HTMLElement & {
-  webkitRequestFullscreen?: () => Promise<void>
-  mozRequestFullScreen?: () => Promise<void>
-  msRequestFullscreen?: () => Promise<void>
-}
 
 // Ported from streamline-js's app.js fullscreen-recommendation flow: prompt once per
 // session so kiosk-style tablet browsers hide their chrome, but never on desktop, in an
 // embedding webview (the host OS already owns fullscreen there), or when already fullscreen.
-function isFullscreenActive() {
-  const doc = document as DocumentWithVendorFullscreen
-  if (doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement) return true
-  const widthRatio = window.innerWidth / screen.width
-  const heightRatio = window.innerHeight / screen.height
-  return widthRatio >= 0.95 && heightRatio >= 0.95
-}
-
-function isWebViewHost() {
-  const ua = navigator.userAgent
-  const isStandalone = (window.navigator as Navigator & { standalone?: boolean }).standalone === true
-  const isAndroidWebView = /Android/.test(ua) && /wv/.test(ua)
-  const isIOSWebView = isIOSDevice() && !isStandalone && !/Safari\//.test(ua)
-  const isDecentWebView = ua.includes('Decent')
-  const isDecentHost = Boolean((window as Window & { __DECENT_HOST__?: unknown }).__DECENT_HOST__)
-  return isAndroidWebView || isIOSWebView || isDecentWebView || isDecentHost
-}
-
-function isIOSDevice() {
-  const ua = navigator.userAgent
-  return /iPhone|iPad|iPod/i.test(ua) || (ua.includes('Mac') && 'ontouchend' in document)
-}
-
-function isIOSBrowser() {
-  const isStandalone = (window.navigator as Navigator & { standalone?: boolean }).standalone === true
-  return isIOSDevice() && !isStandalone
-}
-
-function requestFullscreen() {
-  const el = document.documentElement as ElementWithVendorFullscreen
-  const request = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen
-  if (!request) return
-  request.call(el).then(() => {
-    screen.orientation?.lock?.('landscape').catch(() => {
-      // Orientation lock is best-effort; unsupported browsers keep their current orientation.
-    })
-  }).catch(() => {
-    // Fullscreen can be denied by the browser (e.g. no user-activation); the dialog just closes.
-  })
-}
-
 function initialVariant(): 'hidden' | 'fullscreen' | 'ios' {
   const ua = navigator.userAgent
   // A plain 'Mac' check also matches iPhone/iPad (their UA embeds "like Mac OS X", and
