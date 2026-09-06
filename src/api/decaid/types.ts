@@ -63,6 +63,7 @@ export type ScalePowerMode = 'disabled' | 'displayOff' | 'disconnect'
 export interface DecaidSettings { preferredScaleId?: string | null; blockTareDuringShot?: boolean; scalePowerMode?: ScalePowerMode }
 export interface DecaidMachineSettings { flushTemp?: number; flushTimeout?: number; flushFlow?: number }
 export interface DisplayState { brightness?: number; requestedBrightness?: number; platformSupported?: { brightness?: boolean; wakeLock?: boolean } }
+export interface DecentAccountStatus { loggedIn: boolean; username?: string | null }
 export interface WaterLevels { currentLevel?: number; refillLevel?: number }
 export interface TimeToReadyFrame { status?: string; remainingTimeMs?: number; currentTemp?: number; targetTemp?: number }
 export interface ShotMeasurement {

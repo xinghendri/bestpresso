@@ -3,7 +3,6 @@ import favoriteRemoveIcon from '../../assets/figma/favorite-remove.svg'
 import favoriteReplaceIcon from '../../assets/figma/favorite-replace.svg'
 import profileChevronIcon from '../../assets/figma/profile-chevron.svg'
 import profileDetailEditIcon from '../../assets/figma/profile-detail-edit.svg'
-import profileEditIcon from '../../assets/figma/profile-edit.svg'
 import profileFavoriteIcon from '../../assets/figma/profile-favorite.svg'
 import profileUseIcon from '../../assets/figma/profile-use.svg'
 import profilesAddIcon from '../../assets/figma/profiles-add.svg'
@@ -13,13 +12,15 @@ import { isCleaningProfile, sortProfilesForDirectory } from '../../api/decaid/ad
 import type { BrewProfile, SettingFeedback } from '../../domain/brewing'
 import { ProfileTargetChart } from '../brew/ProfileTargetChart'
 
-const PROFILE_CREATION_DEMO_ENABLED = false
-const PROFILE_EDITING_ENABLED = false
+type ProfileEditMode = 'copy' | 'edit'
 
 interface ProfilesPanelProps {
   profiles: BrewProfile[]
   favoriteProfileSlots: Array<string | null>
   activeProfileId?: string
+  initialProfileId?: string
+  editingEnabled?: boolean
+  profileEditMode?: (profileId: string) => ProfileEditMode
   feedback: SettingFeedback | null
   onSelectProfile: (profileId: string) => Promise<boolean>
   onSetFavoriteSlot: (profileId: string, slot: number) => Promise<boolean>
@@ -29,8 +30,8 @@ interface ProfilesPanelProps {
   onEditProfile?: (profileId: string) => void
 }
 
-export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId, feedback, onSelectProfile, onSetFavoriteSlot, onRemoveFavorite, onClose, onAddProfile, onEditProfile }: ProfilesPanelProps) {
-  const [selectedProfileId, setSelectedProfileId] = useState(activeProfileId ?? profiles[0]?.id)
+export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId, initialProfileId, editingEnabled = false, profileEditMode, feedback, onSelectProfile, onSetFavoriteSlot, onRemoveFavorite, onClose, onAddProfile, onEditProfile }: ProfilesPanelProps) {
+  const [selectedProfileId, setSelectedProfileId] = useState(initialProfileId ?? activeProfileId ?? profiles[0]?.id)
   const [activeCategory, setActiveCategory] = useState('All')
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -38,7 +39,7 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
   const directoryItems = useRef(new Map<string, HTMLButtonElement>())
   const [pendingProfileId, setPendingProfileId] = useState<string | null>(null)
   const [replacementProfileId, setReplacementProfileId] = useState<string | null>(null)
-  const [scrollTargetProfileId, setScrollTargetProfileId] = useState<string | null>(null)
+  const [scrollTargetProfileId, setScrollTargetProfileId] = useState<string | null>(initialProfileId ?? null)
 
   const favoriteIds = favoriteProfileSlots.filter((id): id is string => Boolean(id))
   const favoriteIdSet = new Set(favoriteIds)
@@ -63,6 +64,7 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
   }))
   const emptyFavoriteSlot = favoriteProfileSlots.findIndex((id) => !id)
   const replacingFavorite = replacementProfileId !== null
+  const editLabel = (profileId: string) => profileEditMode?.(profileId) === 'edit' ? 'Edit profile' : 'Edit a copy'
 
   useEffect(() => {
     if (!searchOpen) return
@@ -148,8 +150,7 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
           </label>
           <button className="profiles-icon-button profiles-search" type="button" aria-controls="profiles-search-input" aria-expanded={searchOpen} onClick={() => { setSearchOpen((current) => !current); if (searchOpen) setSearchQuery('') }} aria-label={searchOpen ? 'Close profile search' : 'Search profiles'}><img src={profilesSearchIcon} alt="" /></button>
         </div>
-        {/* Future profile creation is scaffolded but intentionally unavailable until Decaid authoring is designed. */}
-        {PROFILE_CREATION_DEMO_ENABLED && <button className="profiles-icon-button profiles-add" type="button" onClick={onAddProfile} aria-label="Build a profile"><img src={profilesAddIcon} alt="" /></button>}
+        {editingEnabled && <button className="profiles-icon-button profiles-add" type="button" onClick={onAddProfile} aria-label="Create profile" title="Create profile"><img src={profilesAddIcon} alt="" /></button>}
       </div>
     </header>
 
@@ -172,8 +173,6 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
                 ? <button className="favorite-slot__replace" type="button" disabled={pending} onClick={() => void replaceFavorite(slot)}><img src={favoriteReplaceIcon} alt="" /><span>{pending ? 'Replacing…' : 'Replace favorite'}</span></button>
                 : <div className="favorite-slot__actions">
                   <button type="button" disabled={pending} onClick={() => void removeFavorite(profile.id)}><img src={favoriteRemoveIcon} alt="" /><span>{pending ? 'Removing…' : 'Remove'}</span></button>
-                  {/* Future profile editing stays compiled behind the authoring flag for the next phase. */}
-                  {PROFILE_EDITING_ENABLED && <button type="button" onClick={() => onEditProfile?.(profile.id)}><img src={profileEditIcon} alt="" /><span>Edit</span></button>}
                 </div>}
             </article>
           })}
@@ -198,8 +197,7 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
                 <div><h2>{selectedProfile.name}</h2>{selectedProfile.category && <p>{selectedProfile.category}</p>}</div>
                 <div className="profile-detail__actions">
                   <button type="button" disabled={pendingProfileId === selectedProfile.id} onClick={() => void applyProfile(selectedProfile.id)} aria-label={`Use ${selectedProfile.name}`} title="Use profile"><img src={profileUseIcon} alt="" /></button>
-                  {/* Future editing is intentionally hidden while retaining its integration point. */}
-                  {PROFILE_EDITING_ENABLED && <button type="button" onClick={() => onEditProfile?.(selectedProfile.id)} aria-label={`Edit ${selectedProfile.name}`} title="Edit profile"><img src={profileDetailEditIcon} alt="" /></button>}
+                  {editingEnabled && <button type="button" onClick={() => onEditProfile?.(selectedProfile.id)} aria-label={`${editLabel(selectedProfile.id)}: ${selectedProfile.name}`} title={editLabel(selectedProfile.id)}><img src={profileDetailEditIcon} alt="" /></button>}
                   {!favoriteIdSet.has(selectedProfile.id) && <button className={`profile-detail__favorite${replacementProfileId === selectedProfile.id ? ' profile-detail__favorite--replacing' : ''}`} type="button" disabled={pendingProfileId === selectedProfile.id} aria-pressed="false" onClick={() => void requestFavorite()} aria-label={replacementProfileId === selectedProfile.id ? 'Cancel favorite replacement' : `Favorite ${selectedProfile.name}`} title={replacementProfileId === selectedProfile.id ? 'Cancel replacement' : 'Add to favorites'}><img src={profileFavoriteIcon} alt="" /></button>}
                 </div>
               </div>

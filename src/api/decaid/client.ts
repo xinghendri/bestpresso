@@ -1,5 +1,5 @@
 import { getDecaidEndpoints } from './config'
-import type { DecaidDevice, DecaidMachineSettings, DecaidProfile, DecaidProfileRecord, DecaidSettings, DecaidWorkflow, DecaidWorkflowPatch, DisplayState, FavoriteAssignments, PaginatedShots, ScalePowerMode, ShotRecord } from './types'
+import type { DecaidDevice, DecaidMachineSettings, DecaidProfile, DecaidProfileRecord, DecaidSettings, DecaidWorkflow, DecaidWorkflowPatch, DecentAccountStatus, DisplayState, FavoriteAssignments, PaginatedShots, ScalePowerMode, ShotRecord } from './types'
 
 export class DecaidApiError extends Error {
   status: number
@@ -13,12 +13,17 @@ export class DecaidApiError extends Error {
   }
 }
 
+async function responseError(response: Response, fallback: string) {
+  const body = await response.json().catch(() => null) as { message?: string; error?: string; type?: string } | null
+  return new DecaidApiError(body?.message || body?.error || fallback, response.status, body?.type)
+}
+
 async function getJson<T>(path: string, timeoutMs = 4500): Promise<T> {
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), timeoutMs)
   try {
     const response = await fetch(`${getDecaidEndpoints().apiBase}${path}`, { signal: controller.signal })
-    if (!response.ok) throw new Error(`Decaid ${path} returned ${response.status}`)
+    if (!response.ok) throw await responseError(response, `Decaid ${path} returned ${response.status}`)
     return await response.json() as T
   } finally {
     window.clearTimeout(timeout)
@@ -27,6 +32,7 @@ async function getJson<T>(path: string, timeoutMs = 4500): Promise<T> {
 
 export const getWorkflow = () => getJson<DecaidWorkflow>('/workflow')
 export const getProfiles = () => getJson<DecaidProfileRecord[]>('/profiles')
+export const getProfile = (profileId: string) => getJson<DecaidProfileRecord>(`/profiles/${encodeURIComponent(profileId)}`)
 export const getFavoriteAssignments = () => getJson<FavoriteAssignments>('/store/streamline-app/favorite-profiles')
 export const getSharedSetting = <T>(key: string) => getJson<T>(`/store/streamline-app/${encodeURIComponent(key)}`)
 export const getDevices = () => getJson<DecaidDevice[]>('/devices')
@@ -34,6 +40,7 @@ export const scanForDevices = () => getJson<unknown[]>('/devices/scan', 30000)
 export const getDisplayState = () => getJson<DisplayState>('/display')
 export const getSettings = () => getJson<DecaidSettings>('/settings')
 export const getMachineSettings = () => getJson<DecaidMachineSettings>('/machine/settings')
+export const getDecentAccountStatus = () => getJson<DecentAccountStatus>('/account/decent')
 
 export async function createProfile(profile: DecaidProfile, parentId?: string, metadata?: Record<string, unknown> | null) {
   const response = await fetch(`${getDecaidEndpoints().apiBase}/profiles`, {
@@ -41,7 +48,17 @@ export async function createProfile(profile: DecaidProfile, parentId?: string, m
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ profile, parentId: parentId ?? null, metadata: metadata ?? null }),
   })
-  if (!response.ok) throw new Error(`Decaid profile creation returned ${response.status}: ${await response.text()}`)
+  if (!response.ok) throw await responseError(response, `Decaid profile creation returned ${response.status}`)
+  return await response.json() as DecaidProfileRecord
+}
+
+export async function updateProfile(profileId: string, profile: DecaidProfile, metadata?: Record<string, unknown> | null) {
+  const response = await fetch(`${getDecaidEndpoints().apiBase}/profiles/${encodeURIComponent(profileId)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ profile, metadata: metadata ?? null }),
+  })
+  if (!response.ok) throw await responseError(response, `Decaid profile update returned ${response.status}`)
   return await response.json() as DecaidProfileRecord
 }
 
