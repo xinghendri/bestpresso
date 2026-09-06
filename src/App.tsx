@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getDecaidSettingsUrl } from './api/decaid/config'
 import { AppShell } from './app/AppShell'
+import { FullscreenPrompt } from './components/FullscreenPrompt/FullscreenPrompt'
 import { InteractionSound } from './components/InteractionSound/InteractionSound'
 import { ValueAdjustmentProvider } from './components/ValueAdjustment/ValueAdjustmentProvider'
 import { useBrewingData } from './features/brew/useBrewingData'
@@ -49,5 +50,5 @@ export default function App() {
   else if (page === 'previous-pull' && !data.liveBrew.visible) screen = <PreviousShotScreen shots={data.shotHistory} initialShot={data.model.previousShot} status={data.previousShotStatus} onSelectShot={data.loadHistoryShot} onDismiss={() => navigate('home')} />
   else screen = <AppShell {...data} onSleep={data.toggleSleep} onWake={data.wakeMachine} onStopEspresso={data.stopEspresso} onSkipBrewStage={data.skipBrewStage} onStartDemoBrew={data.startDemoBrew} onPrepareCleaning={data.prepareCleaningSequence} onCancelCleaning={data.cancelCleaningSequence} onDismissLiveBrew={data.dismissLiveBrew} onSearchScale={data.searchForScale} onConnectScale={data.connectToScale} onDismissScalePicker={data.dismissScalePicker} onTareScale={data.tareConnectedScale} onUpdateMachineSetting={data.updateMachineSetting} onUpdateProfileSetting={data.updateProfileSetting} onSelectProfile={data.selectProfile} onOpenSettings={() => window.location.assign(getDecaidSettingsUrl())} onManageProfiles={() => navigate('profiles')} onOpenPreviousShot={() => navigate('previous-pull')} />
 
-  return <ValueAdjustmentProvider><InteractionSound />{screen}</ValueAdjustmentProvider>
+  return <ValueAdjustmentProvider><InteractionSound /><FullscreenPrompt />{screen}</ValueAdjustmentProvider>
 }
