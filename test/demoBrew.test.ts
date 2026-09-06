@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import type { BrewProfile, LiveShotPoint } from '../src/domain/brewing.ts'
-import { DEMO_PROFILE_LONG_PRESS_MS, demoBrewForProfile, demoBrewPointsAtElapsed } from '../src/features/brew/demoBrew.ts'
+import { DEMO_PROFILE_LONG_PRESS_MS, demoBrewForProfile, demoBrewPointsAtElapsed, demoPullIsEnabled, isConnectedMockDe1 } from '../src/features/brew/demoBrew.ts'
 
 const profile: BrewProfile = {
   id: 'test-profile',
@@ -38,12 +38,27 @@ test('demo pull clamps telemetry to its available time range', () => {
   assert.equal(demoBrewPointsAtElapsed(points, 2000).at(-1)?.elapsedMs, 1000)
 })
 
-test('long-hold gesture is fixture-only and cancels when the carousel becomes a swipe', () => {
+test('demo pull is enabled only for fixture mode or the connected MockDe1 machine', () => {
+  assert.equal(demoPullIsEnabled('fixture', false), true)
+  assert.equal(demoPullIsEnabled('connected', true), true)
+  assert.equal(demoPullIsEnabled('connected', false), false)
+  assert.equal(demoPullIsEnabled('connecting', true), false)
+  assert.equal(demoPullIsEnabled('disconnected', true), false)
+
+  assert.equal(isConnectedMockDe1({ id: 'MockDe1', name: 'MockDe1', state: 'connected', type: 'machine' }), true)
+  assert.equal(isConnectedMockDe1({ id: 'machine-1', name: ' mockde1 ', state: 'connected', type: 'machine' }), true)
+  assert.equal(isConnectedMockDe1({ id: 'MockDe1', name: 'MockDe1', state: 'disconnected', type: 'machine' }), false)
+  assert.equal(isConnectedMockDe1({ id: 'MockDe1', name: 'MockDe1', state: 'connected', type: 'scale' }), false)
+  assert.equal(isConnectedMockDe1({ id: 'DE1', name: 'DE1', state: 'connected', type: 'machine' }), false)
+  assert.equal(isConnectedMockDe1({ id: 'MockDe10', name: 'MockDe10', state: 'connected', type: 'machine' }), false)
+})
+
+test('long-hold gesture uses the resolved demo capability and cancels when the carousel becomes a swipe', () => {
   const panelSource = readFileSync(new URL('../src/features/brew/BrewingPanel.tsx', import.meta.url), 'utf8')
   const shellSource = readFileSync(new URL('../src/app/AppShell.tsx', import.meta.url), 'utf8')
   const hookSource = readFileSync(new URL('../src/features/brew/useBrewingData.ts', import.meta.url), 'utf8')
   assert.equal(DEMO_PROFILE_LONG_PRESS_MS, 700)
   assert.match(panelSource, /Math\.abs\(distance\) >= 8[\s\S]*cancelDemoHold\(\)/)
-  assert.match(shellSource, /demoMode=\{connection === 'fixture'\}/)
-  assert.match(hookSource, /if \(connection !== 'fixture' \|\| demoBrewSession\.current \|\| liveBrew\.active\) return/)
+  assert.match(shellSource, /demoMode=\{demoPullEnabled\}/)
+  assert.match(hookSource, /if \(!demoPullIsEnabled\(connection, mockDe1Connected\) \|\| demoBrewSession\.current \|\| liveBrew\.active\) return/)
 })
