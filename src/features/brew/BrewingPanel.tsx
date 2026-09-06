@@ -1,10 +1,11 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react'
 import { Metric } from '../../components/Metric/Metric'
 import type { BrewProfile, EditableProfileSetting } from '../../domain/brewing'
 import type { FixedValueSuggestion } from '../../domain/valueAdjustments'
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { doseToYieldRatio } from './brewRatio'
+import { DEMO_PROFILE_LONG_PRESS_MS } from './demoBrew'
 import { ProfileTargetChart } from './ProfileTargetChart'
 import { profileCardMotion, profileCardPosition, projectedProfileSteps, wrappedProfileOffset } from './profileCarouselMotion'
 
@@ -18,7 +19,7 @@ interface CarouselDrag {
   moved: boolean
 }
 
-export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUpdateProfile, onSelectProfile, onManageProfiles }: { profiles: BrewProfile[]; activeProfileId?: string; settingsDisabled?: boolean; onUpdateProfile: (profileId: string, setting: EditableProfileSetting, value: number) => void; onSelectProfile: (profileId: string) => Promise<boolean>; onManageProfiles: () => void }) {
+export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, demoMode = false, onUpdateProfile, onSelectProfile, onStartDemoBrew, onManageProfiles }: { profiles: BrewProfile[]; activeProfileId?: string; settingsDisabled?: boolean; demoMode?: boolean; onUpdateProfile: (profileId: string, setting: EditableProfileSetting, value: number) => void; onSelectProfile: (profileId: string) => Promise<boolean>; onStartDemoBrew?: (profileId: string) => void; onManageProfiles: () => void }) {
   const selectedIndex = profiles.findIndex((profile) => profile.id === activeProfileId)
   const fallbackIndex = profiles.findIndex((profile) => profile.id === 'adaptive-v2')
   const initialIndex = Math.max(0, selectedIndex >= 0 ? selectedIndex : fallbackIndex)
@@ -27,6 +28,7 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
   const activeIndex = optimisticIndex >= 0 ? optimisticIndex : initialIndex
   const [dragProgress, setDragProgress] = useState(0)
   const pointerStart = useRef<CarouselDrag | null>(null)
+  const demoHold = useRef<{ pointerId: number; timeout: number; triggered: boolean } | null>(null)
   const suppressClick = useRef(false)
   const selectionRequest = useRef(0)
   const activeProfile = profiles[activeIndex] ?? profiles[0]
@@ -42,6 +44,15 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
     { label: 'Lungo', detail: '1:3', value: effectiveDose * 3 },
     { label: 'Lungo+', detail: '1:4', value: effectiveDose * 4 },
   ]
+
+  const cancelDemoHold = () => {
+    if (demoHold.current) window.clearTimeout(demoHold.current.timeout)
+    demoHold.current = null
+  }
+
+  useEffect(() => () => {
+    if (demoHold.current) window.clearTimeout(demoHold.current.timeout)
+  }, [])
 
   const editProfileSetting = (setting: EditableProfileSetting, valueHint?: (value: number) => string | undefined, fixedSuggestions?: readonly FixedValueSuggestion[]) => {
     const definition = VALUE_ADJUSTMENTS[setting]
@@ -79,10 +90,25 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
   }
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (!event.isPrimary) {
+      cancelDemoHold()
+      return
+    }
     if (event.pointerType === 'mouse' && event.button !== 0) return
     const width = event.currentTarget.getBoundingClientRect().width
     pointerStart.current = { pointerId: event.pointerId, startX: event.clientX, lastX: event.clientX, lastAt: event.timeStamp, velocity: 0, stride: Math.max(84, width * 0.215), moved: false }
     event.currentTarget.setPointerCapture(event.pointerId)
+    const pressedProfileId = (event.target as Element).closest<HTMLButtonElement>('.profile-card')?.dataset.profileId
+    if (demoMode && onStartDemoBrew && pressedProfileId === activeProfile.id) {
+      const hold = { pointerId: event.pointerId, timeout: 0, triggered: false }
+      hold.timeout = window.setTimeout(() => {
+        if (demoHold.current !== hold || pointerStart.current?.moved) return
+        hold.triggered = true
+        suppressClick.current = true
+        onStartDemoBrew(activeProfile.id)
+      }, DEMO_PROFILE_LONG_PRESS_MS)
+      demoHold.current = hold
+    }
   }
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
@@ -94,7 +120,10 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
     gesture.lastX = event.clientX
     gesture.lastAt = event.timeStamp
     const distance = event.clientX - gesture.startX
-    if (Math.abs(distance) >= 8) gesture.moved = true
+    if (Math.abs(distance) >= 8) {
+      gesture.moved = true
+      cancelDemoHold()
+    }
     const maximumProgress = Math.max(1, profiles.length - 1)
     setDragProgress(Math.max(-maximumProgress, Math.min(maximumProgress, distance / gesture.stride)))
   }
@@ -103,9 +132,15 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
     const gesture = pointerStart.current
     if (!gesture || gesture.pointerId !== event.pointerId) return
     const distance = event.clientX - gesture.startX
+    const demoTriggered = demoHold.current?.triggered === true
+    cancelDemoHold()
     pointerStart.current = null
     setDragProgress(0)
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    if (demoTriggered) {
+      suppressClick.current = true
+      return
+    }
     if (gesture.moved) {
       suppressClick.current = true
       const steps = projectedProfileSteps(distance, gesture.velocity, gesture.stride, profiles.length)
@@ -115,6 +150,7 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
 
   const cancelPointerGesture = (event: PointerEvent<HTMLDivElement>) => {
     if (pointerStart.current?.pointerId !== event.pointerId) return
+    cancelDemoHold()
     pointerStart.current = null
     setDragProgress(0)
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
@@ -126,7 +162,7 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
   }
 
   return <section className="brew-panel">
-    <div className={`profile-carousel${dragProgress !== 0 ? ' profile-carousel--dragging' : ''}`} aria-label="Profiles" aria-roledescription="carousel" tabIndex={0} onKeyDown={handleKeyDown} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={cancelPointerGesture}>
+    <div className={`profile-carousel${dragProgress !== 0 ? ' profile-carousel--dragging' : ''}`} aria-label="Profiles" aria-roledescription="carousel" tabIndex={0} onKeyDown={handleKeyDown} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={cancelPointerGesture} onContextMenu={demoMode ? (event) => event.preventDefault() : undefined}>
       {profiles.map((profile, index) => {
         const offset = wrappedProfileOffset(index, activeIndex - dragProgress, profiles.length)
         const position = profileCardPosition(offset)
@@ -138,7 +174,7 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, onUp
           zIndex: motion.zIndex,
         } as CSSProperties
         const graphVisible = Math.abs(offset) < 1.5
-        return <button key={profile.id} className={`profile-card profile-card--free profile-card--${position}`} style={style} type="button" onClick={() => { if (suppressClick.current) { suppressClick.current = false; return } void selectIndex(index) }} aria-current={index === activeIndex ? 'true' : undefined} aria-label={`${profile.name}${index === activeIndex ? ', selected' : ''}`}>
+        return <button key={profile.id} className={`profile-card profile-card--free profile-card--${position}`} style={style} type="button" data-profile-id={profile.id} onClick={() => { if (suppressClick.current) { suppressClick.current = false; return } void selectIndex(index) }} aria-current={index === activeIndex ? 'true' : undefined} aria-label={`${profile.name}${index === activeIndex ? ', selected' : ''}${demoMode && index === activeIndex ? ', hold to run a demo pull' : ''}`}>
           <h1>{profile.name}</h1>
           {graphVisible && <ProfileTargetChart profileName={profile.name} points={profile.targetPoints} />}
         </button>

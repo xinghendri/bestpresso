@@ -15,6 +15,7 @@ import { observePostShotWeight, reconciledShotYield, type YieldFinalizationState
 import { LAST_SELECTED_PROFILE_LOCAL_KEY, LAST_SELECTED_PROFILE_SHARED_KEY, normalizeRememberedProfileId, resolveRememberedProfileId } from '../profiles/profileSelectionPersistence'
 import { rinseWorkflowPatchFromMachineSettings } from './flushSettings'
 import { isSuccessfulEspressoCompletion, shouldPlayCompletionCue } from './completionCue'
+import { DEMO_BREW_TICK_MS, demoBrewForProfile, demoBrewPointsAtElapsed, type DemoBrewDefinition } from './demoBrew'
 import { advanceShotTimeline, beginSkipTransition, isEspressoMonitoringSnapshot, observeSkipTransition, type SkipTransition } from './liveShotState'
 import { SLEEP_DISPLAY_BRIGHTNESS, shouldRunBackgroundScaleScan, sleepMachineWithConfiguredScalePolicy } from './sleepControl'
 
@@ -37,6 +38,11 @@ interface LiveShotSession {
   targetYield?: number
   stepNames?: string[]
   points: LiveShotPoint[]
+}
+
+interface DemoBrewSession extends DemoBrewDefinition {
+  startedAt: number
+  interval: number | null
 }
 
 interface PendingCleaningSequence {
@@ -166,6 +172,7 @@ export function useBrewingData() {
   const machineNeedsWater = useRef(false)
   const machineConnectionRef = useRef<DataConnection>('connecting')
   const liveShotSession = useRef<LiveShotSession | null>(null)
+  const demoBrewSession = useRef<DemoBrewSession | null>(null)
   const utilityOperationSession = useRef<UtilityOperationSession | null>(null)
   const allProfilesRef = useRef(allProfiles)
   const retainedAdHocProfileId = useRef<string | null>(null)
@@ -175,6 +182,53 @@ export function useBrewingData() {
 
   useEffect(() => { allProfilesRef.current = allProfiles }, [allProfiles])
   useEffect(() => { latestModel.current = model }, [model])
+  useEffect(() => () => {
+    const interval = demoBrewSession.current?.interval
+    if (interval != null) window.clearInterval(interval)
+  }, [])
+
+  const finishDemoBrew = (session: DemoBrewSession, elapsedMs: number, playCue: boolean) => {
+    if (demoBrewSession.current !== session) return
+    if (session.interval !== null) window.clearInterval(session.interval)
+    session.interval = null
+    demoBrewSession.current = null
+    const finalElapsedMs = Math.max(0, Math.min(elapsedMs, session.durationMs))
+    const points = demoBrewPointsAtElapsed(session.points, finalElapsedMs)
+    const finalWeight = points.at(-1)?.weight
+    const completedShot: PreviousShot = {
+      id: `demo-${session.startedAt}`,
+      profileName: session.profileName,
+      timestamp: new Date(session.startedAt).toISOString(),
+      totalYield: (finalWeight ?? 0).toFixed(1),
+      totalTime: String(Math.max(1, Math.round(finalElapsedMs / 1000))),
+      targetYield: session.targetYield,
+      points,
+    }
+    setLiveBrew({ active: false, visible: true, startedAt: session.startedAt, kind: 'espresso', profileName: session.profileName, targetYield: session.targetYield, scaleWeight: finalWeight, elapsedMs: finalElapsedMs, points })
+    setModel((current) => ({ ...current, previousShot: completedShot }))
+    setShotHistory((current) => [completedShot, ...current.filter((shot) => shot.id !== completedShot.id)])
+    setPreviousShotStatus('fixture')
+    if (playCue) void playCompletionSound()
+  }
+
+  const startDemoBrew = (profileId: string) => {
+    if (connection !== 'fixture' || demoBrewSession.current || liveBrew.active) return
+    const profile = latestModel.current.profiles.find((candidate) => candidate.id === profileId)
+    if (!profile || profile.id !== latestModel.current.activeProfileId) return
+    const definition = demoBrewForProfile(profile)
+    const startedAt = Date.now()
+    const session: DemoBrewSession = { ...definition, startedAt, interval: null }
+    demoBrewSession.current = session
+    const render = () => {
+      if (demoBrewSession.current !== session) return
+      const elapsedMs = Math.min(session.durationMs, Date.now() - session.startedAt)
+      const points = demoBrewPointsAtElapsed(session.points, elapsedMs)
+      setLiveBrew({ active: true, visible: true, startedAt: session.startedAt, kind: 'espresso', profileName: session.profileName, targetYield: session.targetYield, scaleWeight: points.at(-1)?.weight, elapsedMs, points })
+      if (elapsedMs >= session.durationMs) finishDemoBrew(session, elapsedMs, true)
+    }
+    render()
+    if (demoBrewSession.current === session) session.interval = window.setInterval(render, DEMO_BREW_TICK_MS)
+  }
 
   const runScaleScan = () => {
     if (activeScaleScan.current) return activeScaleScan.current
@@ -1042,6 +1096,11 @@ export function useBrewingData() {
   }
 
   const stopEspresso = async () => {
+    const demoSession = demoBrewSession.current
+    if (demoSession) {
+      finishDemoBrew(demoSession, Date.now() - demoSession.startedAt, false)
+      return
+    }
     if (brewStopRequestInFlight.current || !liveShotSession.current) return
     if (connection !== 'connected' || machineConnection !== 'connected') {
       showMachineActionError('The machine is disconnected, so the pull could not be stopped.')
@@ -1354,5 +1413,5 @@ export function useBrewingData() {
   const dismissLiveBrew = () => setLiveBrew((current) => current.active ? current : { ...current, visible: false })
   const favoriteProfileIds = favoriteProfileSlots.filter((id): id is string => Boolean(id))
 
-  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, utilityOperation, previousShotStatus, shotHistory, loadHistoryShot, heatingSeconds, connection, machineConnection, scale, availableScales, scaleConnectPendingId, scaleTarePending, brewStopPending, brewSkipPending, cleaningStartPending, cleaningPreparedProfileId, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, skipBrewStage, prepareCleaningSequence, cancelCleaningSequence, dismissLiveBrew, searchForScale, connectToScale, dismissScalePicker, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, profileRecordForEditing, saveProfileCopy, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
+  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, utilityOperation, previousShotStatus, shotHistory, loadHistoryShot, heatingSeconds, connection, machineConnection, scale, availableScales, scaleConnectPendingId, scaleTarePending, brewStopPending, brewSkipPending, cleaningStartPending, cleaningPreparedProfileId, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, skipBrewStage, startDemoBrew, prepareCleaningSequence, cancelCleaningSequence, dismissLiveBrew, searchForScale, connectToScale, dismissScalePicker, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, profileRecordForEditing, saveProfileCopy, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
 }

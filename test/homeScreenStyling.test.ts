@@ -82,9 +82,17 @@ test('uses three-pixel data lines and matching legend samples across graphs', ()
   assert.match(styles, /\.chart-legend__sample \{ height:3px;/)
 })
 
-test('uses content-sized header metrics with symmetric separator spacing', () => {
-  assert.match(styles, /\.live-pull-header__metrics \{ --header-metric-separator-gap:24px; width:max-content; max-width:100%;[^}]*grid-template-columns:max-content 1px max-content;[^}]*gap:var\(--header-metric-separator-gap\);/)
+test('uses stable header metric slots with symmetric separator spacing', () => {
+  assert.match(styles, /\.live-pull-header__metrics \{ --header-metric-separator-gap:24px; width:max-content; max-width:100%;[^}]*grid-template-columns:108px 1px 280px;[^}]*gap:var\(--header-metric-separator-gap\);/)
   assert.match(styles, /\.history-browser-detail \.live-pull-header__metrics strong \{ font-size:30px; \}/)
   assert.doesNotMatch(styles, /\.history-browser-detail \.live-pull-header__metrics \{ width:312px;/)
-  assert.match(styles, /@media\(max-width:600px\)[\s\S]*\.live-pull-header__metrics\{--header-metric-separator-gap:12px;grid-template-columns:max-content 1px max-content\}/)
+  assert.match(styles, /@media\(max-width:600px\)[\s\S]*\.live-pull-header__metrics\{--header-metric-separator-gap:12px;grid-template-columns:68px 1px 120px\}/)
+})
+
+test('constrains the live title and chart to one fixed-width grid track', () => {
+  assert.match(styles, /\.live-brew-screen \{[^}]*grid-template-columns:minmax\(0,1fr\);[^}]*overflow:hidden;[^}]*contain:layout;/)
+  assert.match(styles, /\.live-pull-header \{ width:100%; max-width:100%; min-width:0;/)
+  assert.match(styles, /\.live-pull-chart-panel \{ width:100%; max-width:100%; min-width:0;[^}]*overflow:hidden; contain:layout paint;/)
+  assert.match(styles, /\.live-shot-chart \{[^}]*width:100%; max-width:100%;[^}]*min-width:0;[^}]*overflow:hidden;/)
+  assert.match(styles, /\.live-shot-chart svg \{[^}]*width:100%; max-width:100%;/)
 })
