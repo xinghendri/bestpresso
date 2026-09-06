@@ -1,8 +1,18 @@
-import type { BrewProfile, LiveShotPoint } from '../../domain/brewing'
+import type { DecaidDevice } from '../../api/decaid/types'
+import type { BrewProfile, DataConnection, LiveShotPoint } from '../../domain/brewing'
 import { demoShotPoints } from '../../fixtures/brewingFixture.ts'
 
 export const DEMO_PROFILE_LONG_PRESS_MS = 700
 export const DEMO_BREW_TICK_MS = 100
+
+export function isConnectedMockDe1(device: DecaidDevice | undefined) {
+  if (device?.type !== 'machine' || device.state !== 'connected') return false
+  return [device.id, device.name].some((value) => value?.trim().toLowerCase() === 'mockde1')
+}
+
+export function demoPullIsEnabled(connection: DataConnection, mockDe1Connected: boolean) {
+  return connection === 'fixture' || (connection === 'connected' && mockDe1Connected)
+}
 
 const numericKeys: Array<keyof Pick<LiveShotPoint, 'pressure' | 'flow' | 'targetPressure' | 'targetFlow' | 'temperature' | 'weight' | 'weightFlow'>> = [
   'pressure',

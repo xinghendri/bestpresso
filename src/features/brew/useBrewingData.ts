@@ -15,7 +15,7 @@ import { observePostShotWeight, reconciledShotYield, type YieldFinalizationState
 import { LAST_SELECTED_PROFILE_LOCAL_KEY, LAST_SELECTED_PROFILE_SHARED_KEY, normalizeRememberedProfileId, resolveRememberedProfileId } from '../profiles/profileSelectionPersistence'
 import { rinseWorkflowPatchFromMachineSettings } from './flushSettings'
 import { isSuccessfulEspressoCompletion, shouldPlayCompletionCue } from './completionCue'
-import { DEMO_BREW_TICK_MS, demoBrewForProfile, demoBrewPointsAtElapsed, type DemoBrewDefinition } from './demoBrew'
+import { DEMO_BREW_TICK_MS, demoBrewForProfile, demoBrewPointsAtElapsed, demoPullIsEnabled, isConnectedMockDe1, type DemoBrewDefinition } from './demoBrew'
 import { advanceShotTimeline, beginSkipTransition, isEspressoMonitoringSnapshot, observeSkipTransition, type SkipTransition } from './liveShotState'
 import { SLEEP_DISPLAY_BRIGHTNESS, shouldRunBackgroundScaleScan, sleepMachineWithConfiguredScalePolicy } from './sleepControl'
 
@@ -129,6 +129,7 @@ export function useBrewingData() {
   const [heatingSeconds, setHeatingSeconds] = useState<number | null>(null)
   const [connection, setConnection] = useState<DataConnection>('connecting')
   const [machineConnection, setMachineConnection] = useState<DataConnection>('connecting')
+  const [mockDe1Connected, setMockDe1Connected] = useState(false)
   const [scale, setScale] = useState<ScaleConnection>(localScaleFixture ?? { status: 'disconnected' })
   const [availableScales, setAvailableScales] = useState<AvailableScale[]>([])
   const [scaleConnectPendingId, setScaleConnectPendingId] = useState<string | null>(null)
@@ -212,7 +213,7 @@ export function useBrewingData() {
   }
 
   const startDemoBrew = (profileId: string) => {
-    if (connection !== 'fixture' || demoBrewSession.current || liveBrew.active) return
+    if (!demoPullIsEnabled(connection, mockDe1Connected) || demoBrewSession.current || liveBrew.active) return
     const profile = latestModel.current.profiles.find((candidate) => candidate.id === profileId)
     if (!profile || profile.id !== latestModel.current.activeProfileId) return
     const definition = demoBrewForProfile(profile)
@@ -374,6 +375,7 @@ export function useBrewingData() {
       const scaleConnected = scaleConnectionIsActive(Boolean(activeScale), scaleStreamConnected.current)
       connectedScale.current = scaleConnected
       if (scaleConnected) setAvailableScales([])
+      setMockDe1Connected(isConnectedMockDe1(connectedMachine))
       updateMachineConnection(connectedMachine ? 'connected' : 'disconnected')
       setScale((current) => current.status === 'searching'
         ? current
@@ -1410,8 +1412,9 @@ export function useBrewingData() {
   }
 
   const settingsDisabled = connection !== 'connected' || settingFeedback?.status === 'saving'
+  const demoPullEnabled = demoPullIsEnabled(connection, mockDe1Connected)
   const dismissLiveBrew = () => setLiveBrew((current) => current.active ? current : { ...current, visible: false })
   const favoriteProfileIds = favoriteProfileSlots.filter((id): id is string => Boolean(id))
 
-  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, utilityOperation, previousShotStatus, shotHistory, loadHistoryShot, heatingSeconds, connection, machineConnection, scale, availableScales, scaleConnectPendingId, scaleTarePending, brewStopPending, brewSkipPending, cleaningStartPending, cleaningPreparedProfileId, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, skipBrewStage, startDemoBrew, prepareCleaningSequence, cancelCleaningSequence, dismissLiveBrew, searchForScale, connectToScale, dismissScalePicker, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, profileRecordForEditing, saveProfileCopy, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
+  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, utilityOperation, previousShotStatus, shotHistory, loadHistoryShot, heatingSeconds, connection, machineConnection, demoPullEnabled, scale, availableScales, scaleConnectPendingId, scaleTarePending, brewStopPending, brewSkipPending, cleaningStartPending, cleaningPreparedProfileId, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, skipBrewStage, startDemoBrew, prepareCleaningSequence, cancelCleaningSequence, dismissLiveBrew, searchForScale, connectToScale, dismissScalePicker, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, profileRecordForEditing, saveProfileCopy, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
 }
