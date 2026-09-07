@@ -163,3 +163,11 @@ export function liveShotYield(scaleWeight: unknown, points: Pick<LiveShotPoint, 
   }
   return undefined
 }
+
+export function liveShotFlowRate(points: Pick<LiveShotPoint, 'weightFlow'>[]) {
+  for (let index = points.length - 1; index >= 0; index -= 1) {
+    const flowRate = points[index].weightFlow
+    if (typeof flowRate === 'number' && Number.isFinite(flowRate)) return Math.max(0, flowRate)
+  }
+  return undefined
+}

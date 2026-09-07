@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { liveShotYield, type BrewingScreenModel, type LiveBrewState } from '../../domain/brewing'
+import { liveShotFlowRate, liveShotYield, type BrewingScreenModel, type LiveBrewState } from '../../domain/brewing'
 import type { BrewStageSelection } from './LiveBrewStages'
 import type { ChartSeries } from './chartSeries'
 import { toggleDimmedChartSeries } from './chartSeries'
@@ -34,6 +34,7 @@ export function LiveBrewingScreen({ model, liveBrew, stopPending, skipPending, a
   const profileTargetYield = Number(profile?.targetYield)
   const targetYield = liveBrew.targetYield ?? (Number.isFinite(profileTargetYield) ? profileTargetYield : undefined)
   const weight = liveShotYield(liveBrew.scaleWeight, liveBrew.points)
+  const flowRate = liveShotFlowRate(liveBrew.points)
   const displayPoints = weight !== undefined && liveBrew.points.length > 0
     ? liveBrew.points.map((point, index) => index === liveBrew.points.length - 1 ? { ...point, weight } : point)
     : liveBrew.points
@@ -47,9 +48,14 @@ export function LiveBrewingScreen({ model, liveBrew, stopPending, skipPending, a
     {actionError && <div className="system-messages"><div className="system-message system-message--error" role="alert">{actionError}</div></div>}
     <header className="live-pull-header">
       <h1>{profileName}</h1>
-      <div className={`live-pull-header__metrics${isCleaning ? ' live-pull-header__metrics--single' : ''}`} aria-live="polite">
+      <div className={`live-pull-header__metrics${isCleaning ? ' live-pull-header__metrics--single' : ' live-pull-header__metrics--live'}`} aria-live="polite">
         <div><span>Timer</span><strong>{timedLabel(liveBrew.elapsedMs)}</strong></div>
-        {!isCleaning && <><i aria-hidden="true" /><div><span>Yield</span><strong>{weight?.toFixed(1) ?? '—'}<small>g</small>{targetYield !== undefined && <> <em>/</em> {targetYield.toFixed(Number.isInteger(targetYield) ? 0 : 1)}<small>g</small></>}</strong></div></>}
+        {!isCleaning && <>
+          <i aria-hidden="true" />
+          <div><span>Yield</span><strong>{weight?.toFixed(1) ?? '—'}<small>g</small>{targetYield !== undefined && <> <em>/</em> {targetYield.toFixed(Number.isInteger(targetYield) ? 0 : 1)}<small>g</small></>}</strong></div>
+          <i aria-hidden="true" />
+          <div><span>Flow rate</span><strong>{flowRate?.toFixed(1) ?? '—'}<small>g/s</small></strong></div>
+        </>}
       </div>
       {liveBrew.active
         ? <button className="live-pull-action live-pull-action--stop" type="button" disabled={stopPending} onClick={onStop}>{stopPending ? 'Stopping…' : 'Stop'}</button>

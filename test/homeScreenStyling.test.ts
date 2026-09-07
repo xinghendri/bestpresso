@@ -89,6 +89,12 @@ test('uses stable header metric slots with symmetric separator spacing', () => {
   assert.match(styles, /@media\(max-width:600px\)[\s\S]*\.live-pull-header__metrics\{--header-metric-separator-gap:12px;grid-template-columns:68px 1px 120px\}/)
 })
 
+test('adds a separated live flow-rate slot without changing history metrics', () => {
+  assert.match(styles, /\.live-pull-header__metrics--live \{ grid-template-columns:108px 1px 280px 1px 108px; \}/)
+  assert.match(styles, /@media\(max-width:760px\)[\s\S]*\.live-pull-header__metrics--live\{--header-metric-separator-gap:16px;grid-template-columns:88px 1px 220px 1px 92px\}/)
+  assert.match(styles, /@media\(max-width:600px\)[\s\S]*\.live-pull-header__metrics--live\{grid-template-columns:68px 1px 120px 1px 80px\}/)
+})
+
 test('constrains the live title and chart to one fixed-width grid track', () => {
   assert.match(styles, /\.live-brew-screen \{[^}]*grid-template-columns:minmax\(0,1fr\);[^}]*overflow:hidden;[^}]*contain:layout;/)
   assert.match(styles, /\.live-pull-header \{ width:100%; max-width:100%; min-width:0;/)
