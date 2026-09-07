@@ -26,6 +26,7 @@ test('sizes each pressure capacity with the same structure as visible readings',
   assert.match(styles, /\.live-brew-stage__pressure-chain \{ display:inline-grid;[^}]*text-align:left;/)
   assert.match(styles, /\.live-brew-stage__pressure-sequence \{ grid-area:1\/1;[^}]*width:max-content;/)
   assert.match(styles, /\.live-brew-stage__pressure-sequence--sizing \{ visibility:hidden;/)
+  assert.match(styles, /\.live-brew-stage__pressure-sequence--sizing>span:not\(\.live-brew-stage__pressure-arrow\) \{ margin-right:-8px; \}/)
   assert.match(styles, /\.live-brew-stage__pressure-arrow \{[^}]*margin-inline:\.8ch;[^}]*text-align:center;[^}]*translateX\(-\.08em\);/)
   assert.match(styles, /\.live-brew-stage \{ width:max-content;/)
 })
