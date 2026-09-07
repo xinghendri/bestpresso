@@ -603,7 +603,6 @@ body { min-width:0; min-height:0; background:#171717; }
 .pb-condition-column{min-width:0;display:grid;grid-template-rows:1fr 1fr}
 .pb-condition-column+ .pb-condition-column{border-left:1px solid rgba(192,192,192,.2)}
 .pb-condition{gap:8px;padding:0;background:transparent}
-.pb-condition__metric-label{width:100%;color:var(--pb-label-color);font-size:10px;font-weight:300;text-align:center}
 .pb-condition__comparison{width:173px;height:24px;display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:2px;border-radius:24px;background:#454040}
 .pb-condition__comparison button{height:20px;padding:0;border:0;border-radius:38px;color:rgba(192,192,192,.5);background:transparent;font-size:10px;font-weight:300}
 .pb-condition__comparison button.is-selected{color:#c0c0c0;background:#5e5a55;font-weight:500}

@@ -193,6 +193,7 @@ function Stepper({ label, value, unit, step, min = 0, max = 1000, disabled = fal
 function ExitControl({ type, stage, onChange }: { type: BuilderExitType; stage: BuilderStage; onChange: (patch: Partial<BuilderStage>) => void }) {
   const value = stage.exit?.type === type ? stage.exit.value : undefined
   const label = `Move on ${type}`
+  const comparisonLabel = type === 'flow' ? 'Flow' : 'Pressure'
   const [condition, setCondition] = useState<'over' | 'under'>(() => stage.exit?.type === type ? stage.exit.condition : 'over')
   const selectedCondition = stage.exit?.type === type ? stage.exit.condition : condition
   const changeCondition = (next: 'over' | 'under') => {
@@ -200,10 +201,9 @@ function ExitControl({ type, stage, onChange }: { type: BuilderExitType; stage: 
     if (stage.exit?.type === type) onChange({ exit: { ...stage.exit, condition: next } })
   }
   return <div className="pb-condition">
-    <small className="pb-condition__metric-label">{label}</small>
     <div className="pb-condition__comparison" role="group" aria-label={`${label} condition`}>
-      <button type="button" className={selectedCondition === 'over' ? 'is-selected' : ''} onClick={() => changeCondition('over')}>Above</button>
-      <button type="button" className={selectedCondition === 'under' ? 'is-selected' : ''} onClick={() => changeCondition('under')}>Below</button>
+      <button type="button" className={selectedCondition === 'over' ? 'is-selected' : ''} onClick={() => changeCondition('over')}>{comparisonLabel} &gt;</button>
+      <button type="button" className={selectedCondition === 'under' ? 'is-selected' : ''} onClick={() => changeCondition('under')}>{comparisonLabel} &lt;</button>
     </div>
     <Stepper label={label} value={value} unit={type === 'flow' ? 'ml/s' : 'bar'} step={0.1} onChange={(next) => onChange({ exit: next === undefined ? undefined : { type, condition: selectedCondition, value: next } })} />
   </div>
