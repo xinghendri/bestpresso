@@ -328,21 +328,23 @@ function StageEditorCard({ stage, index, active, isLastStage, onActivate, onChan
         <div data-builder-field="seconds" data-validation-severity={fieldSeverity('seconds')}><small>Max time</small><Stepper label="Duration" value={stage.seconds} unit="s" step={1} min={0} max={127} onChange={(seconds) => onChange({ seconds: seconds ?? 0 })} /></div>
       </aside>
     </section> : <section className="pb-stage__conditions-panel" role="tabpanel" aria-label="Move on conditions">
-      <p className="pb-stage__conditions-rule"><img src={skipNext} alt="" /><span>Moves on when any enabled condition is reached</span></p>
-      <div className="pb-condition-column" data-builder-field="exit" data-validation-severity={fieldSeverity('exit')}>
-        <ExitControl type="flow" stage={stage} onChange={onChange} />
-        <ExitControl type="pressure" stage={stage} onChange={onChange} />
-      </div>
-      <div className="pb-condition-column">
-        <div className="pb-condition pb-condition--simple" data-builder-field="volume" data-validation-severity={fieldSeverity('volume')}>
-          <small>Move on volume</small>
-          <Stepper label="Move on volume" value={stage.volume > 0 ? stage.volume : undefined} unit="ml" step={1} onChange={(volume) => onChange({ volume: volume ?? 0 })} />
+      <div className="pb-stage__conditions-controls">
+        <div className="pb-condition-column" data-builder-field="exit" data-validation-severity={fieldSeverity('exit')}>
+          <ExitControl type="flow" stage={stage} onChange={onChange} />
+          <ExitControl type="pressure" stage={stage} onChange={onChange} />
         </div>
-        <div className={`pb-condition pb-condition--simple${isLastStage ? ' is-disabled' : ''}`} data-builder-field="weight" data-validation-severity={fieldSeverity('weight')}>
-          <small>Move on yield</small>
-          <Stepper label="Move on yield" value={stage.weight} unit="g" step={0.1} disabled={isLastStage} onChange={(weight) => onChange({ weight })} />
+        <div className="pb-condition-column">
+          <div className="pb-condition pb-condition--simple" data-builder-field="volume" data-validation-severity={fieldSeverity('volume')}>
+            <small>Move on volume</small>
+            <Stepper label="Move on volume" value={stage.volume > 0 ? stage.volume : undefined} unit="ml" step={1} onChange={(volume) => onChange({ volume: volume ?? 0 })} />
+          </div>
+          <div className={`pb-condition pb-condition--simple${isLastStage ? ' is-disabled' : ''}`} data-builder-field="weight" data-validation-severity={fieldSeverity('weight')}>
+            <small>Move on yield</small>
+            <Stepper label="Move on yield" value={stage.weight} unit="g" step={0.1} disabled={isLastStage} onChange={(weight) => onChange({ weight })} />
+          </div>
         </div>
       </div>
+      <p className="pb-stage__conditions-rule"><img src={skipNext} alt="" /><span>The next stage starts as soon as any condition on the left is met.</span></p>
     </section>}
   </article>
 }
