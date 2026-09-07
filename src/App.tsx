@@ -6,6 +6,7 @@ import { ValueAdjustmentProvider } from './components/ValueAdjustment/ValueAdjus
 import { useBrewingData } from './features/brew/useBrewingData'
 import { ProfilesPanel } from './features/profiles/ProfilesPanel'
 import { PreviousShotScreen } from './features/history/PreviousShotScreen'
+import { DecaidUpdatePrompt } from './features/updates/DecaidUpdatePrompt'
 import './styles/index.css'
 
 type AppPage = 'home' | 'profiles' | 'previous-pull'
@@ -49,5 +50,5 @@ export default function App() {
   else if (page === 'previous-pull' && !data.liveBrew.visible) screen = <PreviousShotScreen shots={data.shotHistory} initialShot={data.model.previousShot} status={data.previousShotStatus} onSelectShot={data.loadHistoryShot} onDismiss={() => navigate('home')} />
   else screen = <AppShell {...data} onSleep={data.toggleSleep} onWake={data.wakeMachine} onStopEspresso={data.stopEspresso} onSkipBrewStage={data.skipBrewStage} onStartDemoBrew={data.startDemoBrew} onPrepareCleaning={data.prepareCleaningSequence} onCancelCleaning={data.cancelCleaningSequence} onDismissLiveBrew={data.dismissLiveBrew} onSearchScale={data.searchForScale} onConnectScale={data.connectToScale} onDismissScalePicker={data.dismissScalePicker} onTareScale={data.tareConnectedScale} onUpdateMachineSetting={data.updateMachineSetting} onUpdateProfileSetting={data.updateProfileSetting} onSelectProfile={data.selectProfile} onOpenSettings={() => window.location.assign(getDecaidSettingsUrl())} onManageProfiles={() => navigate('profiles')} onOpenPreviousShot={() => navigate('previous-pull')} />
 
-  return <ValueAdjustmentProvider><InteractionSound />{screen}</ValueAdjustmentProvider>
+  return <ValueAdjustmentProvider><InteractionSound />{screen}<DecaidUpdatePrompt defer={data.liveBrew.visible || Boolean(data.utilityOperation) || data.sleepScreenActive} /></ValueAdjustmentProvider>
 }
