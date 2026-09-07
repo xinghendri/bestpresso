@@ -1,6 +1,6 @@
 import type { BrewingScreenModel, LiveBrewState, LiveShotPoint } from '../domain/brewing'
 
-export const demoShotPoints: LiveShotPoint[] = [
+const demoShotMeasurements: LiveShotPoint[] = [
   { elapsedMs: 0, stageIndex: 0, stageName: 'Preinfusion', pressure: 0, flow: 4.1, targetPressure: 2, targetFlow: 4, temperature: 88, weight: 0 },
   { elapsedMs: 2500, stageIndex: 0, stageName: 'Preinfusion', pressure: 0.8, flow: 4, targetPressure: 2, targetFlow: 4, temperature: 89.2, weight: 0.1 },
   { elapsedMs: 5000, stageIndex: 0, stageName: 'Preinfusion', pressure: 1.6, flow: 3.8, targetPressure: 2, targetFlow: 4, temperature: 90.4, weight: 0.4 },
@@ -30,6 +30,13 @@ export const demoShotPoints: LiveShotPoint[] = [
   { elapsedMs: 45000, stageIndex: 5, stageName: 'Finish', pressure: 2.4, flow: 1.3, targetPressure: 2.5, targetFlow: 1.2, temperature: 91.7, weight: 39.8 },
   { elapsedMs: 48000, stageIndex: 5, stageName: 'Finish', pressure: 0, flow: 0, targetPressure: 0, targetFlow: 0, temperature: 91.6, weight: 40.2 },
 ]
+
+export const demoShotPoints = demoShotMeasurements.map((point, index) => {
+  const previous = demoShotMeasurements[index - 1]
+  if (!previous || point.weight === undefined || previous.weight === undefined) return { ...point, weightFlow: 0 }
+  const elapsedSeconds = (point.elapsedMs - previous.elapsedMs) / 1000
+  return { ...point, weightFlow: elapsedSeconds > 0 ? Math.max(0, (point.weight - previous.weight) / elapsedSeconds) : 0 }
+})
 
 export const demoLiveBrewFixture: LiveBrewState = {
   active: true,
