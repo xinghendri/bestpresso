@@ -423,6 +423,7 @@ test('editor follows the designed high-level hierarchy without prototype-only fi
   assert.match(screen, /\{comparisonLabel\} &gt;<\/button>/)
   assert.match(screen, /\{comparisonLabel\} &lt;<\/button>/)
   assert.match(styles, /\.pb-stage__conditions-panel\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)[^}]*grid-template-rows:auto repeat\(2,minmax\(0,1fr\)\)/)
+  assert.match(styles, /\.pb-stage__conditions-panel\{[^}]*gap:8px 18px/)
   assert.match(styles, /\.pb-stage__conditions-panel>\.pb-condition-column\{display:contents\}/)
   assert.match(screen, /disabled=\{isLastStage\}/)
   assert.match(screen, /isLastStage=\{index === draft\.stages\.length - 1\}/)
@@ -492,6 +493,9 @@ test('stage cards use the compact Figma dimensions and compact further on short 
   assert.match(styles, /@media\(max-height:650px\)\{\.profile-builder-screen\.pb-screen\{--pb-stage-height:245px\}/)
   assert.match(styles, /\.pb-stage__target-panel\{display:grid;grid-template-columns:minmax\(0,1fr\) 153px/)
   assert.match(styles, /\.pb-stage__conditions-panel\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/)
+  assert.match(styles, /\.pb-stage__target-main\{position:relative;[^}]*padding-right:0;border-right:0\}/)
+  assert.match(styles, /\.pb-stage__target-main::after\{[^}]*left:50%;[^}]*background:rgba\(192,192,192,.2\)/)
+  assert.doesNotMatch(screen, /pb-stage__connector/)
 })
 
 test('builder chart uses the established profile colors and includes temperature', () => {

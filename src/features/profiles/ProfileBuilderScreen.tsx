@@ -285,7 +285,6 @@ function StageEditorCard({ stage, index, active, isLastStage, onActivate, onChan
     event.preventDefault()
     onActivate()
   }} aria-expanded="false" aria-label={`Open stage ${index + 1}: ${stage.name}`}>
-    <span className="pb-stage__connector" aria-hidden="true">›</span>
     <header className="pb-stage__summary-header">
       <StageDragHandle onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd} />
       <b style={{ backgroundImage: `url(${builderStageNumber})` }}>{stageNumber}</b>
@@ -300,7 +299,6 @@ function StageEditorCard({ stage, index, active, isLastStage, onActivate, onChan
   </article>
 
   return <article ref={cardRef} data-stage-id={stage.id} data-validation-severity={issueSeverity} className={`pb-stage is-active is-${activePanel}${dragging ? ' is-dragging' : ''}`} aria-expanded="true" aria-label={`Stage ${index + 1}: ${stage.name}`}>
-    <span className="pb-stage__connector" aria-hidden="true">›</span>
     <header className="pb-stage__active-header">
       <StageDragHandle onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd} />
       <b style={{ backgroundImage: `url(${builderStageNumber})` }}>{stageNumber}</b>
