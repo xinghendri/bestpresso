@@ -97,7 +97,8 @@ test('uses stable header metric slots with symmetric separator spacing', () => {
 
 test('adds a separated live flow-rate slot without changing history metrics', () => {
   assert.match(styles, /\.live-pull-header__metrics--live \{ --header-metric-separator-gap:18px; grid-template-columns:118px 1px 196px 1px 118px; \}/)
-  assert.match(styles, /\.live-pull-header__metrics--live strong \{ font-size:32px; \}/)
+  assert.match(styles, /\.live-pull-header__metrics\.live-pull-header__metrics--live strong \{ color:#f5f5f5; font-size:27px; \}/)
+  assert.match(styles, /\.live-pull-header__metrics\.live-pull-header__metrics--live strong small \{ font-size:16px; \}/)
   assert.match(styles, /@media\(max-width:760px\)[\s\S]*\.live-pull-header__metrics--live\{--header-metric-separator-gap:12px;grid-template-columns:84px 1px 160px 1px 84px\}/)
   assert.match(styles, /@media\(max-width:600px\)[\s\S]*\.live-pull-header__metrics--live\{grid-template-columns:68px 1px 120px 1px 80px\}/)
 })
