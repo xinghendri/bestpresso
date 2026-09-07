@@ -20,6 +20,8 @@ test('demo pull uses the selected profile metadata and scales its fixture teleme
   assert.equal(demo.durationMs, 48_000)
   assert.equal(demo.points[0].temperature, 90)
   assert.ok(Math.abs((demo.points.at(-1)?.weight ?? 0) - 48) < 0.001)
+  assert.ok(demo.points.some((point) => typeof point.weightFlow === 'number' && point.weightFlow > 0))
+  assert.ok(Math.abs((demo.points[2].weightFlow ?? 0) - 0.144) < 0.001)
 })
 
 test('demo pull interpolates an in-progress point instead of jumping between samples', () => {
