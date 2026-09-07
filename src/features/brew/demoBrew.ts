@@ -47,6 +47,7 @@ export function demoBrewForProfile(profile: BrewProfile): DemoBrewDefinition {
     ...point,
     temperature: point.temperature === undefined ? undefined : point.temperature + temperatureOffset,
     weight: point.weight === undefined ? undefined : point.weight * yieldScale,
+    weightFlow: point.weightFlow === undefined ? undefined : point.weightFlow * yieldScale,
   }))
   return {
     profileName: profile.name,

@@ -20,6 +20,14 @@ test('provides Decaid-shaped fixtures for Decent scale variants', () => {
   })
 })
 
+test('provides the Atomax fixture used by the collapsed scale-card regression', () => {
+  assert.deepEqual(scaleFixtureForKey('atomax'), {
+    status: 'connected',
+    id: 'AA:BB:CC:ATOMAX',
+    name: 'Atomax Skale',
+  })
+})
+
 test('does not invent a fixture for an unknown key', () => {
   assert.equal(scaleFixtureForKey('unknown'), undefined)
   assert.equal(scaleFixtureForKey(null), undefined)

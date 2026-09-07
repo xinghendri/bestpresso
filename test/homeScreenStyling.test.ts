@@ -27,6 +27,12 @@ test('increases collapsed home-screen numeric readouts by one pixel', () => {
   assert.match(styles, /\.utility-card--scale\.utility-card--compact \.metric__reading small \{[^}]*font-size:23px;/)
 })
 
+test('reflows the collapsed scale name and anchors its weight to the card bottom', () => {
+  assert.match(styles, /\.utility-card--scale\.utility-card--compact header \{[^}]*grid-template-columns:25px minmax\(0,1fr\);/)
+  assert.match(styles, /\.utility-card--scale\.utility-card--compact header>span \{[^}]*width:auto;[^}]*transform:none;[^}]*-webkit-line-clamp:2;/)
+  assert.match(styles, /\.utility-card--scale\.utility-card--compact \.utility-card__metrics \{[^}]*top:auto; bottom:18px; width:auto;/)
+})
+
 test('uses the requested home-screen colors for labels and numbers', () => {
   assert.match(styles, /\.app-shell \.utility-card header,[\s\S]*\.app-shell \.history-card__summary time \{\s*color:#707070;/)
   assert.match(styles, /\.app-shell \.metric__label \{\s*color:#878787;/)
@@ -90,8 +96,9 @@ test('uses stable header metric slots with symmetric separator spacing', () => {
 })
 
 test('adds a separated live flow-rate slot without changing history metrics', () => {
-  assert.match(styles, /\.live-pull-header__metrics--live \{ grid-template-columns:108px 1px 280px 1px 108px; \}/)
-  assert.match(styles, /@media\(max-width:760px\)[\s\S]*\.live-pull-header__metrics--live\{--header-metric-separator-gap:16px;grid-template-columns:88px 1px 220px 1px 92px\}/)
+  assert.match(styles, /\.live-pull-header__metrics--live \{ --header-metric-separator-gap:18px; grid-template-columns:118px 1px 196px 1px 118px; \}/)
+  assert.match(styles, /\.live-pull-header__metrics--live strong \{ font-size:32px; \}/)
+  assert.match(styles, /@media\(max-width:760px\)[\s\S]*\.live-pull-header__metrics--live\{--header-metric-separator-gap:12px;grid-template-columns:84px 1px 160px 1px 84px\}/)
   assert.match(styles, /@media\(max-width:600px\)[\s\S]*\.live-pull-header__metrics--live\{grid-template-columns:68px 1px 120px 1px 80px\}/)
 })
 
