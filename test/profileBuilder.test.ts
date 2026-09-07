@@ -14,6 +14,11 @@ const feature = readFileSync(new URL('../src/features/profiles/profileBuilderFea
 const brewingData = readFileSync(new URL('../src/features/brew/useBrewingData.ts', import.meta.url), 'utf8')
 const styles = readFileSync(new URL('../src/styles/index.css', import.meta.url), 'utf8')
 const closeIcon = readFileSync(new URL('../src/assets/figma/builder-card-close.svg', import.meta.url), 'utf8')
+const fastActiveIcon = readFileSync(new URL('../src/assets/figma/builder-transition-fast-active.svg', import.meta.url), 'utf8')
+const smoothActiveIcon = readFileSync(new URL('../src/assets/figma/builder-transition-smooth-active.svg', import.meta.url), 'utf8')
+const coffeeActiveIcon = readFileSync(new URL('../src/assets/figma/builder-coffee-source.svg', import.meta.url), 'utf8')
+const coffeeMutedIcon = readFileSync(new URL('../src/assets/figma/builder-coffee-source-muted.svg', import.meta.url), 'utf8')
+const waterActiveIcon = readFileSync(new URL('../src/assets/figma/builder-water-source-active.svg', import.meta.url), 'utf8')
 
 test('keeps the unfinished profile builder hidden in normal releases while allowing an explicit RC build', () => {
   assert.match(app, /page === 'profile-builder' && profileBuilderEnabled\(\)/)
@@ -441,6 +446,16 @@ test('editor panels use a true close icon rather than the add-stage plus', () =>
   assert.match(screen, /aria-label="Close validation"><img src=\{builderCardClose\}/)
   assert.match(closeIcon, /M3\.75 3\.75L14\.25 14\.25/)
   assert.match(closeIcon, /M14\.25 3\.75L3\.75 14\.25/)
+})
+
+test('transition and temperature-source icons turn green only while selected', () => {
+  assert.match(screen, /value === 'fast' \? builderTransitionFastActive : builderTransitionFast/)
+  assert.match(screen, /value === 'smooth' \? builderTransitionSmoothActive : builderTransitionSmooth/)
+  assert.match(screen, /value === 'coffee' \? builderCoffeeSource : builderCoffeeSourceMuted/)
+  assert.match(screen, /value === 'water' \? builderWaterSourceActive : builderWaterSource/)
+  for (const icon of [fastActiveIcon, smoothActiveIcon, coffeeActiveIcon, waterActiveIcon]) assert.match(icon, /#53D68E|#57C98A/)
+  assert.doesNotMatch(coffeeMutedIcon, /#53D68E|#57C98A/)
+  assert.match(coffeeMutedIcon, /#C0C0C0/)
 })
 
 test('scale-dependent exits do not produce redundant validation warnings', () => {

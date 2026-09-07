@@ -3,6 +3,7 @@ import type { PointerEvent as ReactPointerEvent } from 'react'
 import builderCategoryChevron from '../../assets/figma/builder-category-chevron.svg'
 import builderCardClose from '../../assets/figma/builder-card-close.svg'
 import builderCoffeeSource from '../../assets/figma/builder-coffee-source.svg'
+import builderCoffeeSourceMuted from '../../assets/figma/builder-coffee-source-muted.svg'
 import builderStageDelete from '../../assets/figma/builder-stage-delete.svg'
 import builderStageDrag from '../../assets/figma/builder-stage-drag.svg'
 import builderStageDuplicate from '../../assets/figma/builder-stage-duplicate.svg'
@@ -11,9 +12,12 @@ import builderStepMinus from '../../assets/figma/builder-step-minus.svg'
 import builderStepMinusMuted from '../../assets/figma/builder-step-minus-muted.svg'
 import builderStepPlus from '../../assets/figma/builder-step-plus.svg'
 import builderTransitionFast from '../../assets/figma/builder-transition-fast.svg'
+import builderTransitionFastActive from '../../assets/figma/builder-transition-fast-active.svg'
 import builderTransitionSmooth from '../../assets/figma/builder-transition-smooth.svg'
+import builderTransitionSmoothActive from '../../assets/figma/builder-transition-smooth-active.svg'
 import builderValueChevron from '../../assets/figma/builder-value-chevron.svg'
 import builderWaterSource from '../../assets/figma/builder-water-source.svg'
+import builderWaterSourceActive from '../../assets/figma/builder-water-source-active.svg'
 import skipNext from '../../assets/figma/skip-next.svg'
 import { useValueAdjustment } from '../../components/ValueAdjustment/ValueAdjustmentContext'
 import type { DecaidProfile, DecaidProfileRecord } from '../../api/decaid/types'
@@ -98,15 +102,15 @@ function SegmentControl({ value, onChange }: { value: BuilderStage['pump']; onCh
 
 function TransitionControl({ value, onChange }: { value: BuilderStage['transition']; onChange: (value: BuilderStage['transition']) => void }) {
   return <div className="pb-segmented pb-segmented--choice" role="group" aria-label="Stage transition">
-    <button type="button" className={value === 'fast' ? 'is-selected' : ''} onClick={() => onChange('fast')}><img src={builderTransitionFast} alt="" />Fast</button>
-    <button type="button" className={value === 'smooth' ? 'is-selected' : ''} onClick={() => onChange('smooth')}><img src={builderTransitionSmooth} alt="" />Smooth</button>
+    <button type="button" className={value === 'fast' ? 'is-selected' : ''} onClick={() => onChange('fast')}><img src={value === 'fast' ? builderTransitionFastActive : builderTransitionFast} alt="" />Fast</button>
+    <button type="button" className={value === 'smooth' ? 'is-selected' : ''} onClick={() => onChange('smooth')}><img src={value === 'smooth' ? builderTransitionSmoothActive : builderTransitionSmooth} alt="" />Smooth</button>
   </div>
 }
 
 function SensorControl({ value, onChange }: { value: BuilderStage['sensor']; onChange: (value: BuilderStage['sensor']) => void }) {
   return <div className="pb-segmented pb-segmented--choice" role="group" aria-label="Temperature sensor">
-    <button type="button" className={value === 'coffee' ? 'is-selected' : ''} onClick={() => onChange('coffee')}><img src={builderCoffeeSource} alt="" />Coffee</button>
-    <button type="button" className={value === 'water' ? 'is-selected' : ''} onClick={() => onChange('water')}><img src={builderWaterSource} alt="" />Water</button>
+    <button type="button" className={value === 'coffee' ? 'is-selected' : ''} onClick={() => onChange('coffee')}><img src={value === 'coffee' ? builderCoffeeSource : builderCoffeeSourceMuted} alt="" />Coffee</button>
+    <button type="button" className={value === 'water' ? 'is-selected' : ''} onClick={() => onChange('water')}><img src={value === 'water' ? builderWaterSourceActive : builderWaterSource} alt="" />Water</button>
   </div>
 }
 
