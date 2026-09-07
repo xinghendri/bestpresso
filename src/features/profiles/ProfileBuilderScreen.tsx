@@ -14,6 +14,7 @@ import builderTransitionFast from '../../assets/figma/builder-transition-fast.sv
 import builderTransitionSmooth from '../../assets/figma/builder-transition-smooth.svg'
 import builderValueChevron from '../../assets/figma/builder-value-chevron.svg'
 import builderWaterSource from '../../assets/figma/builder-water-source.svg'
+import skipNext from '../../assets/figma/skip-next.svg'
 import { useValueAdjustment } from '../../components/ValueAdjustment/ValueAdjustmentContext'
 import type { DecaidProfile, DecaidProfileRecord } from '../../api/decaid/types'
 import type { ProfileTargetPoint } from '../../domain/brewing'
@@ -327,7 +328,7 @@ function StageEditorCard({ stage, index, active, isLastStage, onActivate, onChan
         <div data-builder-field="seconds" data-validation-severity={fieldSeverity('seconds')}><small>Max time</small><Stepper label="Duration" value={stage.seconds} unit="s" step={1} min={0} max={127} onChange={(seconds) => onChange({ seconds: seconds ?? 0 })} /></div>
       </aside>
     </section> : <section className="pb-stage__conditions-panel" role="tabpanel" aria-label="Move on conditions">
-      <p className="pb-stage__conditions-rule">Moves on when any enabled condition is reached</p>
+      <p className="pb-stage__conditions-rule"><img src={skipNext} alt="" /><span>Moves on when any enabled condition is reached</span></p>
       <div className="pb-condition-column" data-builder-field="exit" data-validation-severity={fieldSeverity('exit')}>
         <ExitControl type="flow" stage={stage} onChange={onChange} />
         <ExitControl type="pressure" stage={stage} onChange={onChange} />
