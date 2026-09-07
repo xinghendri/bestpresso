@@ -32,7 +32,7 @@ export const VALUE_ADJUSTMENTS = {
   },
   hotWaterTemperature: {
     title: 'Hot water temperature',
-    min: 50,
+    min: 35,
     max: 95,
     step: 1,
     mode: 'integer',
