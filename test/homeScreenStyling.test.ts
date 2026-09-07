@@ -27,6 +27,12 @@ test('increases collapsed home-screen numeric readouts by one pixel', () => {
   assert.match(styles, /\.utility-card--scale\.utility-card--compact \.metric__reading small \{[^}]*font-size:23px;/)
 })
 
+test('reflows the collapsed scale name and anchors its weight to the card bottom', () => {
+  assert.match(styles, /\.utility-card--scale\.utility-card--compact header \{[^}]*grid-template-columns:25px minmax\(0,1fr\);/)
+  assert.match(styles, /\.utility-card--scale\.utility-card--compact header>span \{[^}]*width:auto;[^}]*transform:none;[^}]*-webkit-line-clamp:2;/)
+  assert.match(styles, /\.utility-card--scale\.utility-card--compact \.utility-card__metrics \{[^}]*top:auto; bottom:18px; width:auto;/)
+})
+
 test('uses the requested home-screen colors for labels and numbers', () => {
   assert.match(styles, /\.app-shell \.utility-card header,[\s\S]*\.app-shell \.history-card__summary time \{\s*color:#707070;/)
   assert.match(styles, /\.app-shell \.metric__label \{\s*color:#878787;/)
