@@ -106,8 +106,8 @@ export function validateProfileDraft(draft: ProfileDraft): ProfileBuilderValidat
   if (!['espresso', 'calibrate', 'cleaning', 'manual', 'pourover'].includes(draft.beverageType)) addProfile('error', 'profile-beverage', 'beverageType', 'Choose a supported beverage type.')
   if (!finite(draft.tankTemperature)) addProfile('error', 'profile-tank-temperature', 'tankTemperature', 'Tank temperature must be a number.')
   if (!Number.isInteger(draft.targetVolumeCountStart)) addProfile('error', 'profile-volume-start-integer', 'targetVolumeCountStart', 'Volume count start must be a whole stage number.')
-  if (finite(draft.targetWeight) && (draft.targetWeight < 0 || draft.targetWeight > MAX_SOFTWARE_TARGET)) addProfile('error', 'profile-target-weight-range', 'targetWeight', `Target yield must be between 0 and ${MAX_SOFTWARE_TARGET} g.`)
-  if (finite(draft.targetVolume) && (draft.targetVolume < 0 || draft.targetVolume > MAX_SOFTWARE_TARGET)) addProfile('error', 'profile-target-volume-range', 'targetVolume', `Volume fallback must be between 0 and ${MAX_SOFTWARE_TARGET} ml.`)
+  if (finite(draft.targetWeight) && (draft.targetWeight < 0 || draft.targetWeight > MAX_SOFTWARE_TARGET)) addProfile('error', 'profile-target-weight-range', 'targetWeight', `End shot yield must be between 0 and ${MAX_SOFTWARE_TARGET} g.`)
+  if (finite(draft.targetVolume) && (draft.targetVolume < 0 || draft.targetVolume > MAX_SOFTWARE_TARGET)) addProfile('error', 'profile-target-volume-range', 'targetVolume', `End shot volume fallback must be between 0 and ${MAX_SOFTWARE_TARGET} ml.`)
 
   const volumeFallbackActive = finite(draft.targetVolume) && draft.targetVolume > 0
   if (volumeFallbackActive && (draft.targetVolumeCountStart < 0 || draft.targetVolumeCountStart >= draft.stages.length)) {
@@ -126,7 +126,7 @@ export function validateProfileDraft(draft: ProfileDraft): ProfileBuilderValidat
     pushRangeIssue(issues, stage, stageIndex, 'temperature', 'Temperature', stage.temperature, 0, MAX_TEMPERATURE)
     pushRangeIssue(issues, stage, stageIndex, 'seconds', 'Maximum time', stage.seconds, 0, MAX_STAGE_SECONDS)
     pushRangeIssue(issues, stage, stageIndex, 'volume', 'Stage volume', stage.volume, 0, MAX_STAGE_VOLUME)
-    if (stage.weight !== undefined && stage.weight !== null) pushRangeIssue(issues, stage, stageIndex, 'weight', 'Stage weight', stage.weight, 0, MAX_SOFTWARE_TARGET)
+    if (stage.weight !== undefined && stage.weight !== null) pushRangeIssue(issues, stage, stageIndex, 'weight', 'Move on yield', stage.weight, 0, MAX_SOFTWARE_TARGET)
 
     if (stage.exit) {
       if (stage.exit.type !== 'pressure' && stage.exit.type !== 'flow') addStage('error', stage, stageIndex, 'exit-type', 'exit', 'Choose a pressure or flow move-on condition.')

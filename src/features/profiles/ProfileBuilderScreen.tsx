@@ -192,6 +192,7 @@ function Stepper({ label, value, unit, step, min = 0, max = 1000, disabled = fal
 
 function ExitControl({ type, stage, onChange }: { type: BuilderExitType; stage: BuilderStage; onChange: (patch: Partial<BuilderStage>) => void }) {
   const value = stage.exit?.type === type ? stage.exit.value : undefined
+  const label = `Move on ${type}`
   const [condition, setCondition] = useState<'over' | 'under'>(() => stage.exit?.type === type ? stage.exit.condition : 'over')
   const selectedCondition = stage.exit?.type === type ? stage.exit.condition : condition
   const changeCondition = (next: 'over' | 'under') => {
@@ -199,11 +200,12 @@ function ExitControl({ type, stage, onChange }: { type: BuilderExitType; stage: 
     if (stage.exit?.type === type) onChange({ exit: { ...stage.exit, condition: next } })
   }
   return <div className="pb-condition">
-    <div className="pb-condition__comparison" role="group" aria-label={`${type} condition`}>
-      <button type="button" className={selectedCondition === 'over' ? 'is-selected' : ''} onClick={() => changeCondition('over')}>{type === 'flow' ? 'Flow' : 'Pressure'} &gt;</button>
-      <button type="button" className={selectedCondition === 'under' ? 'is-selected' : ''} onClick={() => changeCondition('under')}>{type === 'flow' ? 'Flow' : 'Pressure'} &lt;</button>
+    <small className="pb-condition__metric-label">{label}</small>
+    <div className="pb-condition__comparison" role="group" aria-label={`${label} condition`}>
+      <button type="button" className={selectedCondition === 'over' ? 'is-selected' : ''} onClick={() => changeCondition('over')}>Above</button>
+      <button type="button" className={selectedCondition === 'under' ? 'is-selected' : ''} onClick={() => changeCondition('under')}>Below</button>
     </div>
-    <Stepper label={`${type} exit`} value={value} unit={type === 'flow' ? 'ml/s' : 'bar'} step={0.1} onChange={(next) => onChange({ exit: next === undefined ? undefined : { type, condition: selectedCondition, value: next } })} />
+    <Stepper label={label} value={value} unit={type === 'flow' ? 'ml/s' : 'bar'} step={0.1} onChange={(next) => onChange({ exit: next === undefined ? undefined : { type, condition: selectedCondition, value: next } })} />
   </div>
 }
 
@@ -334,12 +336,12 @@ function StageEditorCard({ stage, index, active, isLastStage, onActivate, onChan
       </div>
       <div className="pb-condition-column">
         <div className="pb-condition pb-condition--simple" data-builder-field="volume" data-validation-severity={fieldSeverity('volume')}>
-          <small>Volume</small>
-          <Stepper label="Stage volume" value={stage.volume > 0 ? stage.volume : undefined} unit="ml" step={1} onChange={(volume) => onChange({ volume: volume ?? 0 })} />
+          <small>Move on volume</small>
+          <Stepper label="Move on volume" value={stage.volume > 0 ? stage.volume : undefined} unit="ml" step={1} onChange={(volume) => onChange({ volume: volume ?? 0 })} />
         </div>
         <div className={`pb-condition pb-condition--simple${isLastStage ? ' is-disabled' : ''}`} data-builder-field="weight" data-validation-severity={fieldSeverity('weight')}>
-          <small>Move on at</small>
-          <Stepper label="Stage move-on weight" value={stage.weight} unit="g" step={0.1} disabled={isLastStage} onChange={(weight) => onChange({ weight })} />
+          <small>Move on yield</small>
+          <Stepper label="Move on yield" value={stage.weight} unit="g" step={0.1} disabled={isLastStage} onChange={(weight) => onChange({ weight })} />
         </div>
       </div>
     </section>}
@@ -694,7 +696,7 @@ export function ProfileBuilderScreen({ onClose, initialRecord, existingTitles = 
     updateDraft('beverageType', types[(index + 1) % types.length])
   }
   const editTargetYield = () => openAdjustment({
-    label: 'Yield',
+    label: 'End shot yield',
     value: draft.targetWeight ?? 0,
     unit: 'g',
     ...VALUE_ADJUSTMENTS.targetYield,
@@ -815,7 +817,7 @@ export function ProfileBuilderScreen({ onClose, initialRecord, existingTitles = 
       </div>
       <div className="pb-topbar__metadata">
         <button type="button" className="pb-meta" onClick={cycleType}><span>Type <img src={builderValueChevron} alt="" /></span><strong>{draft.beverageType === 'pourover' ? 'Pour over' : `${draft.beverageType[0].toUpperCase()}${draft.beverageType.slice(1)}`}</strong></button>
-        <button type="button" className="pb-meta" onClick={editTargetYield}><span>Yield <img src={builderValueChevron} alt="" /></span><strong>{formatValue(draft.targetWeight)} <small>g</small></strong></button>
+        <button type="button" className="pb-meta" onClick={editTargetYield}><span>End shot yield <img src={builderValueChevron} alt="" /></span><strong>{formatValue(draft.targetWeight)} <small>g</small></strong></button>
       </div>
       <div className="pb-topbar__actions">
         <button className="pb-cancel" type="button" onClick={requestClose}>Cancel</button>
@@ -875,11 +877,11 @@ export function ProfileBuilderScreen({ onClose, initialRecord, existingTitles = 
             <textarea value={draft.notes} placeholder="Profile description and preparation notes" onChange={(event) => updateDraft('notes', event.target.value)} />
           </label>
           <label data-builder-field="targetWeight" data-validation-severity={profileFieldSeverity('targetWeight')}>
-            <span>Target yield</span>
+            <span>End shot yield</span>
             <span className="pb-profile-details__number"><input type="number" inputMode="decimal" min="0" step="0.1" value={draft.targetWeight ?? ''} onChange={(event) => updateOptionalDraftNumber('targetWeight', event.target.value)} /><small>g</small></span>
           </label>
           <label data-builder-field="targetVolume" data-validation-severity={profileFieldSeverity('targetVolume')}>
-            <span>Fallback stop volume</span>
+            <span>End shot volume fallback</span>
             <span className="pb-profile-details__number"><input type="number" inputMode="decimal" min="0" step="0.1" value={draft.targetVolume ?? ''} onChange={(event) => updateOptionalDraftNumber('targetVolume', event.target.value)} /><small>ml</small></span>
           </label>
           {volumeFallbackActive && <label data-builder-field="targetVolumeCountStart" data-validation-severity={profileFieldSeverity('targetVolumeCountStart')}>
