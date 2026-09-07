@@ -113,7 +113,7 @@ export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, o
           <h1>{activeShot?.profileName ?? 'Pull history'}</h1>
           {activeShot && <time dateTime={activeShot.timestamp}>{pullTime(activeShot.timestamp)}</time>}
         </div>
-        <div className={`live-pull-header__metrics${isCleaning ? ' live-pull-header__metrics--single' : ''}`}>
+        <div className={`live-pull-header__metrics${isCleaning ? ' live-pull-header__metrics--single' : ' live-pull-header__metrics--history'}`}>
           <div><span>Duration</span><strong>{activeShot ? timerLabel(activeShot) : '—'}</strong></div>
           {!isCleaning && <><i aria-hidden="true" /><div><span>Yield</span><strong>{activeShot?.totalYield ?? '—'}{activeShot?.totalYield !== '—' && <small>g</small>}</strong></div></>}
         </div>

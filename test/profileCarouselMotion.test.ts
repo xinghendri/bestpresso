@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { profileCardMotion, profileCardPosition, projectedProfileSteps, wrappedProfileOffset } from '../src/features/brew/profileCarouselMotion.ts'
+
+const styles = readFileSync(new URL('../src/styles/index.css', import.meta.url), 'utf8')
 
 test('a long swipe can traverse several profiles', () => {
   assert.equal(projectedProfileSteps(-290, 0, 120, 6), 2)
@@ -26,4 +29,9 @@ test('only five profile slots remain visible with an ad hoc sixth card', () => {
     const positions = Array.from({ length: 6 }, (_, index) => profileCardPosition(wrappedProfileOffset(index, center, 6)))
     assert.equal(positions.filter((position) => position !== 'hidden').length, 5)
   }
+})
+
+test('profile selection animates between taps while direct dragging tracks the pointer', () => {
+  assert.match(styles, /\.profile-card\.profile-card--free \{[^}]*transition:left \.24s cubic-bezier/)
+  assert.match(styles, /\.profile-carousel--dragging \.profile-card--free \{ transition:none; \}/)
 })

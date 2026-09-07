@@ -33,6 +33,11 @@ test('yield supports the Decaid-compatible reference range', () => {
   assert.equal(VALUE_ADJUSTMENTS.targetYield.step, 0.1)
 })
 
+test('hot water temperature includes Decaid-supported low-temperature dispensing', () => {
+  assert.equal(VALUE_ADJUSTMENTS.hotWaterTemperature.min, 35)
+  assert.equal(VALUE_ADJUSTMENTS.hotWaterTemperature.max, 95)
+})
+
 test('direct numeric entry accepts locale decimal separators', () => {
   assert.equal(normalizedNumericDraft('18,3'), '18.3')
 })
