@@ -60,6 +60,11 @@ test('validation uses an issue-count warning icon after Save and has no ready st
   assert.doesNotMatch(screen, /Ready to save/)
 })
 
+test('validation issue text stays legible on the tablet display', () => {
+  assert.match(styles, /\.pb-validation-panel__issues strong\{font-size:12px/)
+  assert.match(styles, /\.pb-validation-panel__issues small\{[^}]*font-size:12px;line-height:1\.4/)
+})
+
 test('favorite rows omit editing while the selected profile detail keeps it', () => {
   const favorites = profilesPanel.slice(profilesPanel.indexOf('<aside className="favorites-panel"'), profilesPanel.indexOf('<section className="profile-browser">'))
   assert.doesNotMatch(favorites, /onEditProfile/)
