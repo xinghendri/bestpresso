@@ -420,6 +420,28 @@ test('validation flags likely unreachable and immediately satisfied exits withou
   assert.match(validation.warnings.find((issue) => issue.id.endsWith('exit-already-met'))?.message ?? '', /may begin around 8 bar/)
 })
 
+test('zero max pressure or flow means unrestricted and never makes a move-on condition look unreachable', () => {
+  const draft = createDefaultProfileDraft()
+  draft.targetWeight = 36
+  draft.stages[0] = {
+    ...draft.stages[0],
+    pump: 'flow',
+    limiter: { type: 'pressure', value: 0, range: 0.6 },
+    exit: { type: 'pressure', condition: 'over', value: 4 },
+  }
+  draft.stages[1] = {
+    ...draft.stages[1],
+    pump: 'pressure',
+    limiter: { type: 'flow', value: 0, range: 0.6 },
+    exit: { type: 'flow', condition: 'over', value: 2 },
+  }
+
+  const validation = validateProfileDraft(draft)
+
+  assert.equal(validation.canSave, true)
+  assert.equal(validation.warnings.some((issue) => issue.id.endsWith('exit-beyond-limiter')), false)
+})
+
 test('editor follows the designed high-level hierarchy without prototype-only fields', () => {
   assert.match(screen, /pb-stage__conditions-rule"><img src=\{skipNext\} alt="" \/><span>The next stage starts as soon as any condition on the left is met\.<\/span><\/p>/)
   assert.match(screen, /label: 'End shot yield'/)

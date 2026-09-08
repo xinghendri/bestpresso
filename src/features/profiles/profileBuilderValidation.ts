@@ -132,7 +132,7 @@ export function validateProfileDraft(draft: ProfileDraft): ProfileBuilderValidat
       if (stage.exit.type !== 'pressure' && stage.exit.type !== 'flow') addStage('error', stage, stageIndex, 'exit-type', 'exit', 'Choose a pressure or flow move-on condition.')
       if (stage.exit.condition !== 'over' && stage.exit.condition !== 'under') addStage('error', stage, stageIndex, 'exit-condition', 'exit', 'Choose whether the reading moves over or under the threshold.')
       pushRangeIssue(issues, stage, stageIndex, 'exit', 'Move-on threshold', stage.exit.value, 0, MAX_AXIS_VALUE)
-      if (stage.limiter?.type === stage.exit.type && stage.exit.condition === 'over' && stage.exit.value > stage.limiter.value) {
+      if (stage.limiter?.type === stage.exit.type && stage.limiter.value > 0 && stage.exit.condition === 'over' && stage.exit.value > stage.limiter.value) {
         const axisName = stage.exit.type === 'pressure' ? 'Pressure' : 'Flow'
         addStage('warning', stage, stageIndex, 'exit-beyond-limiter', 'exit', `One move-on condition may not work. ${axisName} is limited to ${axisDescription(stage.exit.type, stage.limiter.value)}, so “above ${axisDescription(stage.exit.type, stage.exit.value)}” probably won't be reached. This step will still move on after ${durationDescription(stage.seconds)} or when another condition is met.`)
       }
