@@ -114,7 +114,7 @@ function SensorControl({ value, onChange }: { value: BuilderStage['sensor']; onC
   </div>
 }
 
-function Stepper({ label, value, unit, step, min = 0, max = 1000, disabled = false, onChange }: {
+function Stepper({ label, value, unit, step, min = 0, max = 1000, disabled = false, onChange, onOpen }: {
   label: string
   value?: number | null
   unit: string
@@ -123,6 +123,7 @@ function Stepper({ label, value, unit, step, min = 0, max = 1000, disabled = fal
   max?: number
   disabled?: boolean
   onChange: (value: number | undefined) => void
+  onOpen?: () => void
 }) {
   const enabled = !disabled && typeof value === 'number' && value > 0
   const valueRef = useRef(value)
@@ -180,7 +181,19 @@ function Stepper({ label, value, unit, step, min = 0, max = 1000, disabled = fal
       onContextMenu={(event) => event.preventDefault()}
       aria-label={`Reduce ${label}; hold for whole units`}
     ><img src={enabled ? builderStepMinus : builderStepMinusMuted} alt="" /></button>
-    <span>{formatValue(value)}{unit && <small>{unit}</small>}</span>
+    <span
+      className={onOpen && !disabled ? 'pb-stepper__value is-adjustable' : 'pb-stepper__value'}
+      role={onOpen && !disabled ? 'button' : undefined}
+      tabIndex={onOpen && !disabled ? 0 : undefined}
+      onClick={onOpen && !disabled ? (event) => { event.stopPropagation(); onOpen() } : undefined}
+      onKeyDown={onOpen && !disabled ? (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        event.stopPropagation()
+        onOpen()
+      } : undefined}
+      aria-label={onOpen && !disabled ? `Open ${label} fullscreen adjustment` : undefined}
+    >{formatValue(value)}{unit && <small>{unit}</small>}</span>
     <button
       type="button"
       disabled={disabled}
@@ -196,6 +209,7 @@ function Stepper({ label, value, unit, step, min = 0, max = 1000, disabled = fal
 }
 
 function ExitControl({ type, stage, onChange }: { type: BuilderExitType; stage: BuilderStage; onChange: (patch: Partial<BuilderStage>) => void }) {
+  const openAdjustment = useValueAdjustment()
   const value = stage.exit?.type === type ? stage.exit.value : undefined
   const label = `Move on ${type}`
   const comparisonLabel = type === 'flow' ? 'Flow' : 'Pressure'
@@ -205,12 +219,35 @@ function ExitControl({ type, stage, onChange }: { type: BuilderExitType; stage: 
     setCondition(next)
     if (stage.exit?.type === type) onChange({ exit: { ...stage.exit, condition: next } })
   }
+  const definition = type === 'flow' ? VALUE_ADJUSTMENTS.builderFlow : VALUE_ADJUSTMENTS.builderPressure
+  const unit = type === 'flow' ? 'ml/s' : 'bar'
+  const openThresholdAdjustment = () => openAdjustment({
+    label,
+    value: value ?? 0,
+    unit,
+    ...definition,
+    suggestionKey: type === 'flow' ? 'builderFlow' : 'builderPressure',
+    selectedVariantId: selectedCondition,
+    variants: (['over', 'under'] as const).map((variantCondition) => ({
+      id: variantCondition,
+      label: `${comparisonLabel} ${variantCondition === 'over' ? '>' : '<'}`,
+      value: value ?? 0,
+      unit,
+      ...definition,
+      suggestionKey: type === 'flow' ? 'builderFlow' as const : 'builderPressure' as const,
+    })),
+    onSave: (next, variantId) => {
+      const nextCondition = variantId === 'under' ? 'under' : 'over'
+      setCondition(nextCondition)
+      onChange({ exit: { type, condition: nextCondition, value: next } })
+    },
+  })
   return <div className="pb-condition">
     <div className="pb-condition__comparison" role="group" aria-label={`${label} condition`}>
       <button type="button" className={selectedCondition === 'over' ? 'is-selected' : ''} onClick={() => changeCondition('over')}>{comparisonLabel} &gt;</button>
       <button type="button" className={selectedCondition === 'under' ? 'is-selected' : ''} onClick={() => changeCondition('under')}>{comparisonLabel} &lt;</button>
     </div>
-    <Stepper label={label} value={value} unit={type === 'flow' ? 'ml/s' : 'bar'} step={0.1} onChange={(next) => onChange({ exit: next === undefined ? undefined : { type, condition: selectedCondition, value: next } })} />
+    <Stepper label={label} value={value} unit={unit} step={0.1} max={definition.max} onOpen={openThresholdAdjustment} onChange={(next) => onChange({ exit: next === undefined ? undefined : { type, condition: selectedCondition, value: next } })} />
   </div>
 }
 
@@ -250,6 +287,7 @@ function StageEditorCard({ stage, index, active, isLastStage, onActivate, onChan
   onDragEnd: (event: ReactPointerEvent<HTMLButtonElement>) => void
   cardRef: (element: HTMLElement | null) => void
 }) {
+  const openAdjustment = useValueAdjustment()
   const [activePanel, setActivePanel] = useState<'target' | 'conditions'>(panelRequest?.panel ?? 'target')
   const issueSeverity = issues.some((issue) => issue.severity === 'error') ? 'error' : issues.length ? 'warning' : undefined
   const fieldSeverity = (field: string) => issues.some((issue) => issue.field === field && issue.severity === 'error')
@@ -275,6 +313,85 @@ function StageEditorCard({ stage, index, active, isLastStage, onActivate, onChan
   const limiterUnit = stage.pump === 'pressure' ? 'ml/s' : 'bar'
   const limiterValue = stage.limiter?.value
   const targetUnit = stage.pump === 'pressure' ? 'bar' : 'ml/s'
+  const openTargetAdjustment = () => {
+    const pressure = VALUE_ADJUSTMENTS.builderPressure
+    const flow = VALUE_ADJUSTMENTS.builderFlow
+    const variants = (['pressure', 'flow'] as const).map((pump) => {
+      const definition = pump === 'pressure' ? pressure : flow
+      return {
+        id: pump,
+        label: pump === 'pressure' ? 'Pressure' : 'Flow',
+        value: pumpMemory.current[pump] ?? (pump === 'pressure' ? 9 : 2),
+        unit: pump === 'pressure' ? 'bar' : 'ml/s',
+        ...definition,
+        suggestionKey: pump === 'pressure' ? 'builderPressure' as const : 'builderFlow' as const,
+      }
+    })
+    const definition = stage.pump === 'pressure' ? pressure : flow
+    openAdjustment({
+      label: 'Stage control',
+      value: stage.target,
+      unit: targetUnit,
+      ...definition,
+      suggestionKey: stage.pump === 'pressure' ? 'builderPressure' : 'builderFlow',
+      selectedVariantId: stage.pump,
+      variants,
+      onSave: (target, variantId) => {
+        const pump = variantId === 'flow' ? 'flow' : 'pressure'
+        if (pump === stage.pump) {
+          setTarget(target)
+          return
+        }
+        const switched = switchBuilderPump(stage, pump, pumpMemory.current)
+        switched.memory[pump] = target
+        pumpMemory.current = switched.memory
+        onChange({ ...switched.patch, target })
+      },
+    })
+  }
+  const openTemperatureAdjustment = () => openAdjustment({
+    label: 'Temperature',
+    value: stage.temperature,
+    unit: '°',
+    ...VALUE_ADJUSTMENTS.builderTemperature,
+    suggestionKey: 'builderTemperature',
+    onSave: (temperature) => onChange({ temperature }),
+  })
+  const openLimiterAdjustment = () => {
+    const definition = stage.pump === 'pressure' ? VALUE_ADJUSTMENTS.builderFlow : VALUE_ADJUSTMENTS.builderPressure
+    openAdjustment({
+      label: limiterLabel,
+      value: limiterValue ?? 0,
+      unit: limiterUnit,
+      ...definition,
+      suggestionKey: stage.pump === 'pressure' ? 'builderFlow' : 'builderPressure',
+      onSave: setLimiter,
+    })
+  }
+  const openDurationAdjustment = () => openAdjustment({
+    label: 'Max time',
+    value: stage.seconds,
+    unit: 's',
+    ...VALUE_ADJUSTMENTS.builderDuration,
+    suggestionKey: 'builderDuration',
+    onSave: (seconds) => onChange({ seconds }),
+  })
+  const openVolumeAdjustment = () => openAdjustment({
+    label: 'Move on volume',
+    value: stage.volume,
+    unit: 'ml',
+    ...VALUE_ADJUSTMENTS.builderVolume,
+    suggestionKey: 'builderVolume',
+    onSave: (volume) => onChange({ volume }),
+  })
+  const openYieldAdjustment = () => openAdjustment({
+    label: 'Move on yield',
+    value: stage.weight ?? 0,
+    unit: 'g',
+    ...VALUE_ADJUSTMENTS.builderYield,
+    suggestionKey: 'builderYield',
+    onSave: (weight) => onChange({ weight }),
+  })
   const stageNumber = index + 1
   const exitSummary = [
     `${formatValue(stage.seconds)}s max`,
@@ -321,15 +438,15 @@ function StageEditorCard({ stage, index, active, isLastStage, onActivate, onChan
       <div className="pb-stage__target-main">
         <div className="pb-stage__target-control" data-builder-field="target" data-validation-severity={fieldSeverity('target') ?? fieldSeverity('pump')}>
           <SegmentControl value={stage.pump} onChange={setPump} />
-          <Stepper label={`${stage.pump} target`} value={stage.target} unit={targetUnit} step={0.1} max={15.9} onChange={setTarget} />
+          <Stepper label={`${stage.pump} target`} value={stage.target} unit={targetUnit} step={0.1} max={15.9} onOpen={openTargetAdjustment} onChange={setTarget} />
         </div>
-        <div className="pb-stage__temperature-control" data-builder-field="temperature" data-validation-severity={fieldSeverity('temperature')}><small>Temperature</small><Stepper label="Temperature" value={stage.temperature} unit="°" step={0.5} min={0} max={127.5} onChange={(temperature) => onChange({ temperature: temperature ?? 0 })} /></div>
+        <div className="pb-stage__temperature-control" data-builder-field="temperature" data-validation-severity={fieldSeverity('temperature')}><small>Temperature</small><Stepper label="Temperature" value={stage.temperature} unit="°" step={0.5} min={0} max={127.5} onOpen={openTemperatureAdjustment} onChange={(temperature) => onChange({ temperature: temperature ?? 0 })} /></div>
         <div className="pb-stage__choice-control" data-builder-field="transition" data-validation-severity={fieldSeverity('transition')}><small>Transition</small><TransitionControl value={stage.transition} onChange={(transition) => onChange({ transition })} /></div>
         <div className="pb-stage__choice-control" data-builder-field="sensor" data-validation-severity={fieldSeverity('sensor')}><small>Measure from</small><SensorControl value={stage.sensor} onChange={(sensor) => onChange({ sensor })} /></div>
       </div>
       <aside className="pb-stage__limits">
-        <div data-builder-field="limiter" data-validation-severity={fieldSeverity('limiter')}><small>{limiterLabel}</small><Stepper label={limiterLabel} value={limiterValue} unit={limiterUnit} step={0.1} max={15.9} onChange={setLimiter} /></div>
-        <div data-builder-field="seconds" data-validation-severity={fieldSeverity('seconds')}><small>Max time</small><Stepper label="Duration" value={stage.seconds} unit="s" step={1} min={0} max={127} onChange={(seconds) => onChange({ seconds: seconds ?? 0 })} /></div>
+        <div data-builder-field="limiter" data-validation-severity={fieldSeverity('limiter')}><small>{limiterLabel}</small><Stepper label={limiterLabel} value={limiterValue} unit={limiterUnit} step={0.1} max={15.9} onOpen={openLimiterAdjustment} onChange={setLimiter} /></div>
+        <div data-builder-field="seconds" data-validation-severity={fieldSeverity('seconds')}><small>Max time</small><Stepper label="Duration" value={stage.seconds} unit="s" step={1} min={0} max={127} onOpen={openDurationAdjustment} onChange={(seconds) => onChange({ seconds: seconds ?? 0 })} /></div>
       </aside>
     </section> : <section className="pb-stage__conditions-panel" role="tabpanel" aria-label="Move on conditions">
       <div className="pb-stage__conditions-controls">
@@ -340,11 +457,11 @@ function StageEditorCard({ stage, index, active, isLastStage, onActivate, onChan
         <div className="pb-condition-column">
           <div className="pb-condition pb-condition--simple" data-builder-field="volume" data-validation-severity={fieldSeverity('volume')}>
             <small>Move on volume</small>
-            <Stepper label="Move on volume" value={stage.volume > 0 ? stage.volume : undefined} unit="ml" step={1} onChange={(volume) => onChange({ volume: volume ?? 0 })} />
+            <Stepper label="Move on volume" value={stage.volume > 0 ? stage.volume : undefined} unit="ml" step={1} max={1023} onOpen={openVolumeAdjustment} onChange={(volume) => onChange({ volume: volume ?? 0 })} />
           </div>
           <div className={`pb-condition pb-condition--simple${isLastStage ? ' is-disabled' : ''}`} data-builder-field="weight" data-validation-severity={fieldSeverity('weight')}>
             <small>Move on yield</small>
-            <Stepper label="Move on yield" value={stage.weight} unit="g" step={0.1} disabled={isLastStage} onChange={(weight) => onChange({ weight })} />
+            <Stepper label="Move on yield" value={stage.weight} unit="g" step={0.1} disabled={isLastStage} onOpen={openYieldAdjustment} onChange={(weight) => onChange({ weight })} />
           </div>
         </div>
       </div>

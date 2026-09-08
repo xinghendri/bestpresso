@@ -6,10 +6,12 @@ import { profileAuthorForAccount } from '../src/features/profiles/profileAuthor.
 import { assertVerifiedProfileRecord, canonicalProfileForVerification } from '../src/features/profiles/profileSaveVerification.ts'
 import { nextBuilderStepperValue } from '../src/features/profiles/profileBuilderStepper.ts'
 import { validateProfileDraft } from '../src/features/profiles/profileBuilderValidation.ts'
+import { VALUE_ADJUSTMENTS } from '../src/domain/valueAdjustments.ts'
 
 const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
 const profilesPanel = readFileSync(new URL('../src/features/profiles/ProfilesPanel.tsx', import.meta.url), 'utf8')
 const screen = readFileSync(new URL('../src/features/profiles/ProfileBuilderScreen.tsx', import.meta.url), 'utf8')
+const valueAdjustmentScreen = readFileSync(new URL('../src/components/ValueAdjustment/ValueAdjustmentProvider.tsx', import.meta.url), 'utf8')
 const feature = readFileSync(new URL('../src/features/profiles/profileBuilderFeature.ts', import.meta.url), 'utf8')
 const appShell = readFileSync(new URL('../src/app/AppShell.tsx', import.meta.url), 'utf8')
 const brewingData = readFileSync(new URL('../src/features/brew/useBrewingData.ts', import.meta.url), 'utf8')
@@ -27,7 +29,7 @@ test('keeps the unfinished profile builder hidden in normal releases while allow
   assert.match(feature, /if \(import\.meta\.env\.PROD\) return enabledValue\(import\.meta\.env\.VITE_ENABLE_PROFILE_BUILDER_RC\)/)
   assert.match(feature, /VITE_ENABLE_PROFILE_BUILDER/)
   assert.match(profilesPanel, /editingEnabled = false/)
-  assert.match(profilesPanel, /editingEnabled && <button className="profiles-icon-button profiles-add"/)
+  assert.match(profilesPanel, /editingEnabled && <div className="profiles-add-control"/)
 })
 
 test('four quick taps on the Decent logo enable profile editing for the current session', () => {
@@ -40,13 +42,18 @@ test('four quick taps on the Decent logo enable profile editing for the current 
   assert.match(appShell, /className="topbar__logo"[\s\S]*?onClick=\{handleLogoTap\}/)
 })
 
-test('profile builder entry points support create, safe copy, and user-owned editing without import', () => {
+test('profile builder entry points support create, import, safe copy, and user-owned editing', () => {
   assert.match(app, /const creatingProfile = builderEnabled && page === 'profile-builder' && !profileId/)
-  assert.match(app, /onAddProfile=\{\(\) => navigate\('profile-builder'\)\}/)
+  assert.match(app, /onStartProfile=\{startProfileFromScratch\}/)
+  assert.match(app, /onImportProfile=\{editImportedProfile\}/)
+  assert.match(app, /onCheckVisualizer=\{checkVisualizerImport\}/)
+  assert.match(app, /onImportVisualizer=\{importFromVisualizer\}/)
   assert.match(app, /profileEditMode=\{\(selectedProfileId\) => data\.profileRecordForEditing\(selectedProfileId\)\?\.isDefault === false \? 'edit' : 'copy'\}/)
-  assert.match(profilesPanel, /aria-label="Create profile"/)
+  assert.match(profilesPanel, /aria-label="Add profile"/)
+  assert.match(profilesPanel, /Import from \.json/)
+  assert.match(profilesPanel, /Import from Visualizer/)
+  assert.match(profilesPanel, /Start from scratch/)
   assert.match(profilesPanel, /profileEditMode\?\.\(profileId\) === 'edit' \? 'Edit profile' : 'Edit a copy'/)
-  assert.doesNotMatch(profilesPanel, /Import and edit/)
 })
 
 test('cancel protects a changed profile draft while leaving an untouched draft immediately closable', () => {
@@ -95,7 +102,7 @@ test('edit-copy authorship uses a logged-in username and a privacy-safe fallback
 
 test('saving a copy opens its detail without selecting or uploading it', () => {
   const saveImplementation = brewingData.slice(brewingData.indexOf('const saveProfileDraft'), brewingData.indexOf('const selectProfile'))
-  assert.match(app, /onSaved=\{\(created\) => navigate\('profiles', created\.id\)\}/)
+  assert.match(app, /onSaved=\{\(created\) => \{ setImportedProfileRecord\(undefined\); navigate\('profiles', created\.id\) \}\}/)
   assert.doesNotMatch(saveImplementation, /setMachineProfile|updateWorkflow\(/)
   assert.doesNotMatch(saveImplementation, /getWorkflow\(/)
   assert.match(saveImplementation, /createProfile\(authoredProfile, sourceProfileId, metadata\)/)
@@ -340,6 +347,34 @@ test('profile-builder steppers keep precise taps and use whole units while held'
   assert.equal(nextBuilderStepperValue(undefined, -1, 0.1, 0, 12, true), undefined)
   assert.match(screen, /setInterval\(\(\) => change\(direction, true\), 160\)/)
   assert.match(screen, /if \(!held && !cancelled\) change\(direction, false\)/)
+})
+
+test('every numeric stage setting opens the shared fullscreen ruler', () => {
+  for (const handler of [
+    'openTargetAdjustment',
+    'openTemperatureAdjustment',
+    'openLimiterAdjustment',
+    'openDurationAdjustment',
+    'openThresholdAdjustment',
+    'openVolumeAdjustment',
+    'openYieldAdjustment',
+  ]) assert.match(screen, new RegExp(`onOpen=\\{${handler}\\}`))
+  assert.match(screen, /Open \$\{label\} fullscreen adjustment/)
+  assert.match(styles, /\.pb-stepper__value\.is-adjustable\{[^}]*cursor:pointer/)
+})
+
+test('fullscreen stage dials switch pressure, flow, and threshold direction in place', () => {
+  assert.equal(VALUE_ADJUSTMENTS.builderPressure.max, 15.9)
+  assert.equal(VALUE_ADJUSTMENTS.builderFlow.max, 15.9)
+  assert.equal(VALUE_ADJUSTMENTS.builderVolume.max, 1023)
+  assert.equal(VALUE_ADJUSTMENTS.builderYield.max, 1000)
+  assert.match(screen, /selectedVariantId: stage\.pump/)
+  assert.match(screen, /variants: \(\['over', 'under'\] as const\)/)
+  assert.match(screen, /label: `\$\{comparisonLabel\} \$\{variantCondition === 'over' \? '>' : '<'\}`/)
+  assert.match(screen, /onChange\(\{ \.\.\.switched\.patch, target \}\)/)
+  assert.match(valueAdjustmentScreen, /className="value-adjuster__variants" role="tablist"/)
+  assert.match(valueAdjustmentScreen, /const nextRequest = \{ \.\.\.request, \.\.\.nextVariant \}/)
+  assert.match(valueAdjustmentScreen, /request\.onSave\(savedValue, activeVariantId\)/)
 })
 
 test('profile maximum duration remains the sum of stage guardrails', () => {

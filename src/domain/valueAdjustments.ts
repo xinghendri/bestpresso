@@ -1,6 +1,14 @@
 import type { EditableMachineSetting, EditableProfileSetting } from './brewing'
 
-export type ValueAdjustmentKey = EditableMachineSetting | EditableProfileSetting
+export type BuilderValueAdjustmentKey =
+  | 'builderPressure'
+  | 'builderFlow'
+  | 'builderTemperature'
+  | 'builderDuration'
+  | 'builderVolume'
+  | 'builderYield'
+
+export type ValueAdjustmentKey = EditableMachineSetting | EditableProfileSetting | BuilderValueAdjustmentKey
 export type ValueAdjustmentMode = 'integer' | 'decimal'
 
 export interface FixedValueSuggestion {
@@ -96,5 +104,53 @@ export const VALUE_ADJUSTMENTS = {
     mode: 'decimal',
     defaultValue: 36,
     suggestions: [14, 18, 20, 36, 40, 44, 48, 50],
+  },
+  builderPressure: {
+    title: 'Pressure',
+    min: 0,
+    max: 15.9,
+    step: 0.1,
+    mode: 'decimal',
+    suggestions: [2, 4, 6, 8, 9, 10, 12],
+  },
+  builderFlow: {
+    title: 'Flow',
+    min: 0,
+    max: 15.9,
+    step: 0.1,
+    mode: 'decimal',
+    suggestions: [1, 2, 3, 4, 6, 8],
+  },
+  builderTemperature: {
+    title: 'Temperature',
+    min: 0,
+    max: 127.5,
+    step: 0.5,
+    mode: 'decimal',
+    suggestions: [80, 85, 90, 93, 95, 100],
+  },
+  builderDuration: {
+    title: 'Max time',
+    min: 0,
+    max: 127,
+    step: 1,
+    mode: 'integer',
+    suggestions: [5, 10, 15, 20, 30, 40, 60],
+  },
+  builderVolume: {
+    title: 'Move on volume',
+    min: 0,
+    max: 1023,
+    step: 1,
+    mode: 'integer',
+    suggestions: [10, 20, 30, 40, 60, 100],
+  },
+  builderYield: {
+    title: 'Move on yield',
+    min: 0,
+    max: 1000,
+    step: 0.1,
+    mode: 'decimal',
+    suggestions: [10, 20, 30, 36, 40, 50],
   },
 } as const satisfies Record<ValueAdjustmentKey, ValueAdjustmentDefinition>

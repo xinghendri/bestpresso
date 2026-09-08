@@ -11,6 +11,7 @@ import profilesSearchIcon from '../../assets/figma/profiles-search.svg'
 import { isCleaningProfile, sortProfilesForDirectory } from '../../api/decaid/adapters'
 import type { BrewProfile, SettingFeedback } from '../../domain/brewing'
 import { ProfileTargetChart } from '../brew/ProfileTargetChart'
+import { isVisualizerShareCode, normalizeVisualizerShareCode, parseProfileImport, type ParsedProfileImport } from './profileImports'
 
 type ProfileEditMode = 'copy' | 'edit'
 
@@ -26,11 +27,15 @@ interface ProfilesPanelProps {
   onSetFavoriteSlot: (profileId: string, slot: number) => Promise<boolean>
   onRemoveFavorite: (profileId: string) => Promise<boolean>
   onClose: () => void
-  onAddProfile?: () => void
+  onStartProfile?: () => void
+  onImportProfile?: (profile: ParsedProfileImport) => void
+  onCheckVisualizer?: () => Promise<{ ready: boolean; message?: string }>
+  onImportVisualizer?: (shareCode: string) => Promise<void>
+  onOpenSettings?: () => void
   onEditProfile?: (profileId: string) => void
 }
 
-export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId, initialProfileId, editingEnabled = false, profileEditMode, feedback, onSelectProfile, onSetFavoriteSlot, onRemoveFavorite, onClose, onAddProfile, onEditProfile }: ProfilesPanelProps) {
+export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId, initialProfileId, editingEnabled = false, profileEditMode, feedback, onSelectProfile, onSetFavoriteSlot, onRemoveFavorite, onClose, onStartProfile, onImportProfile, onCheckVisualizer, onImportVisualizer, onOpenSettings, onEditProfile }: ProfilesPanelProps) {
   const [selectedProfileId, setSelectedProfileId] = useState(initialProfileId ?? activeProfileId ?? profiles[0]?.id)
   const [activeCategory, setActiveCategory] = useState('All')
   const [searchOpen, setSearchOpen] = useState(false)
@@ -40,6 +45,14 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
   const [pendingProfileId, setPendingProfileId] = useState<string | null>(null)
   const [replacementProfileId, setReplacementProfileId] = useState<string | null>(null)
   const [scrollTargetProfileId, setScrollTargetProfileId] = useState<string | null>(initialProfileId ?? null)
+  const [addMenuOpen, setAddMenuOpen] = useState(false)
+  const [addError, setAddError] = useState<string | null>(null)
+  const [visualizerOpen, setVisualizerOpen] = useState(false)
+  const [visualizerCode, setVisualizerCode] = useState('')
+  const [visualizerStatus, setVisualizerStatus] = useState<'checking' | 'ready' | 'unavailable' | 'importing'>('checking')
+  const [visualizerMessage, setVisualizerMessage] = useState<string | null>(null)
+  const addMenu = useRef<HTMLDivElement>(null)
+  const profileFileInput = useRef<HTMLInputElement>(null)
 
   const favoriteIds = favoriteProfileSlots.filter((id): id is string => Boolean(id))
   const favoriteIdSet = new Set(favoriteIds)
@@ -80,6 +93,31 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
     })
     return () => window.cancelAnimationFrame(frame)
   }, [scrollTargetProfileId, activeCategory, searchQuery])
+
+  useEffect(() => {
+    if (!addMenuOpen) return
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!addMenu.current?.contains(event.target as Node)) setAddMenuOpen(false)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setAddMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutsidePress)
+    window.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePress)
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [addMenuOpen])
+
+  useEffect(() => {
+    if (!visualizerOpen) return
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && visualizerStatus !== 'importing') setVisualizerOpen(false)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [visualizerOpen, visualizerStatus])
 
   const selectPreview = (profileId: string) => {
     setSelectedProfileId(profileId)
@@ -136,6 +174,42 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
     if (replaced) setReplacementProfileId(null)
   }
 
+  const chooseJsonProfile = async (file: File | undefined) => {
+    if (!file) return
+    setAddError(null)
+    try {
+      const imported = parseProfileImport(await file.text())
+      setAddMenuOpen(false)
+      onImportProfile?.(imported)
+    } catch (error) {
+      setAddError(error instanceof Error ? error.message : 'That profile could not be imported.')
+      setAddMenuOpen(true)
+    }
+  }
+
+  const openVisualizerImport = async () => {
+    setAddMenuOpen(false)
+    setVisualizerOpen(true)
+    setVisualizerCode('')
+    setVisualizerMessage(null)
+    setVisualizerStatus('checking')
+    const availability = await onCheckVisualizer?.() ?? { ready: false, message: 'Visualizer import is not available.' }
+    setVisualizerStatus(availability.ready ? 'ready' : 'unavailable')
+    setVisualizerMessage(availability.message ?? null)
+  }
+
+  const submitVisualizerImport = async () => {
+    if (!isVisualizerShareCode(visualizerCode) || visualizerStatus !== 'ready') return
+    setVisualizerStatus('importing')
+    setVisualizerMessage(null)
+    try {
+      await onImportVisualizer?.(visualizerCode)
+    } catch (error) {
+      setVisualizerStatus('ready')
+      setVisualizerMessage(error instanceof Error ? error.message : 'That share code could not be imported.')
+    }
+  }
+
   return <main className="app-shell profiles-page">
     <header className="profiles-header">
       <div className="profiles-header__title">
@@ -150,9 +224,34 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
           </label>
           <button className="profiles-icon-button profiles-search" type="button" aria-controls="profiles-search-input" aria-expanded={searchOpen} onClick={() => { setSearchOpen((current) => !current); if (searchOpen) setSearchQuery('') }} aria-label={searchOpen ? 'Close profile search' : 'Search profiles'}><img src={profilesSearchIcon} alt="" /></button>
         </div>
-        {editingEnabled && <button className="profiles-icon-button profiles-add" type="button" onClick={onAddProfile} aria-label="Create profile" title="Create profile"><img src={profilesAddIcon} alt="" /></button>}
+        {editingEnabled && <div className="profiles-add-control" ref={addMenu}>
+          <button className="profiles-icon-button profiles-add" type="button" onClick={() => { setAddError(null); setAddMenuOpen((current) => !current) }} aria-label="Add profile" title="Add profile" aria-haspopup="menu" aria-expanded={addMenuOpen}><img src={profilesAddIcon} alt="" /></button>
+          {addMenuOpen && <div className="profiles-add-menu" role="menu" aria-label="Add a profile">
+            <div className="profiles-add-menu__heading"><strong>Add a profile</strong><small>How would you like to begin?</small></div>
+            <button type="button" role="menuitem" onClick={() => profileFileInput.current?.click()}><span className="profiles-add-menu__icon profiles-add-menu__icon--json" aria-hidden="true">{'{ }'}</span><span><strong>Import from .json</strong><small>Choose a profile file</small></span></button>
+            <button type="button" role="menuitem" onClick={() => void openVisualizerImport()}><span className="profiles-add-menu__icon" aria-hidden="true">↗</span><span><strong>Import from Visualizer</strong><small>Use a 4-digit share code</small></span></button>
+            <button type="button" role="menuitem" onClick={() => { setAddMenuOpen(false); onStartProfile?.() }}><span className="profiles-add-menu__icon" aria-hidden="true">＋</span><span><strong>Start from scratch</strong><small>Build a new profile</small></span></button>
+            {addError && <p className="profiles-add-menu__error" role="alert">{addError}</p>}
+          </div>}
+          <input ref={profileFileInput} className="profiles-file-input" type="file" accept=".json,application/json" tabIndex={-1} onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; void chooseJsonProfile(file) }} />
+        </div>}
       </div>
     </header>
+
+    {visualizerOpen && <div className="profiles-import-backdrop" role="presentation" onPointerDown={(event) => { if (event.target === event.currentTarget && visualizerStatus !== 'importing') setVisualizerOpen(false) }}>
+      <section className="profiles-import-modal" role="dialog" aria-modal="true" aria-labelledby="visualizer-import-title">
+        <div className="profiles-import-modal__heading"><div><small>ADD PROFILE</small><h2 id="visualizer-import-title">Import from Visualizer</h2></div><button type="button" disabled={visualizerStatus === 'importing'} onClick={() => setVisualizerOpen(false)} aria-label="Close Visualizer import">×</button></div>
+        <p>Enter the four-digit share code from visualizer.coffee.</p>
+        <label className="profiles-share-code"><span>Share code</span><input autoFocus inputMode="numeric" pattern="[0-9]*" autoComplete="one-time-code" maxLength={4} value={visualizerCode} disabled={visualizerStatus !== 'ready'} placeholder="0000" onChange={(event) => setVisualizerCode(normalizeVisualizerShareCode(event.target.value))} onKeyDown={(event) => { if (event.key === 'Enter') void submitVisualizerImport() }} /></label>
+        {visualizerStatus === 'checking' && <p className="profiles-import-modal__status">Checking your Visualizer connection…</p>}
+        {visualizerMessage && <p className="profiles-import-modal__status profiles-import-modal__status--error" role="alert">{visualizerMessage}</p>}
+        <div className="profiles-import-modal__actions">
+          {visualizerStatus === 'unavailable' && <button type="button" className="profiles-import-modal__settings" onClick={onOpenSettings}>Open Decaid settings</button>}
+          <button type="button" className="profiles-import-modal__cancel" disabled={visualizerStatus === 'importing'} onClick={() => setVisualizerOpen(false)}>Cancel</button>
+          <button type="button" className="profiles-import-modal__submit" disabled={visualizerStatus !== 'ready' || !isVisualizerShareCode(visualizerCode)} onClick={() => void submitVisualizerImport()}>{visualizerStatus === 'importing' ? 'Importing…' : 'Import profile'}</button>
+        </div>
+      </section>
+    </div>}
 
     {feedback?.status === 'error' && <div className="system-messages"><div className="system-message system-message--error" role="alert">{feedback.message}</div></div>}
 

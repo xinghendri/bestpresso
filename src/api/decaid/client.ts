@@ -1,6 +1,13 @@
 import { getDecaidEndpoints } from './config'
 import type { DecaidDevice, DecaidMachineSettings, DecaidProfile, DecaidProfileRecord, DecaidSettings, DecaidWorkflow, DecaidWorkflowPatch, DecentAccountStatus, DisplayState, FavoriteAssignments, PaginatedShots, ScalePowerMode, ShotRecord } from './types'
 
+export interface DecaidPluginManifest {
+  id?: string
+  name?: string
+  loaded?: boolean
+  autoLoad?: boolean
+}
+
 export class DecaidApiError extends Error {
   status: number
   type?: string
@@ -41,6 +48,18 @@ export const getDisplayState = () => getJson<DisplayState>('/display')
 export const getSettings = () => getJson<DecaidSettings>('/settings')
 export const getMachineSettings = () => getJson<DecaidMachineSettings>('/machine/settings')
 export const getDecentAccountStatus = () => getJson<DecentAccountStatus>('/account/decent')
+export const getPlugins = () => getJson<DecaidPluginManifest[]>('/plugins')
+export const getPluginSettings = (pluginId: string) => getJson<Record<string, unknown>>(`/plugins/${encodeURIComponent(pluginId)}/settings`)
+
+export async function callPluginEndpoint<T>(pluginId: string, endpoint: string, body: Record<string, unknown>) {
+  const response = await fetch(`${getDecaidEndpoints().apiBase}/plugins/${encodeURIComponent(pluginId)}/${encodeURIComponent(endpoint)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) throw await responseError(response, `${pluginId} ${endpoint} returned ${response.status}`)
+  return await response.json() as T
+}
 
 export async function createProfile(profile: DecaidProfile, parentId?: string, metadata?: Record<string, unknown> | null) {
   const response = await fetch(`${getDecaidEndpoints().apiBase}/profiles`, {
