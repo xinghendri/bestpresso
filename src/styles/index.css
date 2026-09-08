@@ -372,6 +372,7 @@ body { min-width:0; min-height:0; background:#171717; }
   stroke-linecap:butt;
   stroke-linejoin:miter;
 }
+.history-card .mini-chart .chart-line { stroke-width:2; }
 .chart-legend__sample { height:3px; border-radius:0; }
 .profile-card--left .profile-card__chart,
 .profile-card--right .profile-card__chart { opacity:.14; }
