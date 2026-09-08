@@ -62,10 +62,14 @@ interface DragState {
 const pointerCenter = (pointers: Map<number, number>) => [...pointers.values()].reduce((sum, position) => sum + position, 0) / Math.max(1, pointers.size)
 
 function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentRequest; onClose: () => void }) {
-  const mode = request.mode
-  const activeRequest = request
-  const allowThreeFingerGesture = request.suggestionKey === 'grindSetting' || request.suggestionKey === 'targetYield'
-  const [value, setValue] = useState(() => normalizedValue(request.value, request))
+  const initialVariant = request.variants?.find((variant) => variant.id === request.selectedVariantId) ?? request.variants?.[0]
+  const [activeVariantId, setActiveVariantId] = useState(initialVariant?.id)
+  const variantValues = useRef<Record<string, number>>(Object.fromEntries(request.variants?.map((variant) => [variant.id, variant.value]) ?? []))
+  const activeVariant = request.variants?.find((variant) => variant.id === activeVariantId)
+  const activeRequest = useMemo<ValueAdjustmentRequest>(() => activeVariant ? { ...request, ...activeVariant } : request, [activeVariant, request])
+  const mode = activeRequest.mode
+  const allowThreeFingerGesture = activeRequest.suggestionKey === 'grindSetting' || activeRequest.suggestionKey === 'targetYield' || activeRequest.suggestionKey === 'builderYield'
+  const [value, setValue] = useState(() => normalizedValue(initialVariant?.value ?? request.value, initialVariant ? { ...request, ...initialVariant } : request))
   const [visualValue, setVisualValue] = useState(value)
   const ruler = useRef<HTMLDivElement>(null)
   const drag = useRef<DragState | null>(null)
@@ -86,21 +90,21 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const [gestureTip, setGestureTip] = useState<string | null>(null)
   const [draftValue, setDraftValue] = useState(formatValue(value, mode))
   const draftValueRef = useRef(draftValue)
-  const draftRangeIssue = editingValue ? numericDraftRangeIssue(draftValue, request.min, request.max) : null
+  const draftRangeIssue = editingValue ? numericDraftRangeIssue(draftValue, activeRequest.min, activeRequest.max) : null
   const directInputError = draftRangeIssue === 'above'
-    ? `Maximum is ${request.max.toLocaleString()}.`
+    ? `Maximum is ${activeRequest.max.toLocaleString()}.`
     : draftRangeIssue === 'below'
-      ? `Minimum is ${request.min.toLocaleString()}.`
+      ? `Minimum is ${activeRequest.min.toLocaleString()}.`
       : draftRangeIssue === 'required' ? 'Enter a number.' : null
   const [suggestionStore, setSuggestionStore] = useState<SuggestionStore>(readSuggestionStore)
   const suggestionStoreRef = useRef(suggestionStore)
-  const hasSuggestionHistory = Object.prototype.hasOwnProperty.call(suggestionStore, request.suggestionKey)
+  const hasSuggestionHistory = Object.prototype.hasOwnProperty.call(suggestionStore, activeRequest.suggestionKey)
   const presets = useMemo(() => {
-    const source = hasSuggestionHistory ? suggestionStore[request.suggestionKey] ?? [] : request.presets ?? []
+    const source = hasSuggestionHistory ? suggestionStore[activeRequest.suggestionKey] ?? [] : activeRequest.presets ?? []
     const values = normalizedSuggestions(source, activeRequest)
     return [...values].sort((first, second) => first - second)
-  }, [activeRequest, hasSuggestionHistory, request, suggestionStore])
-  const valueHint = request.valueHint?.(normalizedValue(visualValue, activeRequest))
+  }, [activeRequest, hasSuggestionHistory, suggestionStore])
+  const valueHint = activeRequest.valueHint?.(normalizedValue(visualValue, activeRequest))
   const centerLabel = Math.round(visualValue)
   const labels = Array.from({ length: 9 }, (_, index) => centerLabel + index - 4)
   const minorTickStep = mode === 'decimal' ? 0.1 : 0.25
@@ -230,8 +234,8 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const rememberSuggestion = useCallback((nextValue: number, adjustment = activeRequest) => {
     const selected = normalizedValue(nextValue, adjustment)
     const current = suggestionStoreRef.current
-    const hasHistory = Object.prototype.hasOwnProperty.call(current, request.suggestionKey)
-    const source = hasHistory ? current[request.suggestionKey] ?? [] : request.presets ?? []
+    const hasHistory = Object.prototype.hasOwnProperty.call(current, adjustment.suggestionKey)
+    const source = hasHistory ? current[adjustment.suggestionKey] ?? [] : adjustment.presets ?? []
     const existing = normalizedSuggestions(source, adjustment)
     const alreadyIncluded = existing.includes(selected)
     let next = existing.filter((suggestion) => suggestion !== selected)
@@ -245,11 +249,11 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     }
 
     next.push(selected)
-    const updated = { ...current, [request.suggestionKey]: next.slice(-MAX_VALUE_SUGGESTIONS) }
+    const updated = { ...current, [adjustment.suggestionKey]: next.slice(-MAX_VALUE_SUGGESTIONS) }
     suggestionStoreRef.current = updated
     writeSuggestionStore(updated)
     setSuggestionStore(updated)
-  }, [activeRequest, request])
+  }, [activeRequest])
 
   const selectPreset = (preset: number) => {
     fixedSelection.current = null
@@ -319,7 +323,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     directEntryAnimation.current = null
     const normalizedDraft = normalizedNumericDraft(draftValueRef.current)
     const parsed = Number(normalizedDraft)
-    if (numericDraftRangeIssue(normalizedDraft, request.min, request.max)) return
+    if (numericDraftRangeIssue(normalizedDraft, activeRequest.min, activeRequest.max)) return
     if (Number.isFinite(parsed) && normalizedDraft !== '') {
       const nextValue = normalizedValue(parsed, activeRequest)
       stopAnimation()
@@ -337,10 +341,10 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
   const saveAdjustment = () => {
     const normalizedDraft = normalizedNumericDraft(draftValueRef.current)
     const parsedDraft = Number(normalizedDraft)
-    if (editingValue && numericDraftRangeIssue(normalizedDraft, request.min, request.max)) return
+    if (editingValue && numericDraftRangeIssue(normalizedDraft, activeRequest.min, activeRequest.max)) return
     const savedValue = editingValue && Number.isFinite(parsedDraft) && normalizedDraft !== '' ? normalizedValue(parsedDraft, activeRequest) : value
     if (fixedSelection.current !== savedValue) rememberSuggestion(savedValue)
-    request.onSave(savedValue)
+    request.onSave(savedValue, activeVariantId)
     onClose()
   }
 
@@ -386,7 +390,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (editingValue) {
-      const rangeIssue = numericDraftRangeIssue(draftValueRef.current, request.min, request.max)
+      const rangeIssue = numericDraftRangeIssue(draftValueRef.current, activeRequest.min, activeRequest.max)
       if (rangeIssue) cancelDirectEntry()
       else commitDirectEntry()
     }
@@ -449,7 +453,7 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
       return
     }
     drag.current = null
-    if (activeDrag.moved && activeDrag.maxPointers === 1 && !gestureTipShown.current && (request.suggestionKey === 'grindSetting' || request.suggestionKey === 'targetYield')) {
+    if (activeDrag.moved && activeDrag.maxPointers === 1 && !gestureTipShown.current && (activeRequest.suggestionKey === 'grindSetting' || activeRequest.suggestionKey === 'targetYield' || activeRequest.suggestionKey === 'builderYield')) {
       completedSingleFingerSwipes.current += 1
       if (completedSingleFingerSwipes.current > 3) {
         gestureTipShown.current = true
@@ -465,9 +469,34 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     else setImmediateValue(selectedValue)
   }
 
-  const hasFixedSuggestions = Boolean(request.fixedSuggestions?.length)
+  const selectVariant = (variantId: string) => {
+    if (variantId === activeVariantId) return
+    const nextVariant = request.variants?.find((variant) => variant.id === variantId)
+    if (!nextVariant) return
+    if (activeVariantId) variantValues.current[activeVariantId] = normalizedValue(visualValueRef.current, activeRequest)
+    const nextRequest = { ...request, ...nextVariant }
+    const nextValue = normalizedValue(variantValues.current[variantId] ?? nextVariant.value, nextRequest)
+    stopAnimation()
+    if (directEntryAnimation.current !== null) window.clearTimeout(directEntryAnimation.current)
+    directEntryAnimation.current = null
+    drag.current = null
+    fixedSelection.current = null
+    visualValueRef.current = nextValue
+    lastFeedbackValue.current = nextValue
+    directEntryStart.current = nextValue
+    const nextDraft = formatValue(nextValue, nextRequest.mode)
+    draftValueRef.current = nextDraft
+    setDraftValue(nextDraft)
+    setEditingValue(false)
+    setVisualValue(nextValue)
+    setValue(nextValue)
+    setActiveVariantId(variantId)
+    requestAnimationFrame(() => ruler.current?.focus())
+  }
 
-  return <main className={`value-adjuster value-adjuster--${mode}${hasFixedSuggestions ? ' value-adjuster--has-fixed-suggestions' : ''}${editingValue ? ' value-adjuster--keyboard' : ''}`} aria-label={`Adjust ${request.label}`}>
+  const hasFixedSuggestions = Boolean(activeRequest.fixedSuggestions?.length)
+
+  return <main className={`value-adjuster value-adjuster--${mode}${request.variants?.length ? ' value-adjuster--has-variants' : ''}${hasFixedSuggestions ? ' value-adjuster--has-fixed-suggestions' : ''}${editingValue ? ' value-adjuster--keyboard' : ''}`} aria-label={`Adjust ${request.label}`}>
     {gestureTip && <div className="system-messages"><div className="system-message value-adjuster__gesture-tip" role="status" aria-live="polite"><span className="value-adjuster__gesture-tip-icon" aria-hidden="true">i</span><span>{gestureTip}</span></div></div>}
     <header className="value-adjuster__header">
       <img className="logo" src={logo} alt="decent" />
@@ -475,14 +504,17 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     </header>
     <section className="value-adjuster__body">
       <p>{request.label}</p>
+      {request.variants && request.variants.length > 1 && <div className="value-adjuster__variants" role="tablist" aria-label={`${request.label} options`}>
+        {request.variants.map((variant) => <button key={variant.id} type="button" role="tab" aria-selected={variant.id === activeVariantId} className={variant.id === activeVariantId ? 'is-selected' : ''} onClick={() => selectVariant(variant.id)}>{variant.label}</button>)}
+      </div>}
       <div className="value-adjuster__value" aria-live="polite">
         {editingValue
-          ? <span className="value-adjuster__direct-value" aria-label={`${request.label}, ${draftValue || 'empty'}`}><span ref={directDraftText} className="value-adjuster__direct-number">{draftValue || '—'}</span>{request.unit && <small>{request.unit}</small>}</span>
-          : <button type="button" onClick={beginDirectEntry} aria-label={`Enter ${request.label} with keypad`}>{formatValue(visualValue, mode)}{request.unit && <small>{request.unit}</small>}</button>}
+          ? <span className="value-adjuster__direct-value" aria-label={`${request.label}, ${draftValue || 'empty'}`}><span ref={directDraftText} className="value-adjuster__direct-number">{draftValue || '—'}</span>{activeRequest.unit && <small>{activeRequest.unit}</small>}</span>
+          : <button type="button" onClick={beginDirectEntry} aria-label={`Enter ${request.label} with keypad`}>{formatValue(visualValue, mode)}{activeRequest.unit && <small>{activeRequest.unit}</small>}</button>}
       </div>
       {directInputError && <p className="value-adjuster__validation" role="alert">{directInputError}</p>}
       {valueHint && <div className="value-adjuster__value-hint"><span>{valueHint}</span></div>}
-      <div ref={ruler} className="value-adjuster__scrubber" role="slider" tabIndex={0} aria-label={request.label} aria-valuemin={activeRequest.min} aria-valuemax={activeRequest.max} aria-valuenow={value} aria-valuetext={`${formatValue(value, mode)}${request.unit ?? ''}${valueHint ? `, ${valueHint}` : ''}`} onKeyDown={handleKeyDown} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={endDrag} onPointerCancel={endDrag}>
+      <div ref={ruler} className="value-adjuster__scrubber" role="slider" tabIndex={0} aria-label={request.label} aria-valuemin={activeRequest.min} aria-valuemax={activeRequest.max} aria-valuenow={value} aria-valuetext={`${formatValue(value, mode)}${activeRequest.unit ?? ''}${valueHint ? `, ${valueHint}` : ''}`} onKeyDown={handleKeyDown} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={endDrag} onPointerCancel={endDrag}>
         <div className="value-adjuster__scrubber-track">
           <div className="value-adjuster__labels" aria-hidden="true">{labels.map((label, index) => {
             const inRange = label >= activeRequest.min && label <= activeRequest.max
@@ -498,11 +530,11 @@ function ValueAdjustmentScreen({ request, onClose }: { request: ValueAdjustmentR
     </section>
     {editingValue && <NumericKeypad disabled={Boolean(directInputError)} label={request.label} onDelete={deleteKeypadKey} onDismiss={() => { playKeypadFeedback(); commitDirectEntry() }} onKey={pressKeypadKey} />}
     {!editingValue && <footer className="value-adjuster__presets">
-      <div className="value-adjuster__preset-row" aria-label={`${request.label} suggestions`}>{presets.map((preset) => <button key={preset} type="button" className={preset === value ? 'value-adjuster__preset value-adjuster__preset--active' : 'value-adjuster__preset'} onClick={() => selectPreset(preset)}>{formatSuggestion(preset, mode)}{request.unit && <small>{request.unit}</small>}</button>)}</div>
-      {request.fixedSuggestions && <div className="value-adjuster__preset-row value-adjuster__preset-row--fixed" aria-label={`${request.label} typical ratios`}>{request.fixedSuggestions.map((suggestion) => {
+      <div className="value-adjuster__preset-row" aria-label={`${request.label} suggestions`}>{presets.map((preset) => <button key={preset} type="button" className={preset === value ? 'value-adjuster__preset value-adjuster__preset--active' : 'value-adjuster__preset'} onClick={() => selectPreset(preset)}>{formatSuggestion(preset, mode)}{activeRequest.unit && <small>{activeRequest.unit}</small>}</button>)}</div>
+      {activeRequest.fixedSuggestions && <div className="value-adjuster__preset-row value-adjuster__preset-row--fixed" aria-label={`${request.label} typical ratios`}>{activeRequest.fixedSuggestions.map((suggestion) => {
         const available = Number.isFinite(suggestion.value) && suggestion.value >= activeRequest.min && suggestion.value <= activeRequest.max
         const suggestionValue = available ? normalizedValue(suggestion.value, activeRequest) : suggestion.value
-        return <button key={suggestion.label} type="button" className={available && suggestionValue === value ? 'value-adjuster__fixed-preset value-adjuster__fixed-preset--active' : 'value-adjuster__fixed-preset'} disabled={!available} aria-label={`${suggestion.label}, ${formatSuggestion(suggestion.value, mode)}${request.unit ?? ''}, ${suggestion.detail}`} onClick={() => { fixedSelection.current = suggestionValue; prepareAudioFeedback(); animateToValue(suggestionValue) }}>{suggestion.label}</button>
+        return <button key={suggestion.label} type="button" className={available && suggestionValue === value ? 'value-adjuster__fixed-preset value-adjuster__fixed-preset--active' : 'value-adjuster__fixed-preset'} disabled={!available} aria-label={`${suggestion.label}, ${formatSuggestion(suggestion.value, mode)}${activeRequest.unit ?? ''}, ${suggestion.detail}`} onClick={() => { fixedSelection.current = suggestionValue; prepareAudioFeedback(); animateToValue(suggestionValue) }}>{suggestion.label}</button>
       })}</div>}
     </footer>}
   </main>
