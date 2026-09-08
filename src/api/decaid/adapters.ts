@@ -1,7 +1,8 @@
-import type { BrewProfile, BrewingScreenModel, PreviousShot, ProfileTargetPoint } from '../../domain/brewing'
+import type { BrewProfile, BrewingScreenModel, PreviousShot } from '../../domain/brewing'
 import { isSteamHeatingEnabled } from '../../features/machine/steamHeating'
+import { profileStepsToTargetPoints } from './profileTargetPoints.ts'
 import { profileConfiguredTargetYield, profileTargetYield } from './profileWorkflow'
-import type { DecaidProfileRecord, DecaidProfileStep, DecaidWorkflow, FavoriteAssignments, ShotRecord } from './types'
+import type { DecaidProfileRecord, DecaidWorkflow, FavoriteAssignments, ShotRecord } from './types'
 
 const MM_TO_ML = [0,16,43,70,97,124,151,179,206,233,261,288,316,343,371,398,426,453,481,509,537,564,592,620,648,676,704,732,760,788,816,844,872,900,929,957,985,1013,1042,1070,1104,1138,1172,1207,1242,1277,1312,1347,1382,1417,1453,1488,1523,1559,1594,1630,1665,1701,1736,1772,1808,1843,1879,1915,1951,1986,2022,2058]
 export const STEAM_HEATER_READY_C = 130
@@ -28,59 +29,7 @@ export function shotStage(profileFrame: number | undefined, substate: string | u
   return { stageIndex: frame, stageName }
 }
 
-const transitionProgress = (type: string, progress: number) => {
-  if (type === 'ease-in') return progress * progress
-  if (type === 'ease-out') return 1 - (1 - progress) ** 2
-  if (type === 'ease-in-out') return progress < 0.5 ? 2 * progress * progress : 1 - (-2 * progress + 2) ** 2 / 2
-  return progress
-}
-
-export function profileStepsToTargetPoints(steps: DecaidProfileStep[] | undefined): ProfileTargetPoint[] {
-  if (!steps?.length) return []
-  const points: ProfileTargetPoint[] = []
-  let elapsedMs = 0
-  let previousPressure = 0
-  let previousFlow = 0
-
-  for (const step of steps) {
-    const pump = typeof step.pump === 'object' && step.pump !== null ? step.pump : undefined
-    const pressureValue = finiteNumber(pump?.pressure) ?? finiteNumber(step.pressure)
-    const flowValue = finiteNumber(pump?.flow) ?? finiteNumber(step.flow)
-    const pressure = pressureValue === -1 ? previousPressure : pressureValue ?? previousPressure
-    const flow = flowValue === -1 ? previousFlow : flowValue ?? previousFlow
-    const durationMs = Math.max(0, (finiteNumber(step.seconds) ?? finiteNumber(step.duration) ?? 0) * 1000)
-    const transition = step.transition
-    const transitionType = typeof transition === 'string' ? transition : transition?.type ?? 'instant'
-    const smoothLegacyTransition = transitionType === 'smooth'
-    const rampDurationMs = smoothLegacyTransition
-      ? durationMs
-      : transitionType === 'fast' || transitionType === 'instant'
-        ? 0
-        : Math.min(durationMs, Math.max(0, (finiteNumber(typeof transition === 'object' ? transition.duration : undefined) ?? 0) * 1000))
-
-    points.push({ elapsedMs, pressure: previousPressure, flow: previousFlow })
-    if (rampDurationMs > 0) {
-      const samples = 8
-      for (let sample = 1; sample <= samples; sample += 1) {
-        const rawProgress = sample / samples
-        const progress = transitionProgress(smoothLegacyTransition ? 'linear' : transitionType, rawProgress)
-        points.push({
-          elapsedMs: elapsedMs + rampDurationMs * rawProgress,
-          pressure: previousPressure + (pressure - previousPressure) * progress,
-          flow: previousFlow + (flow - previousFlow) * progress,
-        })
-      }
-    } else {
-      points.push({ elapsedMs, pressure, flow })
-    }
-    elapsedMs += durationMs
-    points.push({ elapsedMs, pressure, flow })
-    previousPressure = pressure
-    previousFlow = flow
-  }
-
-  return points
-}
+export { profileStepsToTargetPoints }
 
 export function parseProfileTitle(title: string | undefined) {
   const fullTitle = title?.trim() || 'Untitled profile'

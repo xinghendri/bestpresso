@@ -1,4 +1,5 @@
 import type { DecaidProfile, DecaidProfileStep } from '../../api/decaid/types'
+import { profileStepsToTargetPoints } from '../../api/decaid/profileTargetPoints.ts'
 import type { ProfileTargetPoint } from '../../domain/brewing'
 
 export type BuilderPump = 'pressure' | 'flow'
@@ -371,31 +372,7 @@ export function profileMaximumDurationMs(stages: BuilderStage[]) {
 }
 
 export function builderTargetPoints(stages: BuilderStage[]): ProfileTargetPoint[] {
-  const points: ProfileTargetPoint[] = []
-  let elapsedMs = 0
-  let pressure = 0
-  let flow = 0
-  let temperature = stages[0]?.temperature ?? 0
-
-  for (const stage of stages) {
-    const nextPressure = stage.pump === 'pressure'
-      ? stage.target
-      : stage.limiter?.type === 'pressure' ? stage.limiter.value : pressure
-    const nextFlow = stage.pump === 'flow'
-      ? stage.target
-      : stage.limiter?.type === 'flow' ? stage.limiter.value : flow
-    const stageEndMs = elapsedMs + stageMaximumDurationMs(stage)
-
-    points.push({ elapsedMs, pressure, flow, temperature })
-    if (stage.transition === 'fast') points.push({ elapsedMs, pressure: nextPressure, flow: nextFlow, temperature: stage.temperature })
-    points.push({ elapsedMs: stageEndMs, pressure: nextPressure, flow: nextFlow, temperature: stage.temperature })
-
-    elapsedMs = stageEndMs
-    pressure = nextPressure
-    flow = nextFlow
-    temperature = stage.temperature
-  }
-  return points
+  return profileStepsToTargetPoints(stages.map(stageToDecaid))
 }
 
 export function nextBuilderStage(index: number): BuilderStage {

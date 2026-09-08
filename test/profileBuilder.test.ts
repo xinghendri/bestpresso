@@ -633,6 +633,11 @@ test('touching outside the stage cards dismisses the active stage', () => {
   assert.match(screen, /setActiveStage\(null\)/)
 })
 
+test('profile builder expands to the full viewport instead of retaining the tablet width cap', () => {
+  assert.match(styles, /\.profile-builder-screen\.pb-screen\{[^}]*width:100%;max-width:none/)
+  assert.doesNotMatch(styles, /\.profile-builder-screen\.pb-screen\{[^}]*width:min\(1194px,100%\)/)
+})
+
 test('stage sequence remains explicit while one fluid card is edited in place', () => {
   assert.match(screen, /<ChartStageMarkers/)
   assert.doesNotMatch(screen, /pb-chart__stage-boundary/)
