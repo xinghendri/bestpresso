@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { playCompletionSound } from '../../audio/completionSound'
 import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isCleaningProfile, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotStage, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres } from '../../api/decaid/adapters'
-import { connectDevice, createProfile, DecaidApiError, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getMachineSettings, getProfiles, getSettings, getSharedSetting, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineProfile, setMachineState, setSharedSetting, tareScale, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
+import { connectDevice, createProfile, DecaidApiError, getDecentAccountStatus, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getMachineSettings, getProfile, getProfiles, getSettings, getSharedSetting, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineProfile, setMachineState, setSharedSetting, tareScale, updateProfile, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
 import { profileUserTargetNeedsWorkflowSync, workflowValuesForProfile } from '../../api/decaid/profileWorkflow'
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
@@ -13,6 +13,8 @@ import { scaleFixtureForKey } from '../../fixtures/scaleFixtures'
 import { cleaningRestorePatch, isCleaningSequenceRun, prepareCleaningProfileForEspressoStart, profileForCleaningShortcut } from '../cleaning/cleaningSequence'
 import { observePostShotWeight, reconciledShotYield, type YieldFinalizationState } from '../history/shotYieldFinalization'
 import { LAST_SELECTED_PROFILE_LOCAL_KEY, LAST_SELECTED_PROFILE_SHARED_KEY, normalizeRememberedProfileId, resolveRememberedProfileId } from '../profiles/profileSelectionPersistence'
+import { profileAuthorForAccount } from '../profiles/profileAuthor'
+import { assertMatchingProfileReadback, assertVerifiedProfileRecord, ProfileSaveVerificationError } from '../profiles/profileSaveVerification'
 import { rinseWorkflowPatchFromMachineSettings } from './flushSettings'
 import { isSuccessfulEspressoCompletion, shouldPlayCompletionCue } from './completionCue'
 import { DEMO_BREW_TICK_MS, demoBrewForProfile, demoBrewPointsAtElapsed, demoPullIsEnabled, isConnectedMockDe1, type DemoBrewDefinition } from './demoBrew'
@@ -1247,46 +1249,109 @@ export function useBrewingData() {
       },
       visibility: 'visible',
       metadata: { description: profile.description },
-      isDefault: false,
+      isDefault: true,
     } satisfies DecaidProfileRecord
   }
 
-  const saveProfileCopy = async (profile: DecaidProfile, parentId?: string, metadata?: Record<string, unknown> | null) => {
+  const saveProfileDraft = async (profile: DecaidProfile, sourceProfileId: string | undefined, overwriteSource: boolean, metadata?: Record<string, unknown> | null) => {
     if (!profile.title?.trim() || !profile.steps?.length) {
-      showSettingFeedback({ status: 'error', message: 'A profile name and at least one stage are required.' })
-      return false
+      const message = 'A profile name and at least one stage are required.'
+      showSettingFeedback({ status: 'error', message })
+      throw new Error(message)
     }
     showSettingFeedback({ status: 'saving', message: `Saving ${profile.title}…` })
     try {
-      if (connection === 'fixture') {
-        const createdRecord: DecaidProfileRecord = { id: `local-${crypto.randomUUID()}`, parentId: parentId ?? null, profile, metadata: metadata ?? null, visibility: 'visible', isDefault: false }
-        profileRecords.current = [...profileRecords.current, createdRecord]
-        const createdProfile = profileRecordsToDomain([createdRecord], {}, [])[0]
-        if (createdProfile) {
-          allProfilesRef.current = [...allProfilesRef.current, createdProfile]
-          setAllProfiles(allProfilesRef.current)
+      const author = connection === 'fixture'
+        ? 'user'
+        : profileAuthorForAccount(await getDecentAccountStatus().catch(() => null))
+      const authoredProfile = { ...profile, author }
+      const sourceRecord = sourceProfileId ? profileRecords.current.find((candidate) => candidate.id === sourceProfileId) : undefined
+      const shouldOverwrite = overwriteSource && sourceRecord?.isDefault === false
+      if (overwriteSource && !shouldOverwrite) {
+        throw new Error('This protected profile must be saved as a copy.')
+      }
+      const expectedParentId = shouldOverwrite ? sourceRecord?.parentId ?? null : sourceProfileId ?? null
+
+      const previousFavoriteSlots = shouldOverwrite && sourceProfileId
+        ? resolveFavoriteProfileSlots(allProfilesRef.current, favoriteAssignments.current)
+        : []
+      const rememberUpdatedReferences = async (savedRecord: DecaidProfileRecord) => {
+        if (!shouldOverwrite || !sourceProfileId || !savedRecord.id || savedRecord.id === sourceProfileId) return
+        const nextSlots = previousFavoriteSlots.map((profileId) => profileId === sourceProfileId ? savedRecord.id! : profileId)
+        if (previousFavoriteSlots.includes(sourceProfileId)) {
+          const assignments = favoriteAssignmentsForSlots(nextSlots)
+          if (connection !== 'fixture') await setSharedSetting('favorite-profiles', assignments)
+          else {
+            try { window.localStorage.setItem(localFavoriteStorageKey, JSON.stringify(nextSlots)) }
+            catch { /* Fixture persistence is optional. */ }
+          }
+          favoriteAssignments.current = assignments
         }
-        showSettingFeedback({ status: 'saved', message: `${profile.title} saved as a new profile.` })
-        return true
       }
-      if (connection !== 'connected') {
-        showSettingFeedback({ status: 'error', message: 'Connect to Decaid before saving this profile.' })
-        return false
+
+      if (connection === 'fixture') {
+        const savedRecord: DecaidProfileRecord = {
+          ...sourceRecord,
+          id: `local-${crypto.randomUUID()}`,
+          parentId: expectedParentId,
+          profile: authoredProfile,
+          metadata: metadata ?? null,
+          visibility: 'visible',
+          isDefault: false,
+        }
+        assertVerifiedProfileRecord(authoredProfile, metadata, expectedParentId, savedRecord)
+        await rememberUpdatedReferences(savedRecord)
+        profileRecords.current = shouldOverwrite && sourceProfileId
+          ? [...profileRecords.current.filter((candidate) => candidate.id !== sourceProfileId), savedRecord]
+          : [...profileRecords.current, savedRecord]
+        const storedProfileIds = new Set(profileRecords.current.map((record) => record.id).filter((id): id is string => Boolean(id)))
+        const fixtureFallback = allProfilesRef.current.filter((candidate) => !storedProfileIds.has(candidate.id) && candidate.id !== (shouldOverwrite ? sourceProfileId : undefined))
+        const savedProfiles = profileRecordsToDomain(profileRecords.current, {}, [])
+        const domainProfiles = profilesWithParsedTitles([...fixtureFallback, ...savedProfiles])
+        allProfilesRef.current = domainProfiles
+        setAllProfiles(domainProfiles)
+        setFavoriteProfileSlots(resolveFavoriteProfileSlots(domainProfiles, favoriteAssignments.current))
+        showSettingFeedback({ status: 'saved', message: shouldOverwrite ? `${profile.title} updated.` : `${profile.title} saved as a new profile.` })
+        return savedRecord
       }
-      const createdRecord = await createProfile(profile, parentId, metadata)
-      const records = [...profileRecords.current.filter((candidate) => candidate.id !== createdRecord.id), createdRecord]
-      const workflow = await getWorkflow()
+      const savedRecord = shouldOverwrite && sourceProfileId
+        ? await updateProfile(sourceProfileId, authoredProfile, metadata)
+        : await createProfile(authoredProfile, sourceProfileId, metadata)
+      assertVerifiedProfileRecord(authoredProfile, metadata, expectedParentId, savedRecord)
+      if (!savedRecord.id) throw new ProfileSaveVerificationError('Decaid did not return an identifier for the saved profile.')
+      const verifiedRecord = await getProfile(savedRecord.id)
+      assertMatchingProfileReadback(savedRecord, verifiedRecord)
+      assertVerifiedProfileRecord(authoredProfile, metadata, expectedParentId, verifiedRecord)
+      await rememberUpdatedReferences(verifiedRecord)
+      const records = shouldOverwrite && sourceProfileId
+        ? [...profileRecords.current.filter((candidate) => candidate.id !== sourceProfileId && candidate.id !== verifiedRecord.id), verifiedRecord]
+        : [...profileRecords.current.filter((candidate) => candidate.id !== verifiedRecord.id), verifiedRecord]
       profileRecords.current = records
-      const domainProfiles = profileRecordsToDomain(records, workflow, fixtureProfiles)
+      const domainProfiles = profileRecordsToDomain(records, {}, allProfilesRef.current)
       allProfilesRef.current = domainProfiles
       setAllProfiles(domainProfiles)
       setFavoriteProfileSlots(resolveFavoriteProfileSlots(domainProfiles, favoriteAssignments.current))
-      setModel((current) => applyWorkflow(current, workflow, records, favoriteAssignments.current, retainedAdHocProfileId.current))
-      showSettingFeedback({ status: 'saved', message: `${profile.title} saved as a new profile.` })
-      return true
-    } catch {
-      showSettingFeedback({ status: 'error', message: `${profile.title} could not be saved.` })
-      return false
+      const activeRuntimeProfile = latestModel.current.profiles.find((candidate) => candidate.id === latestModel.current.activeProfileId)
+      const carouselSource = activeRuntimeProfile && !domainProfiles.some((candidate) => candidate.id === activeRuntimeProfile.id)
+        ? [...domainProfiles, activeRuntimeProfile]
+        : domainProfiles
+      if (shouldOverwrite && sourceProfileId && latestModel.current.activeProfileId === sourceProfileId && verifiedRecord.id !== sourceProfileId) {
+        retainedAdHocProfileId.current = sourceProfileId
+      }
+      setModel((current) => ({
+        ...current,
+        profiles: carouselProfiles(carouselSource, favoriteAssignments.current, current.activeProfileId),
+      }))
+      showSettingFeedback({ status: 'saved', message: shouldOverwrite ? `${profile.title} updated.` : `${profile.title} saved as a new profile.` })
+      return verifiedRecord
+    } catch (error) {
+      const message = error instanceof ProfileSaveVerificationError || error instanceof DecaidApiError
+        ? error.message
+        : error instanceof Error && error.message
+          ? error.message
+          : `${profile.title} could not be saved.`
+      showSettingFeedback({ status: 'error', message })
+      throw new Error(message)
     }
   }
 
@@ -1416,5 +1481,5 @@ export function useBrewingData() {
   const dismissLiveBrew = () => setLiveBrew((current) => current.active ? current : { ...current, visible: false })
   const favoriteProfileIds = favoriteProfileSlots.filter((id): id is string => Boolean(id))
 
-  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, utilityOperation, previousShotStatus, shotHistory, loadHistoryShot, heatingSeconds, connection, machineConnection, demoPullEnabled, scale, availableScales, scaleConnectPendingId, scaleTarePending, brewStopPending, brewSkipPending, cleaningStartPending, cleaningPreparedProfileId, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, skipBrewStage, startDemoBrew, prepareCleaningSequence, cancelCleaningSequence, dismissLiveBrew, searchForScale, connectToScale, dismissScalePicker, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, profileRecordForEditing, saveProfileCopy, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
+  return { model, allProfiles, favoriteProfileIds, favoriteProfileSlots, liveBrew, utilityOperation, previousShotStatus, shotHistory, loadHistoryShot, heatingSeconds, connection, machineConnection, demoPullEnabled, scale, availableScales, scaleConnectPendingId, scaleTarePending, brewStopPending, brewSkipPending, cleaningStartPending, cleaningPreparedProfileId, sleepPending, sleepScreenActive, machineActionError, settingFeedback: settingFeedbackVisible ? settingFeedback : null, settingsDisabled, toggleSleep, wakeMachine, stopEspresso, skipBrewStage, startDemoBrew, prepareCleaningSequence, cancelCleaningSequence, dismissLiveBrew, searchForScale, connectToScale, dismissScalePicker, tareConnectedScale: () => requestScaleTare(false), updateMachineSetting, updateProfileSetting, profileRecordForEditing, saveProfileDraft, selectProfile, setFavoriteProfileSlot, removeFavoriteProfile }
 }

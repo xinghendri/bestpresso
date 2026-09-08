@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import cleaning from '../assets/figma/cleaning-profile.svg'
 import logo from '../assets/figma/decent-logo.png'
 import settings from '../assets/figma/settings.svg'
@@ -60,6 +60,7 @@ interface AppShellProps {
   onOpenSettings: () => void
   onManageProfiles: () => void
   onOpenPreviousShot: () => void
+  onUnlockProfileBuilder: () => void
 }
 
 const utilityLayoutStorageKey = 'bestpresso.utility-layout-collapsed.v1'
@@ -72,10 +73,11 @@ const initialUtilityLayout = () => {
   }
 }
 
-export function AppShell({ model, allProfiles, liveBrew, utilityOperation, previousShotStatus, connection, machineConnection, demoPullEnabled, heatingSeconds, sleepPending, sleepScreenActive, machineActionError, settingFeedback, settingsDisabled, scale, availableScales, scaleConnectPendingId, scaleTarePending, brewStopPending, brewSkipPending, cleaningStartPending, cleaningPreparedProfileId, onSleep, onWake, onStopEspresso, onSkipBrewStage, onPrepareCleaning, onCancelCleaning, onDismissLiveBrew, onSearchScale, onConnectScale, onDismissScalePicker, onTareScale, onUpdateMachineSetting, onUpdateProfileSetting, onSelectProfile, onStartDemoBrew, onOpenSettings, onManageProfiles, onOpenPreviousShot }: AppShellProps) {
+export function AppShell({ model, allProfiles, liveBrew, utilityOperation, previousShotStatus, connection, machineConnection, demoPullEnabled, heatingSeconds, sleepPending, sleepScreenActive, machineActionError, settingFeedback, settingsDisabled, scale, availableScales, scaleConnectPendingId, scaleTarePending, brewStopPending, brewSkipPending, cleaningStartPending, cleaningPreparedProfileId, onSleep, onWake, onStopEspresso, onSkipBrewStage, onPrepareCleaning, onCancelCleaning, onDismissLiveBrew, onSearchScale, onConnectScale, onDismissScalePicker, onTareScale, onUpdateMachineSetting, onUpdateProfileSetting, onSelectProfile, onStartDemoBrew, onOpenSettings, onManageProfiles, onOpenPreviousShot, onUnlockProfileBuilder }: AppShellProps) {
   const [utilitiesCollapsed, setUtilitiesCollapsed] = useState(initialUtilityLayout)
   const [utilityLayoutHasChanged, setUtilityLayoutHasChanged] = useState(false)
   const [cleaningPickerOpen, setCleaningPickerOpen] = useState(false)
+  const profileBuilderLogoTaps = useRef({ count: 0, lastTapAt: 0 })
   const cleaningProfiles = allProfiles.filter(isCleaningProfile).slice(0, 8)
   const sleepLabel = model.readiness === 'sleeping' ? 'Wake' : 'Sleep'
   const toggleUtilityLayout = () => {
@@ -93,11 +95,20 @@ export function AppShell({ model, allProfiles, liveBrew, utilityOperation, previ
   const dismissCleaningPicker = async () => {
     if (await onCancelCleaning()) setCleaningPickerOpen(false)
   }
+  const handleLogoTap = () => {
+    const now = performance.now()
+    const previous = profileBuilderLogoTaps.current
+    const count = now - previous.lastTapAt <= 2_000 ? previous.count + 1 : 1
+    profileBuilderLogoTaps.current = { count, lastTapAt: now }
+    if (count < 4) return
+    profileBuilderLogoTaps.current = { count: 0, lastTapAt: 0 }
+    onUnlockProfileBuilder()
+  }
   if (sleepScreenActive) return <SleepWakeScreen onWake={onWake} />
   if (liveBrew.visible && !utilityOperation) return <LiveBrewingScreen model={model} liveBrew={liveBrew} stopPending={brewStopPending} skipPending={brewSkipPending} actionError={machineActionError} onStop={onStopEspresso} onSkipStage={onSkipBrewStage} onDismiss={onDismissLiveBrew} />
   return <main className={`app-shell${utilitiesCollapsed ? ' app-shell--utilities-collapsed' : ''}${utilityLayoutHasChanged ? ' app-shell--utility-layout-transitioned' : ''}`}>
     <LayoutDiagnostics />
-    <header className="topbar"><div className="topbar__brand"><button className="utility-layout-toggle" type="button" aria-label={utilitiesCollapsed ? 'Expand utility panels' : 'Minimize utility panels'} aria-controls="machine-utilities" aria-expanded={!utilitiesCollapsed} title={utilitiesCollapsed ? 'Expand utility panels' : 'Minimize utility panels'} onClick={toggleUtilityLayout}><img src={utilitiesCollapsed ? utilityExpand : utilityCollapse} alt="" /></button><img className="logo" src={logo} alt="decent" /></div><nav aria-label="Machine controls"><button className="control-button control-button--cleaning" type="button" aria-label="Cleaning sequences" title="Cleaning" onClick={() => setCleaningPickerOpen(true)}><img src={cleaning} alt="" /></button><button className={sleepPending ? 'control-button control-button--pending' : 'control-button'} type="button" aria-label={sleepPending ? `${sleepLabel} request in progress` : sleepLabel} title={sleepLabel} disabled={sleepPending} onClick={onSleep}><img src={sleep} alt="" /></button><button className="control-button" type="button" aria-label="Settings" title="Settings" onClick={onOpenSettings}><img src={settings} alt="" /></button><FullscreenToggle /><StatusPill status={model.readiness} connection={connection} machineConnection={machineConnection} heatingSeconds={heatingSeconds} /></nav></header>
+    <header className="topbar"><div className="topbar__brand"><button className="utility-layout-toggle" type="button" aria-label={utilitiesCollapsed ? 'Expand utility panels' : 'Minimize utility panels'} aria-controls="machine-utilities" aria-expanded={!utilitiesCollapsed} title={utilitiesCollapsed ? 'Expand utility panels' : 'Minimize utility panels'} onClick={toggleUtilityLayout}><img src={utilitiesCollapsed ? utilityExpand : utilityCollapse} alt="" /></button><button className="topbar__logo" type="button" aria-label="Decent" onClick={handleLogoTap}><img className="logo" src={logo} alt="" /></button></div><nav aria-label="Machine controls"><button className="control-button control-button--cleaning" type="button" aria-label="Cleaning sequences" title="Cleaning" onClick={() => setCleaningPickerOpen(true)}><img src={cleaning} alt="" /></button><button className={sleepPending ? 'control-button control-button--pending' : 'control-button'} type="button" aria-label={sleepPending ? `${sleepLabel} request in progress` : sleepLabel} title={sleepLabel} disabled={sleepPending} onClick={onSleep}><img src={sleep} alt="" /></button><button className="control-button" type="button" aria-label="Settings" title="Settings" onClick={onOpenSettings}><img src={settings} alt="" /></button><FullscreenToggle /><StatusPill status={model.readiness} connection={connection} machineConnection={machineConnection} heatingSeconds={heatingSeconds} /></nav></header>
     {(machineActionError || settingFeedback) && <div className="system-messages">
       {machineActionError && <div className="system-message system-message--error" role="alert">{machineActionError}</div>}
       {settingFeedback && <div className={`system-message system-message--${settingFeedback.status}`} role={settingFeedback.status === 'error' ? 'alert' : 'status'} aria-live="polite">{settingFeedback.message}</div>}

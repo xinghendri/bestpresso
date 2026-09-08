@@ -89,6 +89,10 @@ test('uses three-pixel data lines and matching legend samples across graphs', ()
   assert.match(styles, /\.chart-legend__sample \{ height:3px;/)
 })
 
+test('uses a lighter two-pixel line only for the home history chart', () => {
+  assert.match(styles, /\.history-card \.mini-chart \.chart-line \{ stroke-width:2; \}/)
+})
+
 test('uses stable header metric slots with symmetric separator spacing', () => {
   assert.match(styles, /\.live-pull-header__metrics \{ --header-metric-separator-gap:24px; width:max-content; max-width:100%;[^}]*grid-template-columns:108px 1px 280px;[^}]*gap:var\(--header-metric-separator-gap\);/)
   assert.match(styles, /\.history-browser-detail \.live-pull-header__metrics strong \{ font-size:30px; \}/)
