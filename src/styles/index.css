@@ -10,6 +10,7 @@ button { border:0; color:inherit; font:inherit; cursor:pointer; }
 .app-shell { width:min(1194px,100%); min-height:834px; margin:0 auto; padding:0 32px 33px 40px; background:radial-gradient(circle at 16% 16%,#060707 0,#141414 22%,transparent 50%),linear-gradient(124deg,#181818 36%,#4d4038 100%); }
 .topbar { height:127px; display:flex; align-items:center; justify-content:space-between; padding:0 9px 0 7px; }
 .topbar__brand { min-width:0; display:flex; align-items:center; gap:12px; }
+.topbar__logo{display:flex;align-items:center;padding:0;border:0;background:transparent;touch-action:manipulation}
 .logo { width:173px; height:44px; object-fit:fill; transform:translateY(-4px); }
 .utility-layout-toggle { width:48px; height:48px; flex:0 0 48px; display:flex; align-items:center; justify-content:center; padding:0; border-radius:50%; color:#e3e3e3; background:rgba(89,84,80,.5); transition:background-color .2s ease,transform .2s ease; -webkit-tap-highlight-color:transparent; }
 .utility-layout-toggle img { width:auto; height:15px; display:block; }

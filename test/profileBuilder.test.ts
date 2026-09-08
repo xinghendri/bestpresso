@@ -11,6 +11,7 @@ const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
 const profilesPanel = readFileSync(new URL('../src/features/profiles/ProfilesPanel.tsx', import.meta.url), 'utf8')
 const screen = readFileSync(new URL('../src/features/profiles/ProfileBuilderScreen.tsx', import.meta.url), 'utf8')
 const feature = readFileSync(new URL('../src/features/profiles/profileBuilderFeature.ts', import.meta.url), 'utf8')
+const appShell = readFileSync(new URL('../src/app/AppShell.tsx', import.meta.url), 'utf8')
 const brewingData = readFileSync(new URL('../src/features/brew/useBrewingData.ts', import.meta.url), 'utf8')
 const styles = readFileSync(new URL('../src/styles/index.css', import.meta.url), 'utf8')
 const closeIcon = readFileSync(new URL('../src/assets/figma/builder-card-close.svg', import.meta.url), 'utf8')
@@ -21,12 +22,22 @@ const coffeeMutedIcon = readFileSync(new URL('../src/assets/figma/builder-coffee
 const waterActiveIcon = readFileSync(new URL('../src/assets/figma/builder-water-source-active.svg', import.meta.url), 'utf8')
 
 test('keeps the unfinished profile builder hidden in normal releases while allowing an explicit RC build', () => {
-  assert.match(app, /page === 'profile-builder' && profileBuilderEnabled\(\)/)
+  assert.match(app, /page === 'profile-builder' && runtimeBuilderEnabled/)
   assert.match(app, /editingEnabled=\{builderEnabled\}/)
   assert.match(feature, /if \(import\.meta\.env\.PROD\) return enabledValue\(import\.meta\.env\.VITE_ENABLE_PROFILE_BUILDER_RC\)/)
   assert.match(feature, /VITE_ENABLE_PROFILE_BUILDER/)
   assert.match(profilesPanel, /editingEnabled = false/)
   assert.match(profilesPanel, /editingEnabled && <button className="profiles-icon-button profiles-add"/)
+})
+
+test('four quick taps on the Decent logo enable profile editing for the current session', () => {
+  assert.match(app, /useState\(profileBuilderEnabled\)/)
+  assert.match(app, /enableProfileBuilderForSession\(\); setBuilderEnabled\(true\)/)
+  assert.match(feature, /window\.sessionStorage\.setItem\(profileBuilderSessionKey, 'true'\)/)
+  assert.match(feature, /if \(sessionEnabled\(\)\) return true/)
+  assert.match(appShell, /now - previous\.lastTapAt <= 2_000/)
+  assert.match(appShell, /if \(count < 4\) return/)
+  assert.match(appShell, /className="topbar__logo"[\s\S]*?onClick=\{handleLogoTap\}/)
 })
 
 test('profile builder entry points support create, safe copy, and user-owned editing without import', () => {
