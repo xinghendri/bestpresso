@@ -20,6 +20,7 @@ import { isSuccessfulEspressoCompletion, shouldPlayCompletionCue } from './compl
 import { DEMO_BREW_TICK_MS, demoBrewForProfile, demoBrewPointsAtElapsed, demoPullIsEnabled, isConnectedMockDe1, type DemoBrewDefinition } from './demoBrew'
 import { advanceShotTimeline, beginSkipTransition, isEspressoMonitoringSnapshot, observeSkipTransition, type SkipTransition } from './liveShotState'
 import { SLEEP_DISPLAY_BRIGHTNESS, shouldRunBackgroundScaleScan, sleepMachineWithConfiguredScalePolicy } from './sleepControl'
+import { utilityElapsedMs, utilityTimerStartedAt } from './utilityOperationTiming'
 
 const MAX_LIVE_SHOT_POINTS = 900
 const MINIMUM_SCALE_SCAN_MS = 10_000
@@ -63,7 +64,7 @@ interface PendingYieldFinalization {
 
 interface UtilityOperationSession {
   kind: UtilityOperationKind
-  startedAt: number
+  startedAt?: number
   lastAt: number
   previousFlow: number
   volumeMl: number
@@ -633,7 +634,7 @@ export function useBrewingData() {
         if (!session || session.kind !== operationKind) {
           session = {
             kind: operationKind,
-            startedAt: now,
+            startedAt: utilityTimerStartedAt(operationKind, undefined, snapshot.state, now),
             lastAt: now,
             previousFlow: Math.max(0, snapshot.flow ?? 0),
             volumeMl: 0,
@@ -642,16 +643,20 @@ export function useBrewingData() {
           utilityOperationSession.current = session
           setLiveBrew((current) => current.active ? current : { ...current, visible: false })
         } else {
+          const outputWasAlreadyRunning = session.startedAt !== undefined
+          session.startedAt = utilityTimerStartedAt(operationKind, session.startedAt, snapshot.state, now)
           const flow = Math.max(0, snapshot.flow ?? 0)
           const elapsedSeconds = Math.max(0, Math.min(2, (now - session.lastAt) / 1000))
-          if (operationKind === 'hotWater') session.volumeMl += (session.previousFlow + flow) / 2 * elapsedSeconds
+          if (operationKind === 'hotWater' && outputWasAlreadyRunning) {
+            session.volumeMl += (session.previousFlow + flow) / 2 * elapsedSeconds
+          }
           session.lastAt = Math.max(session.lastAt, now)
           session.previousFlow = flow
         }
         const model = latestModel.current
         setUtilityOperation({
           kind: operationKind,
-          elapsedMs: Math.max(0, now - session.startedAt),
+          elapsedMs: utilityElapsedMs(session.startedAt, now),
           flow: Math.max(0, snapshot.flow ?? 0),
           temperature: operationKind === 'steam' ? snapshot.steamTemperature : snapshot.mixTemperature ?? snapshot.groupTemperature,
           volumeMl: session.volumeMl,
