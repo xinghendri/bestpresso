@@ -57,6 +57,7 @@ export interface BrewProfile {
   id: string
   name: string
   category?: string
+  version?: string
   beverageType?: string
   description?: string
   temperature: string

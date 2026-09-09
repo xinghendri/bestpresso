@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { PointerEvent as ReactPointerEvent } from 'react'
+import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import builderCategoryChevron from '../../assets/figma/builder-category-chevron.svg'
 import builderCardClose from '../../assets/figma/builder-card-close.svg'
 import builderCoffeeSource from '../../assets/figma/builder-coffee-source.svg'
@@ -26,7 +26,7 @@ import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { ChartLegend } from '../brew/ChartLegend'
 import { ChartStageMarkers } from '../brew/ChartStageMarkers'
 import type { ChartStageMarker } from '../brew/ChartStageMarkers'
-import { builderPumpMemory, builderTargetPoints, createDefaultProfileDraft, duplicateBuilderStage, moveBuilderStage, nextBuilderStage, profileDraftFromDecaidProfile, profileDraftToDecaidProfile, profileMaximumDurationMs, stageIndexAfterMove, switchBuilderPump, volumeCountStartAfterDelete } from './profileBuilderModel'
+import { applyBuilderLimiterTolerance, builderPumpMemory, builderTargetPoints, createDefaultProfileDraft, duplicateBuilderStage, moveBuilderStage, nextBuilderStage, profileDraftFromDecaidProfile, profileDraftToDecaidProfile, profileMaximumDurationMs, stageIndexAfterMove, switchBuilderPump, volumeCountStartAfterDelete } from './profileBuilderModel'
 import type { BuilderExitType, BuilderStage, ProfileDraft } from './profileBuilderModel'
 import { nextBuilderStepperValue } from './profileBuilderStepper'
 import type { BuilderStepperDirection } from './profileBuilderStepper'
@@ -208,6 +208,42 @@ function Stepper({ label, value, unit, step, min = 0, max = 1000, disabled = fal
   </div>
 }
 
+function EditableChoice({ id, label, value, options, placeholder, onChange, inline = false }: {
+  id: string
+  label: string
+  value?: string | null
+  options: string[]
+  placeholder: string
+  onChange: (value: string | undefined) => void
+  inline?: boolean
+}) {
+  const listId = `profile-builder-${id}-choices`
+  const visibleLength = Math.min(Math.max((value?.trim() || placeholder).length + 0.75, 3), 30)
+  return <label className={`pb-editable-choice${inline ? ' pb-editable-choice--inline' : ''}`} data-builder-field={id}>
+    {!inline && <span>{label}</span>}
+    <span className="pb-editable-choice__control">
+      <input
+        list={listId}
+        value={value ?? ''}
+        style={{ width: `${visibleLength}ch` }}
+        placeholder={placeholder}
+        autoComplete="off"
+        onChange={(event) => onChange(event.target.value.trimStart() || undefined)}
+        onBlur={(event) => onChange(event.target.value.trim() || undefined)}
+      />
+      <img src={builderCategoryChevron} alt="" />
+    </span>
+    <datalist id={listId}>{options.map((option) => <option key={option} value={option} />)}</datalist>
+  </label>
+}
+
+function SettingsMetric({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
+  return <div className={`pb-settings-metric${className ? ` ${className}` : ''}`}>
+    <span>{label}</span>
+    {children}
+  </div>
+}
+
 function ExitControl({ type, stage, onChange }: { type: BuilderExitType; stage: BuilderStage; onChange: (patch: Partial<BuilderStage>) => void }) {
   const openAdjustment = useValueAdjustment()
   const value = stage.exit?.type === type ? stage.exit.value : undefined
@@ -269,11 +305,12 @@ function StageDragHandle({ onPointerDown, onPointerMove, onPointerUp }: {
   ><img src={builderStageDrag} alt="" /></button>
 }
 
-function StageEditorCard({ stage, index, active, isLastStage, onActivate, onChange, onDuplicate, onDelete, canDelete, dragging, issues, panelRequest, onDragStart, onDragMove, onDragEnd, cardRef }: {
+function StageEditorCard({ stage, index, active, isLastStage, limiterTolerances, onActivate, onChange, onDuplicate, onDelete, canDelete, dragging, issues, panelRequest, onDragStart, onDragMove, onDragEnd, cardRef }: {
   stage: BuilderStage
   index: number
   active: boolean
   isLastStage: boolean
+  limiterTolerances: Record<BuilderExitType, number>
   onActivate: () => void
   onChange: (patch: Partial<BuilderStage>) => void
   onDuplicate: () => void
@@ -307,7 +344,7 @@ function StageEditorCard({ stage, index, active, isLastStage, onActivate, onChan
   const setLimiter = (value: number | undefined) => {
     const limiterType = stage.pump === 'pressure' ? 'flow' : 'pressure'
     if (value !== undefined) pumpMemory.current[limiterType] = value
-    onChange({ limiter: value === undefined ? undefined : { type: limiterType, value, range: stage.limiter?.range ?? 0.4 } })
+    onChange({ limiter: value === undefined ? undefined : { type: limiterType, value, range: stage.limiter?.range ?? limiterTolerances[limiterType] } })
   }
   const limiterLabel = stage.pump === 'pressure' ? 'Max flow' : 'Max pressure'
   const limiterUnit = stage.pump === 'pressure' ? 'ml/s' : 'bar'
@@ -474,6 +511,8 @@ interface ProfileBuilderScreenProps {
   onClose: () => void
   initialRecord?: DecaidProfileRecord
   existingTitles?: string[]
+  knownCategories?: string[]
+  knownVersions?: string[]
   onSave?: (profile: DecaidProfile, sourceProfileId: string | undefined, overwriteSource: boolean, metadata?: Record<string, unknown> | null) => Promise<DecaidProfileRecord | null>
   onSaved?: (record: DecaidProfileRecord) => void
 }
@@ -496,7 +535,7 @@ interface StageDragSession {
   ending: boolean
 }
 
-export function ProfileBuilderScreen({ onClose, initialRecord, existingTitles = [], onSave, onSaved }: ProfileBuilderScreenProps) {
+export function ProfileBuilderScreen({ onClose, initialRecord, existingTitles = [], knownCategories = [], knownVersions = [], onSave, onSaved }: ProfileBuilderScreenProps) {
   const openAdjustment = useValueAdjustment()
   const overwriteSource = initialRecord?.isDefault === false
   const [initialDraft] = useState(() => initialRecord?.profile?.steps?.length
@@ -516,7 +555,20 @@ export function ProfileBuilderScreen({ onClose, initialRecord, existingTitles = 
   const stageDrag = useRef<StageDragSession | null>(null)
   const pendingStageDrop = useRef<StageDragSession | null>(null)
   const stagePanelRequestSequence = useRef(0)
-  const categories = useMemo(() => [undefined, 'Espresso', 'Filter', 'Tea', 'Cleaning'] as const, [])
+  const categoryOptions = useMemo(() => Array.from(new Set([
+    ...knownCategories,
+    'Espresso',
+    'Filter',
+    'Pour over',
+    'Tea',
+    'Cleaning',
+  ].map((value) => value.trim()).filter(Boolean))).sort((left, right) => left.localeCompare(right)), [knownCategories])
+  const versionOptions = useMemo(() => Array.from(new Set([
+    ...knownVersions,
+    '2.1',
+    '2.0',
+    '1.0',
+  ].map((value) => value.trim()).filter(Boolean))).sort((left, right) => right.localeCompare(left, undefined, { numeric: true })), [knownVersions])
   const validation = useMemo(() => validateProfileDraft(draft), [draft])
   const volumeFallbackActive = typeof draft.targetVolume === 'number' && draft.targetVolume > 0
   const hasUnsavedChanges = JSON.stringify(draft) !== JSON.stringify(initialDraft)
@@ -808,10 +860,6 @@ export function ProfileBuilderScreen({ onClose, initialRecord, existingTitles = 
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [])
-  const cycleCategory = () => {
-    const index = categories.findIndex((item) => item === draft.category)
-    updateDraft('category', categories[(index + 1) % categories.length])
-  }
   const cycleType = () => {
     const types: ProfileDraft['beverageType'][] = ['espresso', 'pourover', 'manual', 'cleaning', 'calibrate']
     const index = types.indexOf(draft.beverageType)
@@ -825,19 +873,21 @@ export function ProfileBuilderScreen({ onClose, initialRecord, existingTitles = 
     suggestionKey: 'targetYield',
     onSave: (targetWeight) => updateDraft('targetWeight', targetWeight > 0 ? targetWeight : undefined),
   })
-  const updateOptionalDraftNumber = (key: 'targetWeight' | 'targetVolume', rawValue: string) => {
-    const parsed = rawValue === '' ? undefined : Number(rawValue)
-    if (parsed === undefined || Number.isFinite(parsed)) updateDraft(key, parsed)
-  }
-  const updateRequiredDraftNumber = (key: 'tankTemperature', rawValue: string) => {
-    updateDraft(key, rawValue === '' ? Number.NaN : Number(rawValue))
-  }
-  const updateLimiterRange = (stageIndex: number, rawValue: string) => {
-    const limiter = draft.stages[stageIndex]?.limiter
-    if (!limiter) return
-    const parsed = rawValue === '' ? undefined : Number(rawValue)
-    if (parsed === undefined || Number.isFinite(parsed)) updateStage(stageIndex, { limiter: { ...limiter, range: parsed } })
-  }
+  const limiterTolerance = (type: BuilderExitType) => draft.limiterTolerances[type]
+  const updateLimiterTolerance = (type: BuilderExitType, range: number | undefined) => setDraft((current) => ({
+    ...current,
+    limiterTolerances: { ...current.limiterTolerances, [type]: range ?? 0 },
+    stages: applyBuilderLimiterTolerance(current.stages, type, range ?? 0),
+    importIssues: current.importIssues?.filter((issue) => issue.field !== 'limiter'),
+  }))
+  const openProfileMetric = ({ label, value, unit, definition, suggestionKey, onSave: save }: {
+    label: string
+    value: number
+    unit: string
+    definition: typeof VALUE_ADJUSTMENTS.builderFlow | typeof VALUE_ADJUSTMENTS.builderPressure | typeof VALUE_ADJUSTMENTS.builderTemperature | typeof VALUE_ADJUSTMENTS.builderVolume
+    suggestionKey: 'builderFlow' | 'builderPressure' | 'builderTemperature' | 'builderVolume'
+    onSave: (value: number) => void
+  }) => openAdjustment({ label, value, unit, ...definition, suggestionKey, onSave: save })
   const saveProfile = async (allowWarnings = false) => {
     if (!onSave || saving || Boolean(initialRecord) && !hasUnsavedChanges) return
     if (!validation.canSave) {
@@ -919,11 +969,14 @@ export function ProfileBuilderScreen({ onClose, initialRecord, existingTitles = 
   }
 
   return <main className={`profile-builder-screen pb-screen${activeStage === null ? '' : ' has-active-stage'}${saving ? ' is-saving' : ''}`} aria-busy={saving} onPointerDownCapture={dismissActiveStageFromOutside}>
-    <header className="pb-topbar">
+    {profileDetailsOpen && <button type="button" className="pb-profile-details-backdrop" aria-label="Close more settings" onClick={() => setProfileDetailsOpen(false)} />}
+    <header className={`pb-topbar${profileDetailsOpen ? ' is-expanded' : ''}`}>
       <div className="pb-topbar__identity">
         <input aria-label="Profile name" data-builder-field="title" data-validation-severity={profileFieldSeverity('title')} value={draft.title} onChange={(event) => updateDraft('title', event.target.value)} />
         <div className="pb-topbar__identity-actions">
-          <button className="pb-category" type="button" onClick={cycleCategory}>{draft.category ?? 'Category (optional)'}<img src={builderCategoryChevron} alt="" /></button>
+          {profileDetailsOpen
+            ? <EditableChoice id="category" label="Category" value={draft.category} options={categoryOptions} placeholder="Choose category (optional)" inline onChange={(category) => updateDraft('category', category)} />
+            : <span className="pb-category-summary">{draft.category ?? 'Uncategorized'}</span>}
           <button
             type="button"
             className={`pb-more-settings${profileDetailsOpen ? ' is-open' : ''}`}
@@ -934,7 +987,7 @@ export function ProfileBuilderScreen({ onClose, initialRecord, existingTitles = 
               setValidationOpen(false)
               setProfileDetailsOpen((current) => !current)
             }}
-          ><img src={builderCategoryChevron} alt="" /><span>More settings</span></button>
+          ><span>{profileDetailsOpen ? 'Less settings' : 'More settings'}</span><img src={builderCategoryChevron} alt="" /></button>
         </div>
       </div>
       <div className="pb-topbar__metadata">
@@ -970,59 +1023,37 @@ export function ProfileBuilderScreen({ onClose, initialRecord, existingTitles = 
         {!validation.errors.length && validation.warnings.length > 0 && <footer><button type="button" disabled={saveDisabled} onClick={() => void saveProfile(true)}>Save anyway</button></footer>}
       </section>}
       {profileDetailsOpen && <section id="profile-builder-details" className="pb-profile-details" aria-label="Profile details and advanced settings">
-        <header>
-          <div><h2>More settings</h2><p>Metadata and advanced Decaid profile settings.</p></div>
-          <button type="button" onClick={() => setProfileDetailsOpen(false)} aria-label="Close profile details"><img src={builderCardClose} alt="" /></button>
-        </header>
-        <div className="pb-profile-details__grid">
-          <label data-builder-field="beverageType" data-validation-severity={profileFieldSeverity('beverageType')}>
-            <span>Beverage type</span>
-            <select value={draft.beverageType} onChange={(event) => updateDraft('beverageType', event.target.value as ProfileDraft['beverageType'])}>
-              <option value="espresso">Espresso</option>
-              <option value="pourover">Pour over</option>
-              <option value="manual">Manual</option>
-              <option value="cleaning">Cleaning</option>
-              <option value="calibrate">Calibrate</option>
-            </select>
-          </label>
-          <label data-builder-field="version" data-validation-severity={profileFieldSeverity('version')}>
-            <span>Profile format</span>
-            <input value={draft.version ?? ''} placeholder="Optional" onChange={(event) => updateDraft('version', event.target.value || undefined)} />
-          </label>
-          <label className="pb-profile-details__author" data-builder-field="author" data-validation-severity={profileFieldSeverity('author')}>
-            <span>Author</span>
-            <input value={draft.author} placeholder="Your Decent username, or user" readOnly aria-describedby="profile-builder-author-help" />
-            <small id="profile-builder-author-help">Set from the signed-in account when saved.</small>
-          </label>
-          <label className="pb-profile-details__notes" data-builder-field="notes" data-validation-severity={profileFieldSeverity('notes')}>
-            <span>Notes</span>
-            <textarea value={draft.notes} placeholder="Profile description and preparation notes" onChange={(event) => updateDraft('notes', event.target.value)} />
-          </label>
-          <label data-builder-field="targetWeight" data-validation-severity={profileFieldSeverity('targetWeight')}>
-            <span>End shot yield</span>
-            <span className="pb-profile-details__number"><input type="number" inputMode="decimal" min="0" step="0.1" value={draft.targetWeight ?? ''} onChange={(event) => updateOptionalDraftNumber('targetWeight', event.target.value)} /><small>g</small></span>
-          </label>
-          <label data-builder-field="targetVolume" data-validation-severity={profileFieldSeverity('targetVolume')}>
-            <span>End shot volume fallback</span>
-            <span className="pb-profile-details__number"><input type="number" inputMode="decimal" min="0" step="0.1" value={draft.targetVolume ?? ''} onChange={(event) => updateOptionalDraftNumber('targetVolume', event.target.value)} /><small>ml</small></span>
-          </label>
-          {volumeFallbackActive && <label data-builder-field="targetVolumeCountStart" data-validation-severity={profileFieldSeverity('targetVolumeCountStart')}>
-            <span>Start measuring from</span>
-            <select value={draft.targetVolumeCountStart >= 0 && draft.targetVolumeCountStart < draft.stages.length ? draft.targetVolumeCountStart : ''} onChange={(event) => updateDraft('targetVolumeCountStart', Number(event.target.value))}>
-              <option value="" disabled>Choose a step</option>
-              {draft.stages.map((stage, index) => <option key={stage.id} value={index}>{index + 1}. {stage.name.trim() || `Step ${index + 1}`}</option>)}
-            </select>
-          </label>}
-          <label data-builder-field="tankTemperature" data-validation-severity={profileFieldSeverity('tankTemperature')}>
-            <span>Tank temperature</span>
-            <span className="pb-profile-details__number"><input type="number" inputMode="decimal" min="0" step="0.5" value={Number.isFinite(draft.tankTemperature) ? draft.tankTemperature : ''} onChange={(event) => updateRequiredDraftNumber('tankTemperature', event.target.value)} /><small>°C</small></span>
-          </label>
-        </div>
-        <div className="pb-profile-details__limiters">
-          <h3>Stage limiter response range</h3>
-          {draft.stages.some((stage) => Boolean(stage.limiter))
-            ? <div>{draft.stages.map((stage, index) => stage.limiter && <label key={stage.id} data-builder-field="limiter"><span>{index + 1}. {stage.name}</span><span className="pb-profile-details__number"><input type="number" inputMode="decimal" min="0" max="15.9" step="0.1" value={stage.limiter.range ?? ''} placeholder="Required" onChange={(event) => updateLimiterRange(index, event.target.value)} /><small>{stage.limiter.type === 'pressure' ? 'bar' : 'ml/s'}</small></span></label>)}</div>
-            : <p>No stage currently uses an opposite-axis limiter.</p>}
+        <div className="pb-profile-details__body">
+          <div className="pb-profile-details__controls">
+            <EditableChoice id="version" label="Profile version" value={draft.version} options={versionOptions} placeholder="Choose or enter a version" onChange={(version) => updateDraft('version', version)} />
+            <SettingsMetric label="End shot volume (without scale)" className="pb-settings-metric--volume">
+              <Stepper label="End shot volume fallback" value={draft.targetVolume} unit="ml" step={1} max={1023} onOpen={() => openProfileMetric({ label: 'End shot volume fallback', value: draft.targetVolume ?? 0, unit: 'ml', definition: VALUE_ADJUSTMENTS.builderVolume, suggestionKey: 'builderVolume', onSave: (targetVolume) => updateDraft('targetVolume', targetVolume > 0 ? targetVolume : undefined) })} onChange={(targetVolume) => updateDraft('targetVolume', targetVolume)} />
+            </SettingsMetric>
+            <SettingsMetric label="Flow tolerance" className="pb-settings-metric--flow">
+              <Stepper label="Flow tolerance" value={limiterTolerance('flow')} unit="ml/s" step={0.1} max={VALUE_ADJUSTMENTS.builderFlow.max} onOpen={() => openProfileMetric({ label: 'Flow tolerance', value: limiterTolerance('flow'), unit: 'ml/s', definition: VALUE_ADJUSTMENTS.builderFlow, suggestionKey: 'builderFlow', onSave: (range) => updateLimiterTolerance('flow', range) })} onChange={(range) => updateLimiterTolerance('flow', range)} />
+            </SettingsMetric>
+            <SettingsMetric label="Pressure tolerance" className="pb-settings-metric--pressure">
+              <Stepper label="Pressure tolerance" value={limiterTolerance('pressure')} unit="bar" step={0.1} max={VALUE_ADJUSTMENTS.builderPressure.max} onOpen={() => openProfileMetric({ label: 'Pressure tolerance', value: limiterTolerance('pressure'), unit: 'bar', definition: VALUE_ADJUSTMENTS.builderPressure, suggestionKey: 'builderPressure', onSave: (range) => updateLimiterTolerance('pressure', range) })} onChange={(range) => updateLimiterTolerance('pressure', range)} />
+            </SettingsMetric>
+            {volumeFallbackActive && <label className="pb-profile-details__measure-from" data-builder-field="targetVolumeCountStart" data-validation-severity={profileFieldSeverity('targetVolumeCountStart')}>
+              <span>Start measuring volume from</span>
+              <select value={draft.targetVolumeCountStart >= 0 && draft.targetVolumeCountStart < draft.stages.length ? draft.targetVolumeCountStart : ''} onChange={(event) => updateDraft('targetVolumeCountStart', Number(event.target.value))}>
+                <option value="" disabled>Choose a stage</option>
+                {draft.stages.map((stage, index) => <option key={stage.id} value={index}>{index + 1}. {stage.name.trim() || `Stage ${index + 1}`}</option>)}
+              </select>
+            </label>}
+          </div>
+          <div className="pb-profile-details__copy">
+            <label className="pb-profile-details__author" data-builder-field="author" data-validation-severity={profileFieldSeverity('author')}>
+              <span>Author</span>
+              <input value={draft.author} placeholder="Your Decent username, or user" readOnly aria-describedby="profile-builder-author-help" />
+              <small id="profile-builder-author-help">Set from the signed-in account when saved.</small>
+            </label>
+            <label className="pb-profile-details__notes" data-builder-field="notes" data-validation-severity={profileFieldSeverity('notes')}>
+              <span>Description</span>
+              <textarea value={draft.notes} placeholder="Describe how this profile brews" onChange={(event) => updateDraft('notes', event.target.value)} />
+            </label>
+          </div>
         </div>
       </section>}
     </header>
@@ -1035,6 +1066,7 @@ export function ProfileBuilderScreen({ onClose, initialRecord, existingTitles = 
         index={index}
         active={index === activeStage}
         isLastStage={index === draft.stages.length - 1}
+        limiterTolerances={draft.limiterTolerances}
         dragging={stage.id === draggedStageId}
         issues={validation.issues.filter((issue) => issue.stageId === stage.id)}
         panelRequest={stagePanelRequest?.stageId === stage.id ? stagePanelRequest : undefined}
