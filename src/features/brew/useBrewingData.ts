@@ -2,16 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import { playCompletionSound } from '../../audio/completionSound'
 import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isCleaningProfile, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotStage, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres } from '../../api/decaid/adapters'
 import { connectDevice, createProfile, DecaidApiError, getDecentAccountStatus, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getMachineSettings, getProfile, getProfiles, getSettings, getSharedSetting, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineProfile, setMachineState, setSharedSetting, tareScale, updateProfile, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
-import { profileUserTargetNeedsWorkflowSync, workflowValuesForProfile } from '../../api/decaid/profileWorkflow'
+import { profileTargetNeedsWorkflowSync, workflowPatchForSavedActiveProfile, workflowValuesForProfile } from '../../api/decaid/profileWorkflow'
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
 import type { DecaidProfile, DecaidProfileRecord, DecaidWorkflowPatch, FavoriteAssignments, MachineSnapshot, ScaleSnapshot, TimeToReadyFrame, WaterLevels } from '../../api/decaid/types'
 import { liveScaleDisplayWeight, liveShotYield, normalizedLiveScaleWeight, scaleConnectionIsActive, WATER_TANK_SENSOR_FULL_MM, waterTankLevelState } from '../../domain/brewing'
-import type { AvailableScale, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, LiveUtilityOperation, MachineReadiness, PreviousShot, PreviousShotStatus, ScaleConnection, SettingFeedback, UtilityOperationKind } from '../../domain/brewing'
+import type { AvailableScale, BrewProfile, BrewingScreenModel, DataConnection, EditableMachineSetting, EditableProfileSetting, LiveBrewState, LiveShotPoint, LiveUtilityOperation, MachineReadiness, PreviousShot, PreviousShotStatus, ScaleConnection, SettingFeedback, UtilityOperationKind } from '../../domain/brewing'
 import { brewingFixture, demoLiveBrewFixture } from '../../fixtures/brewingFixture'
 import { scaleFixtureForKey } from '../../fixtures/scaleFixtures'
 import { cleaningRestorePatch, isCleaningSequenceRun, prepareCleaningProfileForEspressoStart, profileForCleaningShortcut } from '../cleaning/cleaningSequence'
-import { observePostShotWeight, reconciledShotYield, type YieldFinalizationState } from '../history/shotYieldFinalization'
+import { observePostShotWeight, reconciledShotPoints, reconciledShotYield, type YieldFinalizationState } from '../history/shotYieldFinalization'
 import { LAST_SELECTED_PROFILE_LOCAL_KEY, LAST_SELECTED_PROFILE_SHARED_KEY, normalizeRememberedProfileId, resolveRememberedProfileId } from '../profiles/profileSelectionPersistence'
 import { profileAuthorForAccount } from '../profiles/profileAuthor'
 import { assertMatchingProfileReadback, assertVerifiedProfileRecord, ProfileSaveVerificationError } from '../profiles/profileSaveVerification'
@@ -35,6 +35,7 @@ const localLiveBrewFixture = import.meta.env.DEV && new URLSearchParams(window.l
 
 interface LiveShotSession {
   kind: 'espresso' | 'cleaning'
+  beverageType?: string
   startedAt: number
   telemetryStartedAt?: number
   profileName: string
@@ -406,8 +407,9 @@ export function useBrewingData() {
             const domainShot = {
               ...persistedShot,
               profileName: session.profileName,
-              beverageType: session.kind,
+              beverageType: session.beverageType ?? persistedShot.beverageType ?? session.kind,
               totalYield: reconciledShotYield(persistedShot.totalYield, settledYieldBySession.get(session.startedAt)),
+              points: reconciledShotPoints(persistedShot.points, session.points),
             }
             settledYieldBySession.delete(session.startedAt)
             if (domainShot.id) shotHistoryCache.current.set(domainShot.id, domainShot)
@@ -476,6 +478,7 @@ export function useBrewingData() {
       if (finalWeight !== undefined && points.length > 0) {
         points = points.map((point, index) => index === points.length - 1 ? { ...point, weight: finalWeight } : point)
       }
+      session.points = points
       setLiveBrew({ active: false, visible: true, startedAt: session.startedAt, kind: 'espresso', profileName: session.profileName, targetYield: session.targetYield, scaleWeight: finalWeight, elapsedMs, points })
 
       const hasExtraction = points.some((point) => (point.pressure ?? 0) > 0.5 || (point.flow ?? 0) > 0.1)
@@ -565,7 +568,7 @@ export function useBrewingData() {
         if (restoredProfileId) {
           const restoredProfile = domainProfiles.find((profile) => profile.id === restoredProfileId)
           const restoredRecord = records.find((record) => (record.id || record.profile?.title) === restoredProfileId)
-          const targetOverrideNeedsSync = profileUserTargetNeedsWorkflowSync(restoredRecord?.metadata, workflow.context?.targetYield)
+          const targetOverrideNeedsSync = profileTargetNeedsWorkflowSync(restoredRecord?.profile, restoredRecord?.metadata, workflow.context?.targetYield)
           const shouldRestoreProfile = restoredProfileId !== workflowProfile?.id || targetOverrideNeedsSync
           if (shouldRestoreProfile && restoredProfile && restoredRecord?.profile?.steps?.length) {
             const workflowBeforeProfileRestore = workflow
@@ -689,6 +692,7 @@ export function useBrewingData() {
           finishPendingYield()
           liveShotSession.current = {
             kind: isCleaning ? 'cleaning' : 'espresso',
+            beverageType: isCleaning ? 'cleaning' : profile?.beverageType,
             startedAt: now,
             profileName: isCleaning ? cleaningSequence?.profileName ?? 'Cleaning' : profile?.name ?? 'Espresso',
             targetYield: profile && Number.isFinite(Number(profile.targetYield)) ? Number(profile.targetYield) : undefined,
@@ -1258,6 +1262,20 @@ export function useBrewingData() {
     } satisfies DecaidProfileRecord
   }
 
+  const applySavedActiveProfile = async (
+    savedRecord: DecaidProfileRecord,
+    savedProfile: BrewProfile,
+    sourceProfileId: string | undefined,
+    overwriteSource: boolean,
+    records: DecaidProfileRecord[],
+  ) => {
+    const patch = workflowPatchForSavedActiveProfile(savedRecord, savedProfile, sourceProfileId, latestModel.current.activeProfileId, overwriteSource)
+    if (!patch) return false
+    const workflow = await updateWorkflow(patch)
+    setModel((current) => applyWorkflow(current, workflow, records, favoriteAssignments.current, retainedAdHocProfileId.current))
+    return true
+  }
+
   const saveProfileDraft = async (profile: DecaidProfile, sourceProfileId: string | undefined, overwriteSource: boolean, metadata?: Record<string, unknown> | null) => {
     if (!profile.title?.trim() || !profile.steps?.length) {
       const message = 'A profile name and at least one stage are required.'
@@ -1343,10 +1361,29 @@ export function useBrewingData() {
       if (shouldOverwrite && sourceProfileId && latestModel.current.activeProfileId === sourceProfileId && verifiedRecord.id !== sourceProfileId) {
         retainedAdHocProfileId.current = sourceProfileId
       }
-      setModel((current) => ({
-        ...current,
-        profiles: carouselProfiles(carouselSource, favoriteAssignments.current, current.activeProfileId),
-      }))
+      const savedDomainProfile = domainProfiles.find((candidate) => candidate.id === verifiedRecord.id)
+      if (savedDomainProfile) {
+        try {
+          if (!await applySavedActiveProfile(verifiedRecord, savedDomainProfile, sourceProfileId, shouldOverwrite, records)) {
+            setModel((current) => ({
+              ...current,
+              profiles: carouselProfiles(carouselSource, favoriteAssignments.current, current.activeProfileId),
+            }))
+          }
+        } catch {
+          setModel((current) => ({
+            ...current,
+            profiles: carouselProfiles(carouselSource, favoriteAssignments.current, current.activeProfileId),
+          }))
+          showSettingFeedback({ status: 'error', message: `${profile.title} was saved, but could not be applied to the machine.` })
+          return verifiedRecord
+        }
+      } else {
+        setModel((current) => ({
+          ...current,
+          profiles: carouselProfiles(carouselSource, favoriteAssignments.current, current.activeProfileId),
+        }))
+      }
       showSettingFeedback({ status: 'saved', message: shouldOverwrite ? `${profile.title} updated.` : `${profile.title} saved as a new profile.` })
       return verifiedRecord
     } catch (error) {
@@ -1372,7 +1409,20 @@ export function useBrewingData() {
     if (latestModel.current.activeProfileId === profileId) {
       if (!isFavorite) retainedAdHocProfileId.current = profileId
       storeLastSelectedProfileIdLocally(profileId)
-      if (connection === 'connected') await setSharedSetting(LAST_SELECTED_PROFILE_SHARED_KEY, profileId).catch(() => undefined)
+      if (connection === 'connected') {
+        const record = profileRecords.current.find((candidate) => candidate.id === profileId)
+        try {
+          const workflow = await getWorkflow()
+          if (record?.profile?.steps?.length && profileTargetNeedsWorkflowSync(record.profile, record.metadata, workflow.context?.targetYield)) {
+            const synchronizedWorkflow = await updateWorkflow(workflowValuesForProfile(record, profile).patch)
+            setModel((current) => applyWorkflow(current, synchronizedWorkflow, profileRecords.current, favoriteAssignments.current, retainedAdHocProfileId.current))
+          }
+        } catch {
+          showSettingFeedback({ status: 'error', message: `${profile.name} could not be synchronized with Decaid.` })
+          return false
+        }
+        await setSharedSetting(LAST_SELECTED_PROFILE_SHARED_KEY, profileId).catch(() => undefined)
+      }
       return true
     }
     if (connection === 'fixture') {

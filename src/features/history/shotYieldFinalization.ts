@@ -1,3 +1,5 @@
+import type { LiveShotPoint } from '../../domain/brewing.ts'
+
 export const FINAL_YIELD_SETTLE_FLOW = 0.4
 export const FINAL_YIELD_SETTLE_SAMPLES = 10
 export const FINAL_YIELD_REMOVAL_FLOW = -3
@@ -32,4 +34,25 @@ export function observePostShotWeight(state: YieldFinalizationState, weight: num
 export function reconciledShotYield(persistedYield: string, settledWeight?: number) {
   if (settledWeight === undefined || !Number.isFinite(settledWeight) || settledWeight <= 0) return persistedYield
   return settledWeight.toFixed(1)
+}
+
+export function reconciledShotPoints(persistedPoints: LiveShotPoint[] | undefined, livePoints: LiveShotPoint[]) {
+  if (!persistedPoints?.length) return livePoints
+  if (!livePoints.some((point) => Number.isFinite(point.weight))) return persistedPoints
+
+  let liveIndex = 0
+  return persistedPoints.map((point) => {
+    while (
+      liveIndex + 1 < livePoints.length
+      && Math.abs(livePoints[liveIndex + 1].elapsedMs - point.elapsedMs) <= Math.abs(livePoints[liveIndex].elapsedMs - point.elapsedMs)
+    ) liveIndex += 1
+    const livePoint = livePoints[liveIndex]
+    const weight = point.weight ?? livePoint?.weight
+    const weightFlow = point.weightFlow ?? livePoint?.weightFlow
+    return {
+      ...point,
+      ...(weight === undefined ? {} : { weight }),
+      ...(weightFlow === undefined ? {} : { weightFlow }),
+    }
+  })
 }

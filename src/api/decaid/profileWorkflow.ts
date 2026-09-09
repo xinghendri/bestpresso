@@ -48,6 +48,10 @@ export const profileConfiguredTargetYield = (profile?: DecaidProfile, metadata?:
   return configuredTarget ?? userTarget ?? sourceTarget
 }
 
+export const profileTargetNeedsWorkflowSync = (profile: DecaidProfile | undefined, metadata: Record<string, unknown> | null | undefined, workflowTarget: unknown) => (
+  (profileConfiguredTargetYield(profile, metadata) ?? 0) !== (positiveTargetYield(workflowTarget) ?? 0)
+)
+
 export const workflowValuesForProfile = (record: DecaidProfileRecord, profile: BrewProfile) => {
   const profileTemperature = Number(profile.temperature)
   const profileDose = Number(profile.dose)
@@ -92,3 +96,13 @@ export const workflowValuesForProfile = (record: DecaidProfileRecord, profile: B
     metadata,
   }
 }
+
+export const workflowPatchForSavedActiveProfile = (
+  record: DecaidProfileRecord,
+  profile: BrewProfile,
+  sourceProfileId: string | undefined,
+  activeProfileId: string | undefined,
+  overwriteSource: boolean,
+) => overwriteSource && sourceProfileId !== undefined && sourceProfileId === activeProfileId
+  ? workflowValuesForProfile(record, profile).patch
+  : null
