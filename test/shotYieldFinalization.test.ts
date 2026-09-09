@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { observePostShotWeight, reconciledShotYield, type YieldFinalizationState } from '../src/features/history/shotYieldFinalization.ts'
+import { observePostShotWeight, reconciledShotPoints, reconciledShotYield, type YieldFinalizationState } from '../src/features/history/shotYieldFinalization.ts'
 
 const initial = (weight = 34): YieldFinalizationState => ({ bestWeight: weight, lastWeight: weight, stableSamples: 0 })
 
@@ -37,4 +37,24 @@ test('rejects a sudden positive flow spike after the shot', () => {
 test('uses settled scale telemetry instead of the persisted shot yield', () => {
   assert.equal(reconciledShotYield('34.8', 36.1), '36.1')
   assert.equal(reconciledShotYield('36.3', 36.1), '36.1')
+})
+
+test('keeps live scale points when Decaid persists machine-only shot measurements', () => {
+  const persisted = [
+    { elapsedMs: 0, stageIndex: 0, pressure: 1, flow: 4 },
+    { elapsedMs: 1000, stageIndex: 0, pressure: 2, flow: 4 },
+  ]
+  const live = [
+    { elapsedMs: 0, stageIndex: 0, pressure: 1, flow: 4, weight: 0, weightFlow: 0 },
+    { elapsedMs: 1000, stageIndex: 0, pressure: 2, flow: 4, weight: 12.4, weightFlow: 1.2 },
+  ]
+
+  assert.deepEqual(reconciledShotPoints(persisted, live), live)
+})
+
+test('continues to prefer complete persisted measurements when they contain scale data', () => {
+  const persisted = [{ elapsedMs: 0, pressure: 1, weight: 12.5 }]
+  const live = [{ elapsedMs: 0, pressure: 1, weight: 12.4 }]
+
+  assert.deepEqual(reconciledShotPoints(persisted, live), persisted)
 })

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { BESTPRESSO_TARGET_YIELD_OVERRIDE_KEY, profileConfiguredTargetYield, profileTargetYield, profileUserTargetNeedsWorkflowSync, profileUsesStopAtWeight, workflowValuesForProfile } from '../src/api/decaid/profileWorkflow.ts'
+import { BESTPRESSO_TARGET_YIELD_OVERRIDE_KEY, profileConfiguredTargetYield, profileTargetNeedsWorkflowSync, profileTargetYield, profileUserTargetNeedsWorkflowSync, profileUsesStopAtWeight, workflowPatchForSavedActiveProfile, workflowValuesForProfile } from '../src/api/decaid/profileWorkflow.ts'
 import type { DecaidProfileRecord } from '../src/api/decaid/types.ts'
 import type { BrewProfile } from '../src/domain/brewing.ts'
 
@@ -92,7 +92,29 @@ test('restores the saved user yield when the current workflow lost it', () => {
   assert.equal(profileUserTargetNeedsWorkflowSync({}, 42), false)
   assert.equal(profileUserTargetNeedsWorkflowSync({ [BESTPRESSO_TARGET_YIELD_OVERRIDE_KEY]: 0 }, 42), true)
   assert.equal(profileUserTargetNeedsWorkflowSync({ [BESTPRESSO_TARGET_YIELD_OVERRIDE_KEY]: 0 }, null), false)
-  assert.match(brewingData, /profileUserTargetNeedsWorkflowSync\(restoredRecord\?\.metadata, workflow\.context\?\.targetYield\)/)
+  assert.match(brewingData, /profileTargetNeedsWorkflowSync\(restoredRecord\?\.profile, restoredRecord\?\.metadata, workflow\.context\?\.targetYield\)/)
+})
+
+test('restores a stored pour-over target when the active workflow lost it', () => {
+  const pourOverRecord = record(80)
+  pourOverRecord.profile!.beverage_type = 'pourover'
+  pourOverRecord.metadata = { targetYield: 80 }
+
+  assert.equal(profileTargetNeedsWorkflowSync(pourOverRecord.profile, pourOverRecord.metadata, null), true)
+  assert.equal(profileTargetNeedsWorkflowSync(pourOverRecord.profile, pourOverRecord.metadata, 80), false)
+})
+
+test('reapplies an overwritten active pour-over profile to the workflow', () => {
+  const pourOverRecord = record(80)
+  pourOverRecord.profile!.beverage_type = 'pourover'
+  const profile = { ...domainProfile('80'), beverageType: 'pourover' }
+
+  const patch = workflowPatchForSavedActiveProfile(pourOverRecord, profile, 'filter-3', 'filter-3', true)
+  assert.equal(patch?.profile?.beverage_type, 'pourover')
+  assert.equal(patch?.profile?.target_weight, 80)
+  assert.equal(patch?.context?.targetYield, 80)
+  assert.equal(workflowPatchForSavedActiveProfile(pourOverRecord, profile, 'filter-3', 'other-profile', true), null)
+  assert.equal(workflowPatchForSavedActiveProfile(pourOverRecord, profile, 'filter-3', 'filter-3', false), null)
 })
 
 test('yield remains visible and editable when its current value is unset', () => {
