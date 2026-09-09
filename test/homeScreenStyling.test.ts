@@ -73,6 +73,13 @@ test('uses the smaller proportional steam toggle', () => {
   assert.match(styles, /\.steam-heating-toggle--enabled>span \{[^}]*transform:translateX\(19px\);/)
 })
 
+test('makes the needs-water state visibly red in the header and reservoir', () => {
+  assert.match(styles, /\.status-pill--thirsty \{ border-color:#de6161; color:#f49090;/)
+  assert.match(styles, /\.status-pill--thirsty img \{[^}]*filter:/)
+  assert.match(styles, /\.reservoir-meter--needs-water \{ background:rgba\(91,54,54,\.64\); \}/)
+  assert.match(styles, /\.reservoir-meter--needs-water \.reservoir-meter__icon img \{ filter:/)
+})
+
 test('uses 32px standard home-screen metric readings', () => {
   assert.match(styles, /\.metric__reading \{ color:#707070; font-size:32px;/)
   assert.match(styles, /\.brew-metrics \.metric__reading \{ font-size:32px; \}/)
