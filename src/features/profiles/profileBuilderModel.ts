@@ -58,6 +58,7 @@ export interface ProfileDraft {
   targetVolume?: number | null
   targetVolumeCountStart: number
   tankTemperature: number
+  limiterTolerances: Record<BuilderExitType, number>
   stages: BuilderStage[]
   sourceProfile?: DecaidProfile
   sourceProfileId?: string
@@ -70,6 +71,19 @@ export function builderPumpMemory(stage: BuilderStage): BuilderPumpMemory {
     [stage.pump]: stage.target,
     ...(stage.limiter && stage.limiter.value > 0 ? { [stage.limiter.type]: stage.limiter.value } : {}),
   }
+}
+
+export function builderLimiterTolerances(stages: BuilderStage[], fallback = 0.6): Record<BuilderExitType, number> {
+  return {
+    pressure: stages.find((stage) => stage.limiter?.type === 'pressure')?.limiter?.range ?? fallback,
+    flow: stages.find((stage) => stage.limiter?.type === 'flow')?.limiter?.range ?? fallback,
+  }
+}
+
+export function applyBuilderLimiterTolerance(stages: BuilderStage[], type: BuilderExitType, range: number) {
+  return stages.map((stage) => stage.limiter?.type === type
+    ? { ...stage, limiter: { ...stage.limiter, range } }
+    : stage)
 }
 
 export function switchBuilderPump(stage: BuilderStage, pump: BuilderPump, remembered: BuilderPumpMemory) {
@@ -264,6 +278,7 @@ export function profileDraftFromDecaidProfile(profile: DecaidProfile, options: {
   ] as const) {
     if (!isNumericLike(value)) addProfileIssue('error', field, `${label} is required and must be a number.`)
   }
+  const stages = profile.steps?.map((step, index) => stageFromDecaid(step, index, importIssues)) ?? []
   return {
     version: profile.version,
     title: options.copyName === false
@@ -277,7 +292,8 @@ export function profileDraftFromDecaidProfile(profile: DecaidProfile, options: {
     targetVolume: optionalNumeric(profile.target_volume),
     targetVolumeCountStart: numeric(profile.target_volume_count_start),
     tankTemperature: numeric(profile.tank_temperature),
-    stages: profile.steps?.map((step, index) => stageFromDecaid(step, index, importIssues)) ?? [],
+    limiterTolerances: builderLimiterTolerances(stages),
+    stages,
     sourceProfile: { ...profile, steps: profile.steps?.map((step) => ({ ...step })) },
     sourceProfileId: options.sourceProfileId,
     sourceMetadata: options.sourceMetadata,
@@ -347,6 +363,7 @@ export function createDefaultProfileDraft(): ProfileDraft {
     targetVolume: 0,
     targetVolumeCountStart: 0,
     tankTemperature: 0,
+    limiterTolerances: { pressure: 0.6, flow: 0.6 },
     stages: [
       { id: 'preinfusion', name: 'Preinfusion', pump: 'flow', transition: 'fast', target: 2, temperature: 93, sensor: 'coffee', seconds: 10, weight: 0, volume: 0, exit: { type: 'pressure', condition: 'over', value: 4 }, limiter: { type: 'pressure', value: 4, range: 0.6 } },
       { id: 'ramp', name: 'Ramp', pump: 'flow', transition: 'fast', target: 6, temperature: 93, sensor: 'coffee', seconds: 20, weight: 0, volume: 0, exit: { type: 'pressure', condition: 'over', value: 9 }, limiter: { type: 'pressure', value: 9, range: 0.6 } },

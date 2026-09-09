@@ -74,6 +74,7 @@ export function profileRecordsToDomain(records: DecaidProfileRecord[], workflow:
       id: record.id || profile.title || crypto.randomUUID(),
       name: parsedTitle.name,
       category: parsedTitle.category ?? textValue(profile.category),
+      version: profile.version === null || profile.version === undefined ? undefined : String(profile.version),
       beverageType: profile.beverage_type,
       description: textValue(metadata.description, metadata.profileDescription, metadata.notes, metadata.profileNotes, metadata.profile_notes, profile.description, profile.notes, profile.profile_notes),
       temperature: numberString(isActive ? workflow.profile?.steps?.[0]?.temperature : metadata.temperature ?? profile.steps?.[0]?.temperature, '—'),

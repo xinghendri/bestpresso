@@ -113,11 +113,15 @@ export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, o
           <h1>{activeShot?.profileName ?? 'Pull history'}</h1>
           {activeShot && <time dateTime={activeShot.timestamp}>{pullTime(activeShot.timestamp)}</time>}
         </div>
-        <div className={`live-pull-header__metrics${isCleaning ? ' live-pull-header__metrics--single' : ' live-pull-header__metrics--history'}`}>
-          <div><span>Duration</span><strong>{activeShot ? timerLabel(activeShot) : '—'}</strong></div>
-          {!isCleaning && <><i aria-hidden="true" /><div><span>Yield</span><strong>{activeShot?.totalYield ?? '—'}{activeShot?.totalYield !== '—' && <small>g</small>}</strong></div></>}
+        <div className="live-pull-header__controls">
+          <div className={`live-pull-header__metrics${isCleaning ? ' live-pull-header__metrics--single' : ' live-pull-header__metrics--history'}`}>
+            <div><span>Duration</span><strong>{activeShot ? timerLabel(activeShot) : '—'}</strong></div>
+            {!isCleaning && <><i aria-hidden="true" /><div><span>Yield</span><strong>{activeShot?.totalYield ?? '—'}{activeShot?.totalYield !== '—' && <small>g</small>}</strong></div></>}
+          </div>
+          <div className="live-pull-header__actions">
+            <button className="live-pull-action live-pull-action--close" type="button" onClick={onDismiss}>Close</button>
+          </div>
         </div>
-        <button className="live-pull-action live-pull-action--close" type="button" onClick={onDismiss}>Close</button>
       </header>
 
       <section className={`live-pull-chart-panel history-pull-chart${loadingId ? ' history-pull-chart--loading' : ''}`} aria-label={activeShot ? `Shot history: ${activeShot.profileName}` : 'Shot history chart'}>

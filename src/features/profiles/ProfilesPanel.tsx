@@ -35,7 +35,7 @@ interface ProfilesPanelProps {
   onEditProfile?: (profileId: string) => void
 }
 
-export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId, initialProfileId, editingEnabled = false, profileEditMode, feedback, onSelectProfile, onSetFavoriteSlot, onRemoveFavorite, onClose, onStartProfile, onImportProfile, onCheckVisualizer, onImportVisualizer, onOpenSettings, onEditProfile }: ProfilesPanelProps) {
+export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId, initialProfileId, editingEnabled = false, profileEditMode, feedback, onSelectProfile, onSetFavoriteSlot, onRemoveFavorite, onClose, onStartProfile, onImportProfile, onCheckVisualizer: _onCheckVisualizer, onImportVisualizer, onOpenSettings, onEditProfile }: ProfilesPanelProps) {
   const [selectedProfileId, setSelectedProfileId] = useState(initialProfileId ?? activeProfileId ?? profiles[0]?.id)
   const [activeCategory, setActiveCategory] = useState('All')
   const [searchOpen, setSearchOpen] = useState(false)
@@ -187,16 +187,18 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
     }
   }
 
+  /* Visualizer add-profile entry point is temporarily withheld from the UI.
   const openVisualizerImport = async () => {
     setAddMenuOpen(false)
     setVisualizerOpen(true)
     setVisualizerCode('')
     setVisualizerMessage(null)
     setVisualizerStatus('checking')
-    const availability = await onCheckVisualizer?.() ?? { ready: false, message: 'Visualizer import is not available.' }
+    const availability = await _onCheckVisualizer?.() ?? { ready: false, message: 'Visualizer import is not available.' }
     setVisualizerStatus(availability.ready ? 'ready' : 'unavailable')
     setVisualizerMessage(availability.message ?? null)
   }
+  */
 
   const submitVisualizerImport = async () => {
     if (!isVisualizerShareCode(visualizerCode) || visualizerStatus !== 'ready') return
@@ -229,7 +231,8 @@ export function ProfilesPanel({ profiles, favoriteProfileSlots, activeProfileId,
           {addMenuOpen && <div className="profiles-add-menu" role="menu" aria-label="Add a profile">
             <div className="profiles-add-menu__heading"><strong>Add a profile</strong><small>How would you like to begin?</small></div>
             <button type="button" role="menuitem" onClick={() => profileFileInput.current?.click()}><span className="profiles-add-menu__icon profiles-add-menu__icon--json" aria-hidden="true">{'{ }'}</span><span><strong>Import from .json</strong><small>Choose a profile file</small></span></button>
-            <button type="button" role="menuitem" onClick={() => void openVisualizerImport()}><span className="profiles-add-menu__icon" aria-hidden="true">↗</span><span><strong>Import from Visualizer</strong><small>Use a 4-digit share code</small></span></button>
+            {/* Visualizer import stays implemented, but is intentionally hidden until the flow is ready to return. */}
+            {/* <button type="button" role="menuitem" onClick={() => void openVisualizerImport()}><span className="profiles-add-menu__icon" aria-hidden="true">↗</span><span><strong>Import from Visualizer</strong><small>Use a 4-digit share code</small></span></button> */}
             <button type="button" role="menuitem" onClick={() => { setAddMenuOpen(false); onStartProfile?.() }}><span className="profiles-add-menu__icon" aria-hidden="true">＋</span><span><strong>Start from scratch</strong><small>Build a new profile</small></span></button>
             {addError && <p className="profiles-add-menu__error" role="alert">{addError}</p>}
           </div>}

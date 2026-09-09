@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { builderPumpMemory, builderTargetPoints, createDefaultProfileDraft, duplicateBuilderStage, moveBuilderStage, nextBuilderStage, profileDraftFromDecaidProfile, profileDraftToDecaidProfile, profileMaximumDurationMs, stageConstraintLabel, stageIndexAfterMove, switchBuilderPump, volumeCountStartAfterDelete } from '../src/features/profiles/profileBuilderModel.ts'
+import { applyBuilderLimiterTolerance, builderLimiterTolerances, builderPumpMemory, builderTargetPoints, createDefaultProfileDraft, duplicateBuilderStage, moveBuilderStage, nextBuilderStage, profileDraftFromDecaidProfile, profileDraftToDecaidProfile, profileMaximumDurationMs, stageConstraintLabel, stageIndexAfterMove, switchBuilderPump, volumeCountStartAfterDelete } from '../src/features/profiles/profileBuilderModel.ts'
 import { profileAuthorForAccount } from '../src/features/profiles/profileAuthor.ts'
 import { assertVerifiedProfileRecord, canonicalProfileForVerification } from '../src/features/profiles/profileSaveVerification.ts'
 import { nextBuilderStepperValue } from '../src/features/profiles/profileBuilderStepper.ts'
@@ -12,7 +12,6 @@ const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
 const profilesPanel = readFileSync(new URL('../src/features/profiles/ProfilesPanel.tsx', import.meta.url), 'utf8')
 const screen = readFileSync(new URL('../src/features/profiles/ProfileBuilderScreen.tsx', import.meta.url), 'utf8')
 const valueAdjustmentScreen = readFileSync(new URL('../src/components/ValueAdjustment/ValueAdjustmentProvider.tsx', import.meta.url), 'utf8')
-const feature = readFileSync(new URL('../src/features/profiles/profileBuilderFeature.ts', import.meta.url), 'utf8')
 const appShell = readFileSync(new URL('../src/app/AppShell.tsx', import.meta.url), 'utf8')
 const brewingData = readFileSync(new URL('../src/features/brew/useBrewingData.ts', import.meta.url), 'utf8')
 const styles = readFileSync(new URL('../src/styles/index.css', import.meta.url), 'utf8')
@@ -23,27 +22,21 @@ const coffeeActiveIcon = readFileSync(new URL('../src/assets/figma/builder-coffe
 const coffeeMutedIcon = readFileSync(new URL('../src/assets/figma/builder-coffee-source-muted.svg', import.meta.url), 'utf8')
 const waterActiveIcon = readFileSync(new URL('../src/assets/figma/builder-water-source-active.svg', import.meta.url), 'utf8')
 
-test('keeps the unfinished profile builder hidden in normal releases while allowing an explicit RC build', () => {
-  assert.match(app, /page === 'profile-builder' && runtimeBuilderEnabled/)
-  assert.match(app, /editingEnabled=\{builderEnabled\}/)
-  assert.match(feature, /if \(import\.meta\.env\.PROD\) return enabledValue\(import\.meta\.env\.VITE_ENABLE_PROFILE_BUILDER_RC\)/)
-  assert.match(feature, /VITE_ENABLE_PROFILE_BUILDER/)
+test('profile builder routes and entry points are available in normal releases', () => {
+  assert.match(app, /page === 'profiles' \|\| page === 'previous-pull' \|\| page === 'profile-builder'/)
+  assert.match(app, /editingEnabled profileEditMode=/)
+  assert.doesNotMatch(app, /profileBuilderEnabled|enableProfileBuilderForSession/)
   assert.match(profilesPanel, /editingEnabled = false/)
   assert.match(profilesPanel, /editingEnabled && <div className="profiles-add-control"/)
 })
 
-test('four quick taps on the Decent logo enable profile editing for the current session', () => {
-  assert.match(app, /useState\(profileBuilderEnabled\)/)
-  assert.match(app, /enableProfileBuilderForSession\(\); setBuilderEnabled\(true\)/)
-  assert.match(feature, /window\.sessionStorage\.setItem\(profileBuilderSessionKey, 'true'\)/)
-  assert.match(feature, /if \(sessionEnabled\(\)\) return true/)
-  assert.match(appShell, /now - previous\.lastTapAt <= 2_000/)
-  assert.match(appShell, /if \(count < 4\) return/)
-  assert.match(appShell, /className="topbar__logo"[\s\S]*?onClick=\{handleLogoTap\}/)
+test('the Decent logo is no longer a hidden profile-builder gesture', () => {
+  assert.doesNotMatch(appShell, /handleLogoTap|profileBuilderLogoTaps|onUnlockProfileBuilder/)
+  assert.match(appShell, /<div className="topbar__logo" aria-label="Decent">/)
 })
 
 test('profile builder entry points support create, import, safe copy, and user-owned editing', () => {
-  assert.match(app, /const creatingProfile = builderEnabled && page === 'profile-builder' && !profileId/)
+  assert.match(app, /const creatingProfile = page === 'profile-builder' && !profileId/)
   assert.match(app, /onStartProfile=\{startProfileFromScratch\}/)
   assert.match(app, /onImportProfile=\{editImportedProfile\}/)
   assert.match(app, /onCheckVisualizer=\{checkVisualizerImport\}/)
@@ -51,7 +44,8 @@ test('profile builder entry points support create, import, safe copy, and user-o
   assert.match(app, /profileEditMode=\{\(selectedProfileId\) => data\.profileRecordForEditing\(selectedProfileId\)\?\.isDefault === false \? 'edit' : 'copy'\}/)
   assert.match(profilesPanel, /aria-label="Add profile"/)
   assert.match(profilesPanel, /Import from \.json/)
-  assert.match(profilesPanel, /Import from Visualizer/)
+  assert.match(profilesPanel, /Visualizer import stays implemented, but is intentionally hidden/)
+  assert.match(profilesPanel, /\{\/\* <button[^\n]+Import from Visualizer[^\n]+ \*\/\}/)
   assert.match(profilesPanel, /Start from scratch/)
   assert.match(profilesPanel, /profileEditMode\?\.\(profileId\) === 'edit' \? 'Edit profile' : 'Edit a copy'/)
 })
@@ -508,7 +502,7 @@ test('editor follows the designed high-level hierarchy without prototype-only fi
   assert.match(screen, /disabled=\{isLastStage\}/)
   assert.match(screen, /isLastStage=\{index === draft\.stages\.length - 1\}/)
   assert.match(screen, /Measure from/)
-  assert.match(screen, /Category \(optional\)/)
+  assert.match(screen, /Uncategorized/)
   assert.doesNotMatch(screen, /Prototype only/)
   assert.doesNotMatch(screen, />Limiter range</)
   assert.match(screen, /aria-label="Add stage"/)
@@ -539,38 +533,69 @@ test('scale-dependent exits do not produce redundant validation warnings', () =>
   assert.equal(validation.issues.some((issue) => issue.id.endsWith('weight-scale')), false)
 })
 
-test('the header exposes every Decaid profile-level prerequisite and hidden limiter range', () => {
+test('the expanded title card exposes profile prerequisites without repeating title-bar settings', () => {
   assert.match(screen, /aria-controls="profile-builder-details"/)
   assert.match(screen, /Profile details and advanced settings/)
-  assert.match(screen, />Beverage type</)
-  assert.match(screen, />Profile format</)
-  assert.match(screen, />Author</)
-  assert.match(screen, /Set from the signed-in account when saved/)
-  assert.match(screen, />Notes</)
-  assert.match(screen, />End shot yield</)
-  assert.match(screen, />End shot volume fallback</)
-  assert.match(screen, /volumeFallbackActive && <label data-builder-field="targetVolumeCountStart"/)
-  assert.match(screen, />Start measuring from</)
-  assert.match(screen, /<option value="" disabled>Choose a step<\/option>/)
-  assert.match(screen, /\{index \+ 1\}\. \{stage\.name\.trim\(\) \|\| `Step \$\{index \+ 1\}`\}/)
-  assert.doesNotMatch(screen, />Volume count start</)
-  assert.doesNotMatch(screen, /<small>frame<\/small>/)
-  assert.match(screen, />Tank temperature</)
-  assert.match(screen, />Stage limiter response range</)
-  assert.match(screen, /updateLimiterRange/)
-  assert.match(screen, /readOnly aria-describedby="profile-builder-author-help"/)
+  const details = screen.slice(screen.indexOf('{profileDetailsOpen && <section'), screen.indexOf('</section>}\n    </header>'))
+  assert.match(screen, /<EditableChoice id="category" label="Category"/)
+  assert.match(details, /label="Profile version"/)
+  assert.match(screen, /knownCategories/)
+  assert.match(screen, /knownVersions/)
+  assert.match(details, />Author</)
+  assert.match(details, /Set from the signed-in account when saved/)
+  assert.match(details, />Description</)
+  assert.match(screen, /<span>End shot yield <img/)
+  assert.match(details, /label="End shot volume fallback"/)
+  assert.match(details, /volumeFallbackActive && <label className="pb-profile-details__measure-from"/)
+  assert.match(details, />Start measuring volume from</)
+  assert.match(details, /<option value="" disabled>Choose a stage<\/option>/)
+  assert.match(details, /\{index \+ 1\}\. \{stage\.name\.trim\(\) \|\| `Stage \$\{index \+ 1\}`\}/)
+  assert.match(details, /label="Flow tolerance"/)
+  assert.match(details, /label="Pressure tolerance"/)
+  assert.doesNotMatch(details, /label="Tank temperature"/)
+  assert.doesNotMatch(details, />Beverage type</)
+  assert.doesNotMatch(details, />End shot yield</)
+  assert.doesNotMatch(details, />Stage limiter response range</)
+  assert.match(details, /readOnly aria-describedby="profile-builder-author-help"/)
+  assert.match(styles, /Figma 190:34/)
   assert.match(styles, /\.pb-profile-details\{position:absolute/)
+  assert.match(screen, /className="pb-profile-details-backdrop" aria-label="Close more settings"/)
+  assert.match(styles, /\.pb-profile-details-backdrop\{[^}]*position:fixed[^}]*z-index:19[^}]*background:rgba\(0,0,0,\.64\)/)
+  assert.match(styles, /\.pb-topbar\.is-expanded::before\{[^}]*height:var\(--pb-expanded-panel-height\)/)
+  assert.match(styles, /\.pb-topbar\.is-expanded\{[^}]*height:var\(--pb-expanded-header-height\)[^}]*flex-basis:var\(--pb-expanded-header-height\)/)
 })
 
 test('advanced settings opens from a compact title-row disclosure', () => {
   const metadata = screen.slice(screen.indexOf('<div className="pb-topbar__metadata">'), screen.indexOf('<div className="pb-topbar__actions">'))
   assert.match(screen, /className=\{`pb-more-settings/)
-  assert.match(screen, /<span>More settings<\/span>/)
-  assert.match(screen, /<div><h2>More settings<\/h2>/)
+  assert.match(screen, /profileDetailsOpen \? 'Less settings' : 'More settings'/)
+  assert.match(screen, /pb-category-summary/)
   assert.doesNotMatch(metadata, /Profile details/)
   assert.doesNotMatch(metadata, />Hide<|>View</)
   assert.match(styles, /\.pb-topbar__identity-actions\{display:flex/)
   assert.match(styles, /\.pb-more-settings\.is-open img\{transform:rotate\(180deg\)\}/)
+})
+
+test('universal limiter tolerances preserve limiter values and update every matching stage', () => {
+  const stages = createDefaultProfileDraft().stages
+  assert.deepEqual(builderLimiterTolerances(stages), { pressure: 0.6, flow: 0.6 })
+  const updated = applyBuilderLimiterTolerance(stages, 'pressure', 0.9)
+  assert.equal(updated[0].limiter?.value, 4)
+  assert.equal(updated[0].limiter?.range, 0.9)
+  assert.equal(updated[1].limiter?.range, 0.9)
+  assert.equal(updated[2].limiter, undefined)
+  assert.equal(stages[0].limiter?.range, 0.6)
+  assert.match(screen, /limiterTolerances\[limiterType\]/)
+})
+
+test('more-settings metrics reuse stage steppers and open the isolated adjustment screen', () => {
+  assert.match(screen, /<SettingsMetric label="End shot volume \(without scale\)"/)
+  assert.match(screen, /<SettingsMetric label="Flow tolerance"/)
+  assert.match(screen, /<SettingsMetric label="Pressure tolerance"/)
+  assert.doesNotMatch(screen, /<SettingsMetric label="Tank temperature"/)
+  assert.match(screen, /onOpen=\{\(\) => openProfileMetric/)
+  assert.match(screen, /<Stepper label="Flow tolerance"/)
+  assert.match(screen, /<Stepper label="Pressure tolerance"/)
 })
 
 test('stage cards use the compact Figma dimensions and compact further on short screens', () => {

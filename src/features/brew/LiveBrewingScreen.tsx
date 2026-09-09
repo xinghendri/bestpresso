@@ -48,18 +48,22 @@ export function LiveBrewingScreen({ model, liveBrew, stopPending, skipPending, a
     {actionError && <div className="system-messages"><div className="system-message system-message--error" role="alert">{actionError}</div></div>}
     <header className="live-pull-header">
       <h1>{profileName}</h1>
-      <div className={`live-pull-header__metrics${isCleaning ? ' live-pull-header__metrics--single' : ' live-pull-header__metrics--live'}`} aria-live="polite">
-        <div><span>Timer</span><strong>{timedLabel(liveBrew.elapsedMs)}</strong></div>
-        {!isCleaning && <>
-          <i aria-hidden="true" />
-          <div><span>Yield</span><strong>{weight?.toFixed(1) ?? '—'}<small>g</small>{targetYield !== undefined && <> <em>/</em> {targetYield.toFixed(Number.isInteger(targetYield) ? 0 : 1)}<small>g</small></>}</strong></div>
-          <i aria-hidden="true" />
-          <div><span>Flow rate</span><strong>{flowRate?.toFixed(1) ?? '—'}<small>g/s</small></strong></div>
-        </>}
+      <div className="live-pull-header__controls">
+        <div className={`live-pull-header__metrics${isCleaning ? ' live-pull-header__metrics--single' : ' live-pull-header__metrics--live'}`} aria-live="polite">
+          <div><span>Timer</span><strong>{timedLabel(liveBrew.elapsedMs)}</strong></div>
+          {!isCleaning && <>
+            <i aria-hidden="true" />
+            <div><span>Yield</span><strong>{weight?.toFixed(1) ?? '—'}<small>g</small>{targetYield !== undefined && <> <em>/</em> {targetYield.toFixed(Number.isInteger(targetYield) ? 0 : 1)}<small>g</small></>}</strong></div>
+            <i aria-hidden="true" />
+            <div><span>Flow rate</span><strong>{flowRate?.toFixed(1) ?? '—'}<small>g/s</small></strong></div>
+          </>}
+        </div>
+        <div className="live-pull-header__actions">
+          {liveBrew.active
+            ? <button className="live-pull-action live-pull-action--stop" type="button" disabled={stopPending} onClick={onStop}>{stopPending ? 'Stopping…' : 'Stop'}</button>
+            : <button className="live-pull-action live-pull-action--close" type="button" onClick={onDismiss} aria-label="Close completed pull">Close</button>}
+        </div>
       </div>
-      {liveBrew.active
-        ? <button className="live-pull-action live-pull-action--stop" type="button" disabled={stopPending} onClick={onStop}>{stopPending ? 'Stopping…' : 'Stop'}</button>
-        : <button className="live-pull-action live-pull-action--close" type="button" onClick={onDismiss} aria-label="Close completed pull">Close</button>}
     </header>
     <section className="live-pull-chart-panel" aria-label={`Running ${profileName}`}>
       <LiveShotChart points={chartView.points} contextPoints={chartView.contextPoints} elapsedMs={chartView.elapsedMs} startMs={chartView.startMs} fitDuration={!liveBrew.active} targetYield={targetYield ?? weight ?? 36} showWeight={!isCleaning} legendFilterEnabled={!liveBrew.active} dimmedSeries={dimmedSeries} onToggleSeries={(series) => setDimmedSeries((current) => toggleDimmedChartSeries(current, series))} />
