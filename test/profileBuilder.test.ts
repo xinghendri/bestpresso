@@ -561,8 +561,11 @@ test('the expanded title card exposes profile prerequisites without repeating ti
   assert.match(styles, /\.pb-profile-details\{position:absolute/)
   assert.match(screen, /className="pb-profile-details-backdrop" aria-label="Close more settings"/)
   assert.match(styles, /\.pb-profile-details-backdrop\{[^}]*position:fixed[^}]*z-index:19[^}]*background:rgba\(0,0,0,\.64\)/)
-  assert.match(styles, /\.pb-topbar\.is-expanded::before\{[^}]*height:var\(--pb-expanded-panel-height\)/)
+  assert.match(styles, /\.pb-topbar::before\{[^}]*height:100%[^}]*transition:height \.42s/)
+  assert.match(styles, /\.pb-topbar\.is-expanded::before\{height:var\(--pb-expanded-panel-height\)/)
   assert.match(styles, /\.pb-topbar\.is-expanded\{[^}]*height:var\(--pb-expanded-header-height\)[^}]*flex-basis:var\(--pb-expanded-header-height\)/)
+  assert.match(styles, /\.pb-topbar__identity-actions\{min-height:38px;/)
+  assert.match(styles, /@keyframes pb-profile-details-reveal\{from\{opacity:0;clip-path:inset\(0 0 100% 0\);transform:translateY\(-6px\)\}/)
 })
 
 test('advanced settings opens from a compact title-row disclosure', () => {

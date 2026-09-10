@@ -18,12 +18,15 @@ interface MetricEdit {
   onSave: (value: number) => void
 }
 
-export function Metric({ metric, compact = false, edit, reserveSubtext = false }: { metric: DisplayMetric; compact?: boolean; edit?: MetricEdit; reserveSubtext?: boolean }) {
+export type MetricSize = 'large' | 'medium' | 'small'
+
+export function Metric({ metric, compact = false, size, edit, reserveSubtext = false }: { metric: DisplayMetric; compact?: boolean; size?: MetricSize; edit?: MetricEdit; reserveSubtext?: boolean }) {
   const openAdjustment = useValueAdjustment()
   const currentValue = Number(metric.value)
   const adjustmentValue = Number.isFinite(currentValue) ? currentValue : edit?.initialValue
   const editDisabled = Boolean(edit?.disabled) || adjustmentValue === undefined || !Number.isFinite(adjustmentValue)
-  const className = `metric${compact ? ' metric--compact' : ''}`
+  const resolvedSize = size ?? (compact ? 'small' : 'large')
+  const className = `metric metric--${resolvedSize}${compact ? ' metric--compact' : ''}`
   const readingClassName = `metric__reading${metric.highlight ? ' metric__reading--highlight' : ''}`
   const subtextClassName = `metric__subtext${metric.subtextVariant === 'pill' ? ' metric__subtext--pill' : ''}`
   const unitClassName = `metric__unit${metric.unit === '°' ? ' metric__unit--degree' : ''}`

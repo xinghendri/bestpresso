@@ -285,7 +285,7 @@ export function LiveBrewStages({ points, elapsedMs, active = false, showYield = 
       }} role={selectable ? 'button' : undefined} tabIndex={selectable ? 0 : undefined}>
       <header><div className="live-brew-stage__heading"><b>{index + 1}</b><h2>{stage.name}</h2></div><div className="live-brew-stage__time"><time>{timedLabel(stage.endedAt - stage.startedAt)}</time>{wasSkipped && <span className="live-brew-stage__skipped" aria-label="Skipped phase"><img src={skipNext} alt="" /></span>}</div></header>
       <dl>
-        {showYield && <div><dt>Yield</dt><dd><span className="live-brew-stage__yield-value">{reading(stage.yield)}</span><small>g</small></dd></div>}
+        {showYield && <div><dt>Yield</dt><dd><span className="live-brew-stage__yield-value">{reading(stage.yield)}<small>g</small></span></dd></div>}
         <div><dt>Temperature range</dt><dd>{reading(stage.minimumTemperature, 0)}° – {reading(stage.maximumTemperature, 0)}°</dd></div>
         <div><dt>Pressure</dt><dd className="live-brew-stage__pressure-value" aria-label={pressureLabel}><PressureChain pressures={stage.pressureMovements} slotCount={stage.pressureSlotCount} /></dd></div>
       </dl>

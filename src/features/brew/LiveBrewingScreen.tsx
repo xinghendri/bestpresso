@@ -49,7 +49,7 @@ export function LiveBrewingScreen({ model, liveBrew, stopPending, skipPending, a
     <header className="live-pull-header">
       <h1>{profileName}</h1>
       <div className="live-pull-header__controls">
-        <div className={`live-pull-header__metrics${isCleaning ? ' live-pull-header__metrics--single' : ' live-pull-header__metrics--live'}`} aria-live="polite">
+        <div className={`live-pull-header__metrics metric-scale--medium${isCleaning ? ' live-pull-header__metrics--single' : ' live-pull-header__metrics--live'}`} aria-live="polite">
           <div><span>Timer</span><strong>{timedLabel(liveBrew.elapsedMs)}</strong></div>
           {!isCleaning && <>
             <i aria-hidden="true" />

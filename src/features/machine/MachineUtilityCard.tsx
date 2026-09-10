@@ -111,10 +111,10 @@ export function MachineUtilityCard({ utility, compact = false, scale, onExpand, 
       ? <button className={compact ? 'scale-search scale-compact-summary' : 'scale-search'} type="button" onClick={onSearchScale} disabled={scale?.status === 'searching'}>{scale?.status === 'searching' ? 'Searching…' : 'Search'}</button>
       : <div className="utility-card__metrics">{utility.metrics.map((metric) => scaleCanTare
         ? <button className={`scale-tare-control${scaleTarePending ? ' scale-tare-control--pending' : ''}`} key={metric.label} type="button" aria-label={`Tare scale, current weight ${metric.value}${metric.unit ?? ''}`} title="Tare scale" disabled={scaleTarePending} onClick={onTareScale}>
-          <Metric metric={metric} compact />
+          <Metric metric={metric} compact size="large" />
           <svg className="scale-tare-control__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5M4 18v-5h5M6.1 9a7 7 0 0 1 11.6-2.6L20 8.8M4 15.2l2.3 2.4A7 7 0 0 0 17.9 15" /></svg>
         </button>
-        : <Metric key={metric.label} metric={metric} compact edit={compact ? undefined : editForMetric(utility, metric.label, onUpdateSetting, settingsDisabled)} />)}</div>}
+        : <Metric key={metric.label} metric={metric} compact size={isScale || !compact ? 'large' : 'small'} edit={compact ? undefined : editForMetric(utility, metric.label, onUpdateSetting, settingsDisabled)} />)}</div>}
     {compact && utility.id === 'steam' && <span className="utility-card__steam-connector" aria-hidden="true"><img src={steamCompactConnector} alt="" /></span>}
     {scalePresentation?.imageSrc && <span className="scale-device-art" aria-hidden="true"><img src={scalePresentation.imageSrc} alt="" /></span>}
   </section>

@@ -22,11 +22,15 @@ test('uses weight 100 for home-screen numeric readouts in every card state', () 
   assert.match(styles, /\.app-shell \.metric__reading,[\s\S]*\.app-shell \.status-pill--heating span,[\s\S]*\.app-shell \.utility-card--compact:not\(\.utility-card--scale\) \.metric__reading \{\s*font-weight:100;/)
 })
 
-test('increases collapsed home-screen numeric readouts by one pixel', () => {
-  assert.match(styles, /\.utility-card--compact:not\(\.utility-card--scale\) \.metric__reading \{ font-size:17px;/)
-  assert.match(styles, /\.utility-card--compact:not\(\.utility-card--scale\) \.metric__reading small \{[^}]*font-size:13px;/)
-  assert.match(styles, /\.utility-card--scale\.utility-card--compact \.metric__reading \{ font-size:33px;/)
-  assert.match(styles, /\.utility-card--scale\.utility-card--compact \.metric__reading small \{[^}]*font-size:23px;/)
+test('defines reusable large, medium, and small metric typography', () => {
+  assert.match(styles, /--metric-label-color:#878787;/)
+  assert.match(styles, /--metric-value-color:#f5f5f5;/)
+  assert.match(styles, /--metric-label-size-large:14px; --metric-label-size-medium:14px; --metric-label-size-small:12px;/)
+  assert.match(styles, /--metric-value-size-large:32px; --metric-value-size-medium:24px; --metric-value-size-small:17px;/)
+  assert.match(styles, /\.metric-scale--large,\.metric--large \{ --metric-context-label-size:var\(--metric-label-size-large\);/)
+  assert.match(styles, /\.metric-scale--medium,\.metric--medium \{ --metric-context-label-size:var\(--metric-label-size-medium\);/)
+  assert.match(styles, /\.metric-scale--small,\.metric--small \{ --metric-context-label-size:var\(--metric-label-size-small\);/)
+  assert.match(utilityCard, /size=\{isScale \|\| !compact \? 'large' : 'small'\}/)
 })
 
 test('reflows the collapsed scale name and anchors its weight to the card bottom', () => {
@@ -73,9 +77,16 @@ test('uses the smaller proportional steam toggle', () => {
   assert.match(styles, /\.steam-heating-toggle--enabled>span \{[^}]*transform:translateX\(19px\);/)
 })
 
-test('uses 32px standard home-screen metric readings', () => {
-  assert.match(styles, /\.metric__reading \{ color:#707070; font-size:32px;/)
-  assert.match(styles, /\.brew-metrics \.metric__reading \{ font-size:32px; \}/)
+test('makes the needs-water state visibly red in the header and reservoir', () => {
+  assert.match(styles, /\.status-pill--thirsty \{ border-color:#de6161; color:#f49090;/)
+  assert.match(styles, /\.status-pill--thirsty img \{[^}]*filter:/)
+  assert.match(styles, /\.reservoir-meter--needs-water \{ background:rgba\(91,54,54,\.64\); \}/)
+  assert.match(styles, /\.reservoir-meter--needs-water \.reservoir-meter__icon img \{ filter:/)
+})
+
+test('uses the large permutation for standard home-screen metric readings', () => {
+  assert.match(styles, /\.metric__reading \{ color:var\(--metric-value-color\); font-size:var\(--metric-context-value-size,var\(--metric-value-size-large\)\);/)
+  assert.match(styles, /\.brew-metrics \.metric__reading,[^\n]*font-size:var\(--metric-value-size-large\)/)
 })
 
 test('lets the home history summary hug its content while preserving a contractible chart', () => {
@@ -96,7 +107,7 @@ test('uses a lighter two-pixel line only for the home history chart', () => {
 
 test('uses stable header metric slots with symmetric separator spacing', () => {
   assert.match(styles, /\.live-pull-header__metrics \{ --header-metric-separator-gap:24px; width:max-content; max-width:100%;[^}]*grid-template-columns:108px 1px 280px;[^}]*gap:var\(--header-metric-separator-gap\);/)
-  assert.match(styles, /\.history-browser-detail \.live-pull-header__metrics strong \{ font-size:30px; \}/)
+  assert.match(styles, /\.history-browser-detail \.live-pull-header__metrics strong\{color:var\(--metric-value-color\);font-size:var\(--metric-value-size-medium\)\}/)
   assert.doesNotMatch(styles, /\.history-browser-detail \.live-pull-header__metrics \{ width:312px;/)
   assert.match(styles, /@media\(max-width:600px\)[\s\S]*\.live-pull-header__metrics\{--header-metric-separator-gap:12px;grid-template-columns:68px 1px 120px\}/)
 })
@@ -105,8 +116,10 @@ test('adds a separated live flow-rate slot without changing history metrics', ()
   assert.match(historyScreen, /isCleaning \? ' live-pull-header__metrics--single' : ' live-pull-header__metrics--history'/)
   assert.match(styles, /\.live-pull-header__metrics--live \{ --header-metric-separator-gap:18px; grid-template-columns:118px 1px 196px 1px 118px; \}/)
   assert.match(styles, /\.live-pull-header__metrics--history \{ grid-template-columns:108px 1px 108px; \}/)
-  assert.match(styles, /\.live-pull-header__metrics\.live-pull-header__metrics--live strong \{ color:#f5f5f5; font-size:27px; \}/)
-  assert.match(styles, /\.live-pull-header__metrics\.live-pull-header__metrics--live strong small \{ font-size:16px; \}/)
+  assert.match(liveScreen, /live-pull-header__metrics metric-scale--medium/)
+  assert.match(historyScreen, /live-pull-header__metrics metric-scale--medium/)
+  assert.match(styles, /\.live-pull-header__metrics strong,[^\n]*font-size:var\(--metric-value-size-medium\)/)
+  assert.match(styles, /\.live-pull-header__metrics strong small,[^\n]*font-size:var\(--metric-unit-size-medium\)/)
   assert.match(styles, /@media\(max-width:760px\)[\s\S]*\.live-pull-header__metrics--live\{--header-metric-separator-gap:12px;grid-template-columns:84px 1px 160px 1px 84px\}/)
   assert.match(styles, /@media\(max-width:600px\)[\s\S]*\.live-pull-header__metrics--live\{grid-template-columns:68px 1px 120px 1px 80px\}/)
   assert.match(styles, /@media\(max-width:600px\)[\s\S]*\.live-pull-header__metrics--history\{grid-template-columns:68px 1px 80px\}/)
