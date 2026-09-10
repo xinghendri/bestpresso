@@ -34,7 +34,7 @@ export function LiveUtilityOperationOverlay({ operation }: { operation: LiveUtil
         <h2 id="live-utility-title">{state.title}</h2>
         <img src={state.icon} alt="" />
       </header>
-      <div className="live-utility-card__metrics">
+      <div className="live-utility-card__metrics metric-scale--medium">
         <Reading label="Duration">{seconds}{duration !== undefined && <> <em>/</em> {duration}</>}<small>s</small></Reading>
         {hotWaterMeasurement
           ? <Reading label={hotWaterMeasurement.label} align="center">{hotWaterMeasurement.value === undefined ? '—' : decimal(hotWaterMeasurement.value)} <em>/</em> {hotWaterMeasurement.target ?? '—'}<small>{hotWaterMeasurement.unit}</small></Reading>

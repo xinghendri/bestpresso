@@ -35,3 +35,14 @@ test('profile selection animates between taps while direct dragging tracks the p
   assert.match(styles, /\.profile-card\.profile-card--free \{[^}]*transition:left \.24s cubic-bezier/)
   assert.match(styles, /\.profile-carousel--dragging \.profile-card--free \{ transition:none; \}/)
 })
+
+test('profile cards use the dashboard glass treatment while retaining the orbit', () => {
+  assert.match(styles, /\.profile-card \{ border:1px solid rgba\(255,255,255,\.075\); background-clip:padding-box; \}/)
+  assert.match(styles, /\.profile-card--left,\.profile-card--right \{[^}]*backdrop-filter:blur\(14px\) saturate\(116%\);/)
+  assert.match(styles, /\.profile-card--active::before \{ inset:-52%; background:radial-gradient\(circle at 22% 78%[^}]*radial-gradient\(circle at 78% 22%/)
+  assert.match(styles, /\.profile-card--active::after \{[^}]*linear-gradient\(145deg,rgba\(255,255,255,\.105\)/)
+  assert.match(styles, /animation:profile-card-gradient-orbit 30s linear infinite/)
+  assert.match(styles, /\.profile-card--active \{[^}]*conic-gradient\(from var\(--profile-border-angle\)[^}]*animation:profile-card-border-orbit 7s cubic-bezier\(\.87,0,\.13,1\) infinite/)
+  assert.match(styles, /@keyframes profile-card-border-orbit \{ 0% \{ --profile-border-angle:0deg; \} 28\.571%,100% \{ --profile-border-angle:360deg; \} \}/)
+  assert.match(styles, /@media\(prefers-reduced-motion:reduce\)\{\.profile-card--active\{animation:none\}/)
+})
