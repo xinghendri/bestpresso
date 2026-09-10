@@ -10,9 +10,11 @@ export const WATER_TANK_SENSOR_FULL_MM = 43
 export const WATER_TANK_LOW_LEVEL_ML = 300
 export const WATER_TANK_WARNING_LEVEL_ML = 426
 
-export function waterTankLevelState(volumeMl: number, machineNeedsWater = false) {
-  if (machineNeedsWater || volumeMl <= WATER_TANK_LOW_LEVEL_ML) return 'needsWater'
-  if (volumeMl <= WATER_TANK_WARNING_LEVEL_ML) return 'warning'
+export interface WaterWarningThresholds { warningLevelMl: number; criticalLevelMl: number }
+
+export function waterTankLevelState(volumeMl: number, machineNeedsWater = false, thresholds: WaterWarningThresholds = { warningLevelMl: WATER_TANK_WARNING_LEVEL_ML, criticalLevelMl: WATER_TANK_LOW_LEVEL_ML }) {
+  if (machineNeedsWater || volumeMl <= thresholds.criticalLevelMl) return 'needsWater'
+  if (volumeMl <= thresholds.warningLevelMl) return 'warning'
   return 'normal'
 }
 

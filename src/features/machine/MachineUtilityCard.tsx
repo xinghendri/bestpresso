@@ -6,6 +6,7 @@ import steamCompactConnector from '../../assets/figma/steam-compact-connector.sv
 import steamIcon from '../../assets/figma/steam.svg'
 import { Metric } from '../../components/Metric/Metric'
 import { scaleWeightCanTare, WATER_TANK_CAPACITY_ML, waterTankLevelState } from '../../domain/brewing'
+import { readBestpressoPreferences } from '../settings/bestpressoPreferences'
 import type { EditableMachineSetting, MachineUtility, ScaleConnection } from '../../domain/brewing'
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { scalePresentationForDevice } from './scaleArtwork'
@@ -66,7 +67,11 @@ export function MachineUtilityCard({ utility, compact = false, scale, onExpand, 
     const safeVolume = Number.isFinite(volume) ? Math.max(0, Math.min(WATER_TANK_CAPACITY_ML, volume)) : 0
     const fallbackLevel = safeVolume / WATER_TANK_CAPACITY_ML * 100
     const level = Math.max(0, Math.min(100, utility.levelPercent ?? fallbackLevel))
-    const tankState = waterTankLevelState(safeVolume, Boolean(utility.alert))
+    const waterPreferences = readBestpressoPreferences()
+    const tankState = waterTankLevelState(safeVolume, Boolean(utility.alert), {
+      warningLevelMl: waterPreferences.waterWarningLevelMl,
+      criticalLevelMl: waterPreferences.waterCriticalLevelMl,
+    })
     const needsWater = tankState === 'needsWater'
     const warnsWater = tankState === 'warning' || (!needsWater && Boolean(utility.warning))
     const valueLabel = Number.isFinite(volume) ? `${metric.value} ${metric.unit ?? 'ml'}` : 'unknown level'

@@ -21,6 +21,12 @@ import { DEMO_BREW_TICK_MS, demoBrewForProfile, demoBrewPointsAtElapsed, demoPul
 import { advanceShotTimeline, beginSkipTransition, isEspressoMonitoringSnapshot, observeSkipTransition, type SkipTransition } from './liveShotState'
 import { SLEEP_DISPLAY_BRIGHTNESS, shouldRunBackgroundScaleScan, sleepMachineWithConfiguredScalePolicy } from './sleepControl'
 import { utilityElapsedMs, utilityTimerStartedAt } from './utilityOperationTiming'
+import { readBestpressoPreferences } from '../settings/bestpressoPreferences'
+
+const currentWaterThresholds = () => {
+  const preferences = readBestpressoPreferences()
+  return { warningLevelMl: preferences.waterWarningLevelMl, criticalLevelMl: preferences.waterCriticalLevelMl }
+}
 
 const MAX_LIVE_SHOT_POINTS = 900
 const MINIMUM_SCALE_SCAN_MS = 10_000
@@ -757,7 +763,7 @@ export function useBrewingData() {
         utilities: current.utilities.map((utility) => {
           if (utility.id === 'steam') return { ...utility, metrics: utility.metrics.map((metric) => metric.label === 'Current' && snapshot.steamTemperature !== undefined ? { ...metric, value: String(Math.round(snapshot.steamTemperature)), highlight: snapshot.steamTemperature < STEAM_HEATER_READY_C } : metric) }
           if (utility.id === 'tank') {
-            const tankState = waterTankLevelState(latestTankVolume.current ?? Number.POSITIVE_INFINITY, machineNeedsWater.current)
+            const tankState = waterTankLevelState(latestTankVolume.current ?? Number.POSITIVE_INFINITY, machineNeedsWater.current, currentWaterThresholds())
             return { ...utility, alert: tankState === 'needsWater', warning: tankState === 'warning' }
           }
           return utility
@@ -825,7 +831,7 @@ export function useBrewingData() {
       const sensorLevel = levels.currentLevel
       const volume = tankMillilitres(sensorLevel)
       const levelPercent = Math.max(0, Math.min(100, sensorLevel / WATER_TANK_SENSOR_FULL_MM * 100))
-      const tankState = waterTankLevelState(volume, machineNeedsWater.current)
+      const tankState = waterTankLevelState(volume, machineNeedsWater.current, currentWaterThresholds())
       latestTankVolume.current = volume
       setModel((current) => ({
         ...current,

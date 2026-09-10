@@ -1,4 +1,5 @@
 import completionSoundUrl from '../assets/audio/brew-complete.ogg'
+import { readBestpressoPreferences } from '../features/settings/bestpressoPreferences'
 
 type AudioContextConstructor = typeof AudioContext
 
@@ -41,6 +42,7 @@ const loadCompletionBuffer = (audioContext: AudioContext) => {
 
 /** Unlocks and preloads the cue during a user gesture so delayed playback works on tablets. */
 export function primeCompletionSound() {
+  if (!readBestpressoPreferences().completionSoundEnabled) return
   try {
     const audioContext = getContext()
     if (!audioContext) return
@@ -52,6 +54,7 @@ export function primeCompletionSound() {
 }
 
 export async function playCompletionSound() {
+  if (!readBestpressoPreferences().completionSoundEnabled) return
   try {
     const audioContext = getContext()
     if (!audioContext) return
