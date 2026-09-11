@@ -15,6 +15,7 @@ import { SettingsScreen } from './features/settings/SettingsScreen'
 import './styles/index.css'
 import './styles/cardSurfaces.css'
 import './styles/lightMode.css'
+import './styles/settingsLayout.css'
 
 type AppPage = 'home' | 'profiles' | 'previous-pull' | 'profile-builder' | 'settings'
 

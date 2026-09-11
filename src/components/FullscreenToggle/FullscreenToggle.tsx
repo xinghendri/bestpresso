@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import fullscreenEnter from '../../assets/figma/fullscreen-enter.svg'
-import fullscreenExit from '../../assets/figma/fullscreen-exit.svg'
+import fullscreenEnter from '../../assets/figma/fullscreen-enter-glyph.svg'
+import fullscreenExit from '../../assets/figma/fullscreen-exit-glyph.svg'
 import { exitFullscreen, isFullscreenElementActive, isFullscreenSupported, isWebViewHost, requestFullscreen } from '../../lib/fullscreen'
 
 export function FullscreenToggle() {
