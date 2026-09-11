@@ -20,6 +20,7 @@ test('screensaver brightness defaults to 7 but preserves user choices across the
 
 test('water warning preferences remain ordered and within the reservoir control range', () => {
   assert.deepEqual(normalizeBestpressoPreferences({ waterCriticalLevelMl: 500, waterWarningLevelMl: 100 }), {
+    theme: 'dark',
     completionSoundEnabled: true,
     waterCriticalLevelMl: 500,
     waterWarningLevelMl: 501,

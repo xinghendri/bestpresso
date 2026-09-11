@@ -14,6 +14,7 @@ import { DecaidUpdatePrompt } from './features/updates/DecaidUpdatePrompt'
 import { SettingsScreen } from './features/settings/SettingsScreen'
 import './styles/index.css'
 import './styles/cardSurfaces.css'
+import './styles/lightMode.css'
 
 type AppPage = 'home' | 'profiles' | 'previous-pull' | 'profile-builder' | 'settings'
 

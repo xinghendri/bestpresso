@@ -32,6 +32,15 @@
   outline-offset:-1.5px;
 }
 /* Native menus are retained, but the indicator is no longer browser-positioned. */
+/* Separate utility titles from readings in both themes, without moving compact cards. */
+.utility-card:is(.utility-card--water,.utility-card--steam):not(.utility-card--compact) .utility-card__metrics {
+  margin-top:clamp(24px,3.5vh,30px);
+}
+@media(max-height:680px) {
+  .utility-card:is(.utility-card--water,.utility-card--steam):not(.utility-card--compact) .utility-card__metrics {
+    margin-top:20px;
+  }
+}
 .settings-line-options {
   grid-template-columns:repeat(3,minmax(0,1fr));
 }
