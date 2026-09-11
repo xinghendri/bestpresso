@@ -1,0 +1,291 @@
+/* Light (Beta): enabled only by the saved Bestpresso appearance preference. */
+:root[data-theme="light"] {
+  color-scheme:light;
+  --metric-label-color:#788078;
+  --metric-value-color:#23382d;
+  --chart-pressure:#117449;
+  --chart-flow:#216c9b;
+  --chart-temperature:#ad3f48;
+  --chart-weight:#845331;
+  --card-surface:linear-gradient(145deg,#ffffff,#f4f3ee);
+  --card-outline:rgba(37,65,49,.14);
+  --light-control:#edf0eb;
+  --light-control-border:#c4cdc3;
+  --light-selected:#cbe3d1;
+  --light-accent:#246e47;
+  background:#f4f5ef;
+  color:#37463d;
+}
+[data-theme="light"] :is(.app-shell,.profiles-screen,.history-browser-screen,.profile-builder-screen,.settings-screen,.value-adjuster) {
+  background:radial-gradient(ellipse at 0 0,#fdfefa,transparent 65%),linear-gradient(125deg,#f4f6ef,#f0ede6);
+  color:#23382d;
+}
+[data-theme="light"] :is(h1,h2,h3,h4) {color:#23382d}
+[data-theme="light"] :is(.brew-panel::before,.history-section) {background:var(--card-surface)}
+[data-theme="light"] :is(.utility-card,.history-section,.live-pull-header,.live-brew-stage,.profile-detail,.profile-directory,.settings-card) {
+  box-shadow:0 6px 22px rgba(42,53,42,.035);
+  color:#23382d;
+}
+[data-theme="light"] :is(.logo,.settings-brand img,.utility-layout-toggle img,.utility-card header img,.profile-detail__actions img) {filter:brightness(0) saturate(100%);opacity:.75}
+[data-theme="light"] :is(.utility-card header,.utility-card header span,.utility-card__title,.history-card__summary h3,.metric__reading,.live-pull-header__metrics strong,.live-pull-header__title,.live-brew-stage__title) {color:#23382d}
+[data-theme="light"] :is(.metric__label,.history-card__summary small,.history-card__summary time,.settings-helper,.settings-control-row small,.settings-number-row small) {color:#788078}
+[data-theme="light"] :is(.metric__subtext--pill,.profile-category) {background:#e2e8df;color:#4e6255}
+[data-theme="light"] :is(.manage-profiles,.metric__edit-indicator,.settings-card-link) {color:#14784e}
+/* Pale active card with a visible glass edge and neutral grey layers behind. */
+[data-theme="light"] .profile-card {
+  --chart-pressure:#42c599;
+  --chart-flow:#4286c5;
+  --chart-temperature:#d65353;
+}
+[data-theme="light"] .profile-card h1 {color:inherit}
+[data-theme="light"] .profile-card--active {
+  color:#343b37;
+  background:linear-gradient(#f7faf7,#f7faf7) padding-box,conic-gradient(from var(--profile-border-angle),#c8d5cd 0 32%,#72a2b6 42%,#ffffff 49%,#629b80 56%,#c8d5cd 68% 100%) border-box;
+  box-shadow:inset 0 1px 0 #fff,0 16px 30px rgba(42,63,48,.16);
+  --chart-pressure:#25865f;
+  --chart-flow:#347ca8;
+}
+[data-theme="light"] .profile-card--active::before {
+  background:radial-gradient(circle at 22% 78%,rgba(93,184,132,.38) 0,rgba(129,201,156,.22) 24%,transparent 49%),radial-gradient(circle at 78% 22%,rgba(102,164,195,.34) 0,rgba(142,188,209,.2) 25%,transparent 50%),#f7faf7;
+}
+[data-theme="light"] .profile-card--active::after {
+  background:linear-gradient(145deg,rgba(255,255,255,.92) 0,rgba(255,255,255,.18) 30%,rgba(75,110,92,.045) 62%,transparent 85%),radial-gradient(ellipse at 50% -18%,rgba(255,255,255,.95),transparent 58%);
+  box-shadow:inset 0 1px 0 #fff,inset 0 -1px 0 rgba(67,106,83,.16);
+}
+[data-theme="light"] :is(.profile-card--left,.profile-card--right) {
+  background:#d9dcda;
+  color:#657169;
+  border-color:#c4cbc6;
+  box-shadow:0 12px 24px rgba(38,48,41,.1);
+  --chart-pressure:#16835d;
+  --chart-flow:#287aaf;
+}
+[data-theme="light"] :is(.profile-card--far-left,.profile-card--far-right) {
+  background:rgba(174,181,175,.6);
+  border-color:#a4ada6;
+  box-shadow:none;
+}
+[data-theme="light"] :is(.settings-sidebar,.history-browser-rail) {background:rgba(231,235,226,.8);border-color:#d2dacf;backdrop-filter:none}
+[data-theme="light"] :is(.settings-search,.settings-text-input,.settings-control-row select,.settings-number-value,.settings-number-control>button,.settings-search input) {background:#e8ece4;color:#23382d;border-color:#cbd6ca}
+[data-theme="light"] :is(.settings-nav-item,.settings-row,.settings-control-row,.settings-number-row,.settings-text-row) {color:#334a3b;border-color:#d9dfd4}
+[data-theme="light"] :is(.settings-nav-item.is-active,.history-browser-item--selected,.profile-directory__item--selected,.profile-category--active) {background:#cee3d3;color:#17633f}
+[data-theme="light"] :is(.settings-nav-group-label,.settings-card-eyebrow) {color:#63806b}
+[data-theme="light"] :is(.settings-save,.pb-save,.live-pull-action) {background:#277c54;color:#fff}
+[data-theme="light"] :is(.settings-close,.settings-reset,.settings-cancel,.utility-layout-toggle,.profile-detail__actions button) {background:#e0e7dc;color:#375040;border-color:#bdcdbc}
+[data-theme="light"] :is(.settings-card strong,.settings-card label,.settings-card span,.settings-device strong) {color:inherit}
+[data-theme="light"] :is(.favorite-slot,.profile-directory__item,.history-browser-item) {color:#334b3d}
+[data-theme="light"] .favorite-slot {background:linear-gradient(135deg,#deeadf,#d3e5df)}
+[data-theme="light"] :is(.profile-detail__description,.profile-directory__item small,.history-browser-item time) {color:#6b756d}
+[data-theme="light"] :is(.pb-topbar::before,.pb-topbar.is-expanded::before,.pb-stage,.pb-stage-drag-overlay) {background:var(--card-surface);color:#23382d}
+[data-theme="light"] :is(.pb-stage input,.pb-topbar input,.pb-topbar select,.pb-stage button,.pb-stage label,.pb-stage strong,.pb-stage span) {color:#334b3c}
+[data-theme="light"] :is(.pb-stage button,.pb-topbar select,.pb-stage input) {border-color:#c9d5c8}
+[data-theme="light"] :is(.pb-stage [role="tablist"],.pb-stage [role="group"]) {background:#e5ebe1}
+[data-theme="light"] :is(.chart-inspection) {background:rgba(253,254,249,.97);border-color:#cbd8c9;color:#23382d;box-shadow:0 8px 25px #243e2920}
+[data-theme="light"] :is(.shot-chart-axes,.shot-chart-axes span,.live-shot-chart__legend,.live-shot-chart__legend button) {color:#536b5c}
+[data-theme="light"] :is(.live-brew-stage header,.pb-stage header) {border-color:#cdd8cb}
+[data-theme="light"] :is(.live-brew-stage,.live-pull-header) :is(strong,span,small,time) {color:inherit}
+[data-theme="light"] :is(.settings-line-options button,.settings-device,.settings-account) {background:#e6ece1;color:#31553e;border-color:#c8d7c5}
+[data-theme="light"] .settings-line-options button.is-selected {background:#d4e8d7;border-color:#589672}
+/* Sleep stays intentionally dark: a low-light surface, not a daytime page. */
+[data-theme="light"] .brew-panel::before,
+[data-theme="light"] .pb-topbar::before,
+[data-theme="light"] .pb-topbar.is-expanded::before {background:var(--card-surface)}
+[data-theme="light"] .history-card__summary span {color:#23382d}
+[data-theme="light"] .metric .metric__reading--highlight,
+[data-theme="light"] .app-shell .utility-card--steam .metric:first-child .metric__reading--highlight {color:#855600}
+[data-theme="light"] .status-pill::after {background:#d6e8d7}
+[data-theme="light"] .status-pill {color:#236c44}
+[data-theme="light"] .live-brew-screen {background:linear-gradient(125deg,#f8faf3,#f0ede6);color:#23382d}
+[data-theme="light"] .chart-legend__item {color:#4b6152}
+[data-theme="light"] .chart-stage-marker {color:#647264}
+[data-theme="light"] .chart-stage-marker--highlighted {color:#196644;background:#d9e9da}
+[data-theme="light"] .chart-stage-marker__badge {color:#315c3e;background:#d7e5d6}
+[data-theme="light"] .live-brew-stage header>span {color:#287245;background:#deecdc}
+[data-theme="light"] .profile-detail-chart {background:linear-gradient(135deg,#e4eee1,#edf2e9)}
+[data-theme="light"] .profile-directory {border-color:#cbd7c7}
+[data-theme="light"] .favorite-slot button {color:#23794d}
+[data-theme="light"] .settings-sidebar nav button {color:#4c6152}
+[data-theme="light"] .settings-sidebar nav button.is-active {color:#175f3c;background:#d2e5d3}
+[data-theme="light"] .settings-sidebar strong {color:#2c4835}
+[data-theme="light"] .settings-summary-metrics>span {background:#e7ede2}
+[data-theme="light"] .settings-content__header input {background:#e4eade;color:#304a36}
+[data-theme="light"] .profile-builder-screen .pb-stage__limits,
+[data-theme="light"] .pb-stage__conditions-rule {background:#e6ebdf}
+[data-theme="light"] .profile-builder-screen .pb-stepper>button,
+[data-theme="light"] .profile-builder-screen .pb-stepper>.pb-stepper__value {background:#e2e9dc;color:#284a34;border-color:#c3d1bd}
+[data-theme="light"] .profile-builder-screen .pb-segmented button {background:#e3e9de;color:#516950}
+[data-theme="light"] .profile-builder-screen .pb-segmented button.is-selected {background:#c5dfc9;color:#19653e;border-color:#67a17a}
+[data-theme="light"] .pb-add-stage {background:#e5ecdf;color:#286f43;border-color:#bdceba}
+[data-theme="light"] .pb-add-stage span {color:inherit}
+[data-theme="light"] .live-brew-stage-skip {background:#e5ecdf;color:#286f43}
+[data-theme="light"] .live-brew-skip {background:#e0e8da;color:#386045}
+[data-theme="light"] :is(.live-brew-skip__icon,.pb-stage__actions img,.pb-stage__choice-control img) {filter:brightness(.45) saturate(.8)}
+[data-theme="light"] .live-brew-stage__heading b {background:#d7e8d6;color:#2c7046}
+[data-theme="light"] .settings-card header>small,
+[data-theme="light"] .settings-card>small {color:#37724e}
+[data-theme="light"] .settings-line-options path {stroke:#257847}
+[data-theme="light"] .settings-status {background:#e0e9da;color:#4f6b53;border-color:#bfd1b9}
+[data-theme="light"] .settings-header-actions label {background:#e3e9dd;border-color:#c8d3c1}
+[data-theme="light"] .profile-builder-screen .pb-stage__conditions-panel button[aria-pressed="true"] {background:#c5dfc9;color:#19653e}
+[data-theme="light"] .pb-stage__conditions-rule img {filter:brightness(.4)}
+[data-theme="light"] .profile-builder-screen .pb-condition__comparison button.is-selected {background:#c5dfc9;color:#19653e}
+
+/* Secondary header actions use quiet light surfaces; primary actions stay green. */
+[data-theme="light"] .topbar nav>.control-button--cleaning,
+[data-theme="light"] .settings-brand button,
+[data-theme="light"] .pb-topbar__actions .pb-cancel,
+[data-theme="light"] .live-pull-action--close {
+  background:#e0e5de;
+  color:#455549;
+  border-color:#c7d1c6;
+}
+/* These exported SVGs include their button backgrounds, so recolor both together. */
+[data-theme="light"] .topbar nav>.control-button:not(.control-button--cleaning)>img,
+[data-theme="light"] .profiles-icon-button>img {
+  filter:invert(1) grayscale(1) brightness(1.1);
+}
+[data-theme="light"] .topbar nav>.control-button--cleaning>img {filter:brightness(.3)}
+[data-theme="light"] .settings-brand button:hover,
+[data-theme="light"] .pb-topbar__actions .pb-cancel:hover,
+[data-theme="light"] .live-pull-action--close:hover,
+[data-theme="light"] .topbar nav>.control-button--cleaning:hover {background:#d1dace;color:#284733}
+[data-theme="light"] .steam-heating-toggle,
+[data-theme="light"] .settings-toggle {background:#b5beb3;box-shadow:inset 0 0 0 1px #95a38f}
+[data-theme="light"] .steam-heating-toggle--enabled,
+[data-theme="light"] .settings-toggle.is-on {background:#b5d4b9;box-shadow:inset 0 0 0 1px #7fa98b}
+[data-theme="light"] .steam-heating-toggle>span,
+[data-theme="light"] .settings-toggle>span {background:#f8faf5}
+[data-theme="light"] .steam-heating-toggle--enabled>span,
+[data-theme="light"] .settings-toggle.is-on>span {background:#27794c}
+[data-theme="light"] .utility-card--scale .scale-search {
+  color:#236b40;
+  background:#dcebd8;
+  border-color:#82ab88;
+}
+[data-theme="light"] .utility-card--scale .scale-search.scale-compact-summary {color:#236b40;background:transparent;border-color:transparent}
+[data-theme="light"] .utility-card .metric__label {color:#788078}
+
+/* Popup surfaces use the same light palette, including their nested panels. */
+[data-theme="light"] :is(.scale-picker-overlay,.cleaning-picker-overlay,.live-utility-overlay,.fullscreen-prompt-overlay,.decaid-update-overlay,.profiles-import-backdrop,.pb-discard-overlay) {
+  background:rgba(35,46,39,.32);
+  backdrop-filter:none;
+}
+[data-theme="light"] :is(.scale-picker,.cleaning-picker,.live-utility-card,.fullscreen-prompt,.decaid-update,.profiles-add-menu,.profiles-import-modal,.pb-discard-dialog,.pb-validation-panel,.profile-list__slot-picker) {
+  background:#f7f8f2;
+  color:#34463a;
+  border:1px solid #c8d3c4;
+  box-shadow:0 22px 65px rgba(35,48,38,.2);
+  backdrop-filter:none;
+  --pb-value-color:#34463a;
+  --pb-label-color:#747f71;
+}
+[data-theme="light"] :is(.scale-picker__devices,.cleaning-picker__profiles,.live-utility-card__metrics) {background:#edf0e7}
+[data-theme="light"] :is(.scale-picker,.cleaning-picker,.live-utility-card,.fullscreen-prompt,.decaid-update,.profiles-add-menu,.profiles-import-modal,.pb-discard-dialog,.pb-validation-panel) :is(h2,h3,strong) {color:#34463a}
+[data-theme="light"] :is(.scale-picker,.cleaning-picker,.live-utility-card,.fullscreen-prompt,.decaid-update,.profiles-add-menu,.profiles-import-modal,.pb-discard-dialog,.pb-validation-panel) :is(p,small) {color:#697766}
+[data-theme="light"] :is(.scale-picker-card,.cleaning-picker-card,.profiles-add-menu>button,.pb-validation-panel__issues>button) {
+  background:#e1e9dc;color:#344b39;border-color:#c5d2bf;
+}
+[data-theme="light"] :is(.scale-picker-card:hover:not(:disabled),.cleaning-picker-card:hover:not(:disabled),.profiles-add-menu>button:hover,.pb-validation-panel__issues>button:hover) {background:#d5e3ce}
+[data-theme="light"] .cleaning-picker-card--selected {background:#cde3cf;border-color:#4f9468}
+[data-theme="light"] :is(.cleaning-picker__close,.fullscreen-prompt__secondary,.decaid-update__later,.profiles-import-modal__cancel,.pb-discard-dialog button,.pb-validation-panel>header>button) {background:#dfe6d8;color:#3c5940;border-color:#bdccb7}
+[data-theme="light"] :is(.fullscreen-prompt__primary,.decaid-update__primary,.profiles-import-modal__submit) {background:#27794c;color:#fff}
+[data-theme="light"] .pb-discard-dialog .pb-discard-dialog__discard {background:#f0dad5;color:#9d3430}
+[data-theme="light"] :is(.profiles-import-modal input,.profiles-import-modal select) {background:#fff;color:#34463a;border-color:#b9cbb2}
+[data-theme="light"] :is(.scale-picker__hero-icon,.scale-picker-card__icon,.cleaning-picker__brew-guide img,.cleaning-picker-card img,.live-utility-card header img,.profiles-add-menu__icon img) {filter:brightness(.4)}
+[data-theme="light"] .scale-picker-card__status {background:#cfe5cd;color:#256b3e}
+[data-theme="light"] .live-utility-reading :is(strong,span) {color:#34463a}
+[data-theme="light"] :is(.profiles-import-modal__status--error,.fullscreen-prompt__error,.decaid-update__error) {color:#a43832}
+[data-theme="light"] .system-message {background:#f7f8f2;color:#34463a;border-color:#c8d3c4;box-shadow:0 8px 28px rgba(35,48,38,.16)}
+[data-theme="light"] .system-message--error {background:#fff0e9;color:#9d3430;border-color:#dca89a}
+[data-theme="light"] .system-message--saving {color:#855600}
+[data-theme="light"] .system-message--saved {color:#256b3e}
+
+/* Light controls: neutral at rest, green only for selected and primary actions. */
+[data-theme="light"] :is(.settings-number-control>button,.settings-number-value,.settings-text-input,.settings-search,.settings-header-actions label,.settings-content__header input,.settings-line-options button,.profile-category,.profiles-add-menu>button,.cleaning-picker-card,.scale-picker-card) {
+  background:var(--light-control);
+  color:#34463a;
+  border-color:var(--light-control-border);
+}
+[data-theme="light"] .settings-line-options button.is-selected,
+[data-theme="light"] .profile-category--active,
+[data-theme="light"] .cleaning-picker-card--selected {
+  background:var(--light-selected);
+  color:var(--light-accent);
+  border-color:#629475;
+}
+[data-theme="light"] .settings-status {background:#edf0eb;color:#556157;border-color:#cbd2c8}
+[data-theme="light"] .settings-status.is-error {background:#fff0e9;color:#9d3430;border-color:#dca89a}
+[data-theme="light"] .settings-card header small {color:#507a5d}
+[data-theme="light"] .favorite-slot__profile>img {filter:brightness(.35);opacity:.75}
+[data-theme="light"] .favorite-slot__actions img {filter:brightness(.55)}
+[data-theme="light"] .profiles-add-menu::before {background:#f7f8f2;border-color:#c8d3c4}
+[data-theme="light"] :is(.settings-screen,.profile-builder-screen) select {
+  background-color:var(--light-control);
+  color:#34463a;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%23536357' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;
+  background-position:right 16px center;
+  background-size:12px 8px;
+  padding-right:40px;
+}
+[data-theme="light"] :is(.settings-screen,.profile-builder-screen) option {background:#fafbf8;color:#34463a}
+[data-theme="light"] .profile-builder-screen .pb-profile-details :is(input,textarea),
+[data-theme="light"] .profile-builder-screen .pb-editable-choice input {
+  color:#34463a;background:var(--light-control);border-color:var(--light-control-border);
+}
+[data-theme="light"] .profile-builder-screen .pb-editable-choice input {background:transparent}
+[data-theme="light"] .pb-profile-details :is(input,textarea)::placeholder {color:#778176;opacity:1}
+[data-theme="light"] .pb-editable-choice__control img {filter:brightness(.5)}
+[data-theme="light"] .profile-builder-screen .pb-stepper>button,
+[data-theme="light"] .profile-builder-screen .pb-stepper>.pb-stepper__value {background:var(--light-control);border-color:var(--light-control-border)}
+[data-theme="light"] .profile-builder-screen .pb-segmented button {background:transparent}
+[data-theme="light"] .profile-builder-screen .pb-segmented button.is-selected {background:var(--light-selected)}
+[data-theme="light"] .profile-builder-screen .pb-stage__limits,
+[data-theme="light"] .pb-stage__conditions-rule {background:#e8ece5}
+[data-theme="light"] .history-card__summary :is(span,i) {color:var(--metric-value-color)}
+[data-theme="light"] .chart-inspection :is(time,dd,dd small) {color:var(--metric-value-color)}
+[data-theme="light"] .chart-inspection dt {color:#6e786e}
+[data-theme="light"] .live-pull-action--stop {background:#a83f38;border-color:#92352f;color:#fff}
+[data-theme="light"] .live-pull-action--stop:hover:not(:disabled) {background:#92352f}
+[data-theme="light"] :is(.settings-save,.pb-save,.live-pull-action,.profiles-import-modal__submit):disabled {
+  background:#e0e4df;color:#7c857b;border-color:#cbd2c8;opacity:1;box-shadow:none;
+}
+
+/* Rebuild the dial's states explicitly; blanket button styles hide selection. */
+[data-theme="light"] .value-adjuster__body>p {color:#637265}
+[data-theme="light"] .value-adjuster__value,
+[data-theme="light"] .value-adjuster__value :is(button,span,small) {color:#23382d}
+[data-theme="light"] .value-adjuster__value button {background:transparent}
+[data-theme="light"] .value-adjuster__value button:hover {background:#e7eee4}
+[data-theme="light"] .value-adjuster__direct-value {background:#dfede0;border-color:var(--light-accent)}
+[data-theme="light"] .value-adjuster__body>.value-adjuster__validation {color:#a43832}
+[data-theme="light"] .value-adjuster__variants {background:#e1e7dd;box-shadow:inset 0 0 0 1px #c3cdc0}
+[data-theme="light"] .value-adjuster__variants button {background:transparent;color:#61705f}
+[data-theme="light"] .value-adjuster__variants button.is-selected {background:var(--light-accent);color:#fff;box-shadow:0 2px 5px #29423220}
+[data-theme="light"] .value-adjuster__cancel {background:var(--light-control);color:#40523f;border-color:var(--light-control-border)}
+[data-theme="light"] .value-adjuster__save {background:var(--light-accent);color:#fff;border-color:var(--light-accent)}
+[data-theme="light"] .value-adjuster__cancel:hover {background:#e0e6db}
+[data-theme="light"] .value-adjuster__save:hover:not(:disabled) {background:#1d5e3b}
+[data-theme="light"] .value-adjuster__save:disabled {background:#e0e4df;color:#7c857b;border-color:#cbd2c8;opacity:1}
+[data-theme="light"] .value-adjuster__labels span {color:#475b49}
+[data-theme="light"] .value-adjuster__labels span[data-distance="4"] {opacity:.4}
+[data-theme="light"] .value-adjuster__labels span[data-distance="3"] {opacity:.55}
+[data-theme="light"] .value-adjuster__ruler {background:transparent;border-bottom-color:#a6b4a2}
+[data-theme="light"] .value-adjuster__ticks i {background:#a7b4a2}
+[data-theme="light"] .value-adjuster__ticks .value-adjuster__tick--major {background:#677e61}
+[data-theme="light"] .value-adjuster__pointer {border-bottom-color:var(--light-accent)}
+[data-theme="light"] .value-adjuster--decimal .value-adjuster__pointer::before {background:var(--light-accent)}
+[data-theme="light"] .value-adjuster__keypad-grid button {background:#e1e7dd;color:#29452f}
+[data-theme="light"] .value-adjuster__keypad-grid button:active {background:#bfdac4}
+[data-theme="light"] .value-adjuster__keypad-dismiss {background:transparent}
+[data-theme="light"] .value-adjuster__keypad img {filter:brightness(.3)}
+[data-theme="light"] :is(.value-adjuster__preset,.value-adjuster__fixed-preset,.value-adjuster__value-hint span) {background:var(--light-control);color:#40523f;border-color:var(--light-control-border)}
+[data-theme="light"] :is(.value-adjuster__preset:hover,.value-adjuster__fixed-preset:hover,.value-adjuster__preset--active,.value-adjuster__fixed-preset--active) {background:var(--light-selected);color:#235e3b;border-color:#629475}
+[data-theme="light"] .value-adjuster :is(button,.value-adjuster__scrubber):focus-visible {outline:2px solid #467b51;outline-offset:3px}
+[data-theme="light"] .value-adjuster__scrubber:focus-visible .value-adjuster__ruler {border-bottom-color:var(--light-accent)}
+[data-theme="light"] .value-adjuster__gesture-tip {background:#edf3f6;color:#36566c;border-color:#98b3c4}
+
+/* Preserve thin strokes and brand hues; keep overlapping areas quiet on white. */
+[data-theme="light"] linearGradient[id$="-pressure-area"] stop:first-child,
+[data-theme="light"] linearGradient[id$="-flow-area"] stop:first-child {stop-opacity:.09}
+[data-theme="light"] linearGradient[id$="-temperature-area"] stop:first-child {stop-opacity:.045}

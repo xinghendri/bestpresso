@@ -5,6 +5,7 @@ import type { ClockFormat } from '../sleep/deviceTime'
 export type ChartLineWeight = 'fine' | 'standard' | 'bold'
 
 export interface BestpressoPreferences {
+  theme: 'dark' | 'light'
   completionSoundEnabled: boolean
   waterWarningLevelMl: number
   waterCriticalLevelMl: number
@@ -18,6 +19,7 @@ export const BESTPRESSO_PREFERENCES_KEY = 'bestpresso.preferences.v1'
 const preferenceEvent = 'bestpresso:preferences-changed'
 
 export const DEFAULT_BESTPRESSO_PREFERENCES: BestpressoPreferences = {
+  theme: 'dark',
   completionSoundEnabled: true,
   waterWarningLevelMl: 426,
   waterCriticalLevelMl: 300,
@@ -41,6 +43,8 @@ export function normalizeBestpressoPreferences(value: unknown): BestpressoPrefer
     : 'fine'
   const temperatureUnit = candidate.temperatureUnit === 'F' ? 'F' : 'C'
   return {
+    // Light is opt-in: neither device appearance nor old/missing settings enable it.
+    theme: candidate.theme === 'light' ? 'light' : 'dark',
     completionSoundEnabled: candidate.completionSoundEnabled !== false,
     screensaverBrightness: typeof candidate.screensaverBrightness === 'number' && Number.isFinite(candidate.screensaverBrightness)
       ? Math.round(Math.max(0, Math.min(100, candidate.screensaverBrightness)))
@@ -64,7 +68,11 @@ export function readBestpressoPreferences() {
 }
 
 export function applyBestpressoPreferences(preferences = readBestpressoPreferences()) {
-  if (typeof document !== 'undefined') document.documentElement.dataset.chartLineWeight = preferences.chartLineWeight
+  if (typeof document !== 'undefined') {
+    document.documentElement.dataset.chartLineWeight = preferences.chartLineWeight
+    document.documentElement.dataset.theme = preferences.theme
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', preferences.theme === 'light' ? '#f4f5ef' : '#171717')
+  }
   return preferences
 }
 
@@ -85,7 +93,7 @@ export function useBestpressoPreferences() {
   useEffect(() => {
     const onPreference = (event: Event) => setPreferences((event as CustomEvent<BestpressoPreferences>).detail ?? readBestpressoPreferences())
     const onStorage = (event: StorageEvent) => {
-      if (event.key === BESTPRESSO_PREFERENCES_KEY) setPreferences(readBestpressoPreferences())
+      if (event.key === BESTPRESSO_PREFERENCES_KEY || event.key === null) setPreferences(applyBestpressoPreferences())
     }
     window.addEventListener(preferenceEvent, onPreference)
     window.addEventListener('storage', onStorage)
