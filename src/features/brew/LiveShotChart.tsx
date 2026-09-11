@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { LiveShotPoint } from '../../domain/brewing'
+import { formatTemperatureValue, temperatureUnitLabel } from '../../domain/temperature'
+import { useBestpressoPreferences } from '../settings/bestpressoPreferences'
 import { ChartLegend } from './ChartLegend'
 import { ChartStageMarkers } from './ChartStageMarkers'
 import type { ChartStageMarker } from './ChartStageMarkers'
@@ -137,6 +139,7 @@ const useAnimatedChartFocus = (target: ChartFocusTransform) => {
 }
 
 export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fitDuration = false, contextPoints, showWeight = true, legendFilterEnabled = false, dimmedSeries = [], onToggleSeries }: LiveShotChartProps) {
+  const { preferences } = useBestpressoPreferences()
   const gradientId = useId().replaceAll(':', '')
   const svgRef = useRef<SVGSVGElement>(null)
   const inspectionGesture = useRef<{ pointerId: number; startX: number; startY: number; timer: number; active: boolean } | null>(null)
@@ -330,7 +333,7 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
       <dl>
         <div className="chart-reading--pressure"><dt>Pressure</dt><dd>{reading(inspection.pressure, 1)}<small>bar</small></dd></div>
         <div className="chart-reading--flow"><dt>Flow</dt><dd>{reading(inspection.flow, 1)}<small>ml/s</small></dd></div>
-        <div className="chart-reading--temperature"><dt>Temperature</dt><dd>{reading(inspection.temperature, 1)}<small>°C</small></dd></div>
+        <div className="chart-reading--temperature"><dt>Temperature</dt><dd>{formatTemperatureValue(inspection.temperature, preferences.temperatureUnit, 1)}<small className="temperature-unit">{temperatureUnitLabel(preferences.temperatureUnit)}</small></dd></div>
         {showWeight && <div className="chart-reading--weight"><dt>Yield</dt><dd>{reading(inspection.weight, 1)}<small>g</small></dd></div>}
       </dl>
     </aside>}

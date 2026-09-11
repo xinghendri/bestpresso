@@ -10,9 +10,11 @@ export const WATER_TANK_SENSOR_FULL_MM = 43
 export const WATER_TANK_LOW_LEVEL_ML = 300
 export const WATER_TANK_WARNING_LEVEL_ML = 426
 
-export function waterTankLevelState(volumeMl: number, machineNeedsWater = false) {
-  if (machineNeedsWater || volumeMl <= WATER_TANK_LOW_LEVEL_ML) return 'needsWater'
-  if (volumeMl <= WATER_TANK_WARNING_LEVEL_ML) return 'warning'
+export interface WaterWarningThresholds { warningLevelMl: number; criticalLevelMl: number }
+
+export function waterTankLevelState(volumeMl: number, machineNeedsWater = false, thresholds: WaterWarningThresholds = { warningLevelMl: WATER_TANK_WARNING_LEVEL_ML, criticalLevelMl: WATER_TANK_LOW_LEVEL_ML }) {
+  if (machineNeedsWater || volumeMl <= thresholds.criticalLevelMl) return 'needsWater'
+  if (volumeMl <= thresholds.warningLevelMl) return 'warning'
   return 'normal'
 }
 
@@ -157,12 +159,17 @@ export function normalizedLiveScaleWeight(weight: unknown) {
 
 export function liveShotYield(scaleWeight: unknown, points: Pick<LiveShotPoint, 'weight'>[]) {
   const streamedWeight = normalizedLiveScaleWeight(scaleWeight)
-  if (streamedWeight !== undefined) return streamedWeight
+  let sampledWeight: number | undefined
   for (let index = points.length - 1; index >= 0; index -= 1) {
-    const sampledWeight = normalizedLiveScaleWeight(points[index].weight)
-    if (sampledWeight !== undefined) return sampledWeight
+    sampledWeight = normalizedLiveScaleWeight(points[index].weight)
+    if (sampledWeight !== undefined) break
   }
-  return undefined
+  if (streamedWeight === undefined) return sampledWeight
+  if (sampledWeight === undefined) return streamedWeight
+  // The header receives raw scale packets more frequently than stage cards.
+  // Do not let a later downward-drifting packet undercut the shot-timeline
+  // reading already shown on the active stage.
+  return Math.max(streamedWeight, sampledWeight)
 }
 
 export function liveShotFlowRate(points: Pick<LiveShotPoint, 'weightFlow'>[]) {

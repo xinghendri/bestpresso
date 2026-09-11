@@ -21,6 +21,18 @@ test('locks the settled reading after ten low-flow samples', () => {
   assert.equal(result.finished, true)
 })
 
+test('does not lower final yield when an untouched cup drifts down while settling', () => {
+  let state = initial(36.4)
+  let result = observePostShotWeight(state, 36.3, -0.1)
+  for (let index = 1; index < 10; index += 1) {
+    state = result.state
+    result = observePostShotWeight(state, 36.2 - index * 0.01, -0.05)
+  }
+
+  assert.equal(result.displayWeight, 36.4)
+  assert.equal(result.finished, true)
+})
+
 test('freezes the best reading when the cup is removed', () => {
   const result = observePostShotWeight(initial(36.2), 12, -4)
   assert.equal(result.displayWeight, 36.2)

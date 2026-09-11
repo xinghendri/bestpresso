@@ -8,7 +8,9 @@ export type BuilderValueAdjustmentKey =
   | 'builderVolume'
   | 'builderYield'
 
-export type ValueAdjustmentKey = EditableMachineSetting | EditableProfileSetting | BuilderValueAdjustmentKey
+export type BuiltInValueAdjustmentKey = EditableMachineSetting | EditableProfileSetting | BuilderValueAdjustmentKey
+export type SettingsValueAdjustmentKey = `settings:${string}`
+export type ValueAdjustmentKey = BuiltInValueAdjustmentKey | SettingsValueAdjustmentKey
 export type ValueAdjustmentMode = 'integer' | 'decimal'
 
 export interface FixedValueSuggestion {
@@ -153,4 +155,4 @@ export const VALUE_ADJUSTMENTS = {
     mode: 'decimal',
     suggestions: [10, 20, 30, 36, 40, 50],
   },
-} as const satisfies Record<ValueAdjustmentKey, ValueAdjustmentDefinition>
+} as const satisfies Record<BuiltInValueAdjustmentKey, ValueAdjustmentDefinition>

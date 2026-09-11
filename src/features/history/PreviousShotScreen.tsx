@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { clockOptions, type ClockFormat } from '../sleep/deviceTime'
+import { useBestpressoPreferences } from '../settings/bestpressoPreferences'
 import type { LiveShotPoint, PreviousShot, PreviousShotStatus } from '../../domain/brewing'
 import { LiveBrewStages } from '../brew/LiveBrewStages'
 import type { BrewStageSelection } from '../brew/LiveBrewStages'
@@ -30,11 +32,11 @@ function AnimatedHistoryShotChart({ view, targetYield }: { view: HistoryChartVie
   return <LiveShotChart points={view.points} contextPoints={view.contextPoints} elapsedMs={view.elapsedMs} fitDuration={view.fitDuration} startMs={view.startMs} targetYield={targetYield} showWeight={view.showWeight} legendFilterEnabled dimmedSeries={dimmedSeries} onToggleSeries={(series) => setDimmedSeries((current) => toggleDimmedChartSeries(current, series))} />
 }
 
-const pullTime = (timestamp: string | undefined) => {
+const pullTime = (timestamp: string | undefined, clockFormat: ClockFormat) => {
   if (!timestamp) return 'Date unavailable'
   const date = new Date(timestamp)
   if (Number.isNaN(date.getTime())) return 'Date unavailable'
-  return new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date)
+  return new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', ...clockOptions(clockFormat) }).format(date)
 }
 
 const timerLabel = (shot: PreviousShot) => {
@@ -43,6 +45,7 @@ const timerLabel = (shot: PreviousShot) => {
 }
 
 export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, onDismiss }: PreviousShotScreenProps) {
+  const { preferences } = useBestpressoPreferences()
   const firstShot = initialShot ?? shots[0] ?? null
   const [selectedId, setSelectedId] = useState(firstShot?.id)
   const [selectedShot, setSelectedShot] = useState<PreviousShot | null>(firstShot)
@@ -101,7 +104,7 @@ export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, o
       <div className="history-browser-list" role="listbox" aria-label="Shot history">
         {shots.map((shot, index) => <button className={`history-browser-item${shot.id === activeId ? ' history-browser-item--selected' : ''}`} type="button" role="option" aria-selected={shot.id === activeId} aria-busy={loadingId === shot.id} key={shot.id ?? `${shot.timestamp}:${index}`} onClick={() => void selectShot(shot)}>
           <strong>{shot.profileName}</strong>
-          <time dateTime={shot.timestamp}>{pullTime(shot.timestamp)}</time>
+          <time dateTime={shot.timestamp}>{pullTime(shot.timestamp, preferences.clockFormat)}</time>
         </button>)}
         {!shots.length && <p className="history-browser-empty">{status === 'loading' ? 'Finding your pulls…' : "You haven't filled any cups yet."}</p>}
       </div>
@@ -111,7 +114,7 @@ export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, o
       <header className="live-pull-header">
         <div className="history-pull-title">
           <h1>{activeShot?.profileName ?? 'Pull history'}</h1>
-          {activeShot && <time dateTime={activeShot.timestamp}>{pullTime(activeShot.timestamp)}</time>}
+          {activeShot && <time dateTime={activeShot.timestamp}>{pullTime(activeShot.timestamp, preferences.clockFormat)}</time>}
         </div>
         <div className="live-pull-header__controls">
           <div className={`live-pull-header__metrics metric-scale--medium${isCleaning ? ' live-pull-header__metrics--single' : ' live-pull-header__metrics--history'}`}>

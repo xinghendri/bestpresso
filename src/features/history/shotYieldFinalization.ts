@@ -28,7 +28,7 @@ export function observePostShotWeight(state: YieldFinalizationState, weight: num
   const stableSamples = flow !== undefined && Math.abs(flow) < FINAL_YIELD_SETTLE_FLOW ? state.stableSamples + 1 : 0
   const nextState = { bestWeight: Math.max(state.bestWeight, weight), lastWeight: weight, stableSamples, previousFlow: flow ?? state.previousFlow }
   const finished = stableSamples >= FINAL_YIELD_SETTLE_SAMPLES
-  return { state: nextState, displayWeight: finished ? weight : nextState.bestWeight, finished }
+  return { state: nextState, displayWeight: nextState.bestWeight, finished }
 }
 
 export function reconciledShotYield(persistedYield: string, settledWeight?: number) {

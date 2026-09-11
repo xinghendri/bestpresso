@@ -1,0 +1,82 @@
+/* Shared neutral surfaces; layout, selected cues and profile art stay unchanged. */
+:root {
+  --card-surface: linear-gradient(145deg,rgba(77,66,66,.62),rgba(54,47,47,.52));
+  --card-outline: rgba(255,255,255,.09);
+}
+.utility-card.utility-card,.brew-panel::before,.history-section,.live-pull-header,
+.live-brew-stage,.profile-detail,.profile-directory,
+.profile-builder-screen .pb-stage:not(.pb-stage-drag-overlay),
+.settings-card {
+  background:var(--card-surface);
+  outline:1px solid var(--card-outline);
+  outline-offset:-1px;
+}
+.profile-builder-screen .pb-topbar::before {
+  background:var(--card-surface);
+  outline:1px solid var(--card-outline);
+  outline-offset:-1px;
+}
+.profile-builder-screen .pb-topbar.is-expanded::before {
+  background:linear-gradient(145deg,rgba(77,66,66,.98),rgba(54,47,47,.98));
+}
+.favorite-slot,.profile-card {
+  outline:1px solid var(--card-outline);
+  outline-offset:-1px;
+}
+.brew-panel::before,.history-section {
+  background:linear-gradient(145deg,rgba(35,31,31,.88),rgba(24,22,22,.86));
+}
+.profile-card--active {
+  border-width:1.5px;
+  outline-width:1.5px;
+  outline-offset:-1.5px;
+}
+/* Native menus are retained, but the indicator is no longer browser-positioned. */
+.settings-line-options {
+  grid-template-columns:repeat(3,minmax(0,1fr));
+}
+.settings-line-options button {
+  min-width:0;
+  padding-inline:10px;
+}
+@media(min-width:701px) {
+  .settings-control-row,.settings-number-row,
+  .settings-control-row:has(select),.settings-control-row:has(.settings-text-input) {
+    flex-direction:row;
+    flex-wrap:nowrap;
+    align-items:center;
+    gap:14px;
+  }
+  .settings-control-row>span,.settings-number-row>span,
+  .settings-control-row:has(select)>span,.settings-control-row:has(.settings-text-input)>span {
+    flex:1 1 0;
+    min-width:0;
+  }
+  .settings-control-row select,.settings-text-input {
+    flex:0 1 52%;
+    width:52%;
+    min-width:140px;
+  }
+  .settings-number-row>div.settings-number-control {
+    align-self:center;
+    gap:6px;
+  }
+  .settings-number-row .settings-number-value { min-width:88px;padding-inline:8px }
+  .settings-number-row>div.settings-number-control>button:not(.settings-number-value) {
+    width:32px;height:32px;flex-basis:32px;
+  }
+}
+/* A narrower tablet gets wider cards, not cramped or vertically split rows. */
+@media(min-width:701px) and (max-width:1050px) {
+  .settings-grid,.settings-columns { grid-template-columns:minmax(0,1fr) }
+  .settings-grid.settings-grid--alerts { grid-template-columns:repeat(2,minmax(0,1fr)) }
+}
+.settings-screen select,.profile-builder-screen select {
+  appearance:none;
+  -webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%23c0c0c0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;
+  background-position:right 16px center;
+  background-size:12px 8px;
+  padding-right:40px;
+}

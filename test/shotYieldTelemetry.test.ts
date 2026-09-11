@@ -6,6 +6,10 @@ test('uses the independently streamed scale weight for live shot yield', () => {
   assert.equal(liveShotYield(36.4, [{ weight: 34.8 }]), 36.4)
 })
 
+test('does not let raw scale drift lower than the stage-card timeline reading', () => {
+  assert.equal(liveShotYield(36.1, [{ weight: 36.4 }]), 36.4)
+})
+
 test('falls back to the latest machine-frame sample without a scale stream', () => {
   assert.equal(liveShotYield(undefined, [{ weight: 18.2 }, { weight: 35.9 }]), 35.9)
 })

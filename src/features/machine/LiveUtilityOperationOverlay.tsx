@@ -4,6 +4,8 @@ import steamIcon from '../../assets/figma/steam-live.svg'
 import type { ReactNode } from 'react'
 import { liveHotWaterMeasurement } from '../../domain/brewing'
 import type { LiveUtilityOperation } from '../../domain/brewing'
+import { formatTemperatureValue, temperatureUnitLabel } from '../../domain/temperature'
+import { useBestpressoPreferences } from '../settings/bestpressoPreferences'
 
 const presentation = {
   hotWater: { title: 'Dispensing hot water', icon: hotWaterIcon },
@@ -13,7 +15,6 @@ const presentation = {
 
 const elapsedSeconds = (elapsedMs: number) => Math.max(0, Math.floor(elapsedMs / 1000))
 const decimal = (value: number) => Math.max(0, value).toFixed(1)
-const temperature = (value: number | undefined) => value === undefined ? '—' : String(Math.round(value))
 
 function Reading({ label, children, align = 'start' }: { label: string; children: ReactNode; align?: 'start' | 'center' | 'end' }) {
   return <div className={`live-utility-reading live-utility-reading--${align}`}>
@@ -23,6 +24,7 @@ function Reading({ label, children, align = 'start' }: { label: string; children
 }
 
 export function LiveUtilityOperationOverlay({ operation }: { operation: LiveUtilityOperation }) {
+  const { preferences } = useBestpressoPreferences()
   const state = presentation[operation.kind]
   const seconds = elapsedSeconds(operation.elapsedMs)
   const duration = operation.targetDuration
@@ -39,7 +41,7 @@ export function LiveUtilityOperationOverlay({ operation }: { operation: LiveUtil
         {hotWaterMeasurement
           ? <Reading label={hotWaterMeasurement.label} align="center">{hotWaterMeasurement.value === undefined ? '—' : decimal(hotWaterMeasurement.value)} <em>/</em> {hotWaterMeasurement.target ?? '—'}<small>{hotWaterMeasurement.unit}</small></Reading>
           : <Reading label="Flow" align="center">{decimal(operation.flow)}<small>ml/s</small></Reading>}
-        <Reading label="Temperature" align="end">{temperature(operation.temperature)}<small>°</small></Reading>
+        <Reading label="Temperature" align="end">{formatTemperatureValue(operation.temperature, preferences.temperatureUnit)}<small className="temperature-unit">{temperatureUnitLabel(preferences.temperatureUnit)}</small></Reading>
       </div>
     </section>
   </div>
