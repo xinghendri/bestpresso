@@ -19,3 +19,7 @@ test('light header and compact controls share backgrounds, with separate heating
   assert.match(css, /\.status-pill:not\(\.status-pill--thirsty\):not\(\.status-pill--heating\)>img/)
   assert.match(css, /\.status-pill--heating>img,\n\[data-theme="light"\] \.status-pill--thirsty>img \{filter:/)
 })
+test('light sleeping status uses the neutral grey treatment', () => {
+  const css = read('styles/lightMode.css')
+  assert.match(css, /\[data-theme="light"\] :is\(\.status-pill--sleeping,[^)]*\) \{\s*color:#5b605b;background:var\(--light-home-control\);border-color:#b5beb3;/)
+})
