@@ -98,7 +98,7 @@
 [data-theme="light"] .status-pill--thirsty {color:#a43d38;background:#f5dfd9;border-color:#bb6055}
 [data-theme="light"] .status-pill--heating>img,
 [data-theme="light"] .status-pill--thirsty>img {filter:brightness(0) saturate(100%) invert(29%) sepia(39%) saturate(1702%) hue-rotate(326deg) brightness(93%) contrast(87%)}
-[data-theme="light"] :is(.status-pill--not-heating,.status-pill--notHeating,.status-pill--connecting,.status-pill--disconnected) {
+[data-theme="light"] :is(.status-pill--sleeping,.status-pill--not-heating,.status-pill--notHeating,.status-pill--connecting,.status-pill--disconnected) {
   color:#5b605b;background:var(--light-home-control);border-color:#b5beb3;
 }
 [data-theme="light"] .live-brew-screen {background:linear-gradient(125deg,#f8faf3,#f0ede6);color:#23382d}
