@@ -7,6 +7,17 @@ test('Bestpresso preferences preserve the released defaults', () => {
   assert.deepEqual(normalizeBestpressoPreferences(undefined), DEFAULT_BESTPRESSO_PREFERENCES)
 })
 
+test('screensaver brightness defaults to 7 but preserves user choices across the full range', () => {
+  assert.equal(normalizeBestpressoPreferences({}).screensaverBrightness, 7)
+  for (const value of [0, 3, 7, 45, 100]) {
+    assert.equal(normalizeBestpressoPreferences({ screensaverBrightness: value }).screensaverBrightness, value)
+  }
+  assert.equal(normalizeBestpressoPreferences({ screensaverBrightness: NaN }).screensaverBrightness, 7)
+  assert.equal(normalizeBestpressoPreferences({ screensaverBrightness: 120 }).screensaverBrightness, 100)
+  const source = readFileSync(new URL('../src/features/brew/useBrewingData.ts', import.meta.url), 'utf8')
+  assert.match(source, /displayBrightness.dim\(readBestpressoPreferences\(\).screensaverBrightness\)/)
+})
+
 test('water warning preferences remain ordered and within the reservoir control range', () => {
   assert.deepEqual(normalizeBestpressoPreferences({ waterCriticalLevelMl: 500, waterWarningLevelMl: 100 }), {
     completionSoundEnabled: true,
@@ -15,6 +26,7 @@ test('water warning preferences remain ordered and within the reservoir control 
     chartLineWeight: 'fine',
     temperatureUnit: 'C',
     clockFormat: 'device',
+    screensaverBrightness: 7,
   })
   const maximum = normalizeBestpressoPreferences({ waterCriticalLevelMl: 9_000, waterWarningLevelMl: 9_000 })
   assert.equal(maximum.waterCriticalLevelMl, 1_999)

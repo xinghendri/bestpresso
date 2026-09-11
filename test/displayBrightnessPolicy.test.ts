@@ -20,6 +20,15 @@ test('disconnect and duplicate wake do not reset an undimmed display', async () 
   await policy.restore()
   assert.deepEqual(writes, [])
 })
+
+test('screensaver brightness is not capped to the default and wake restores normal brightness', async () => {
+  const { policy, writes } = fixture(60)
+  for (const value of [0, 3, 45, 100]) {
+    await policy.dim(value)
+    await policy.restore()
+  }
+  assert.deepEqual(writes, [0, 60, 3, 60, 45, 60, 100, 60])
+})
 test('rapid sleep/wake is ordered and preserves the requested brightness despite battery cap', async () => {
   const { policy, writes, saved } = fixture()
   await Promise.all([policy.dim(5), policy.restore(), policy.restore()])
