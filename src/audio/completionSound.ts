@@ -1,4 +1,4 @@
-import completionSoundUrl from '../assets/audio/brew-complete.ogg'
+import completionSoundUrl from '../assets/audio/brew-complete.mp3'
 import { readBestpressoPreferences } from '../features/settings/bestpressoPreferences'
 
 type AudioContextConstructor = typeof AudioContext

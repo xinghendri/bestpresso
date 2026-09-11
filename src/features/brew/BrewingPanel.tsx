@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react'
 import { Metric } from '../../components/Metric/Metric'
 import type { BrewProfile, EditableProfileSetting } from '../../domain/brewing'
+import { formatTemperatureValue, temperatureBoundToDisplay, temperatureFromDisplay, temperatureStepToDisplay, temperatureUnitLabel } from '../../domain/temperature'
 import type { FixedValueSuggestion } from '../../domain/valueAdjustments'
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { doseToYieldRatio } from './brewRatio'
 import { DEMO_PROFILE_LONG_PRESS_MS } from './demoBrew'
 import { ProfileTargetChart } from './ProfileTargetChart'
 import { profileCardMotion, profileCardPosition, projectedProfileSteps, wrappedProfileOffset } from './profileCarouselMotion'
+import { useBestpressoPreferences } from '../settings/bestpressoPreferences'
 
 interface CarouselDrag {
   pointerId: number
@@ -20,6 +22,8 @@ interface CarouselDrag {
 }
 
 export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, demoMode = false, onUpdateProfile, onSelectProfile, onStartDemoBrew, onManageProfiles }: { profiles: BrewProfile[]; activeProfileId?: string; settingsDisabled?: boolean; demoMode?: boolean; onUpdateProfile: (profileId: string, setting: EditableProfileSetting, value: number) => void; onSelectProfile: (profileId: string) => Promise<boolean>; onStartDemoBrew?: (profileId: string) => void; onManageProfiles: () => void }) {
+  const { preferences } = useBestpressoPreferences()
+  const temperatureUnit = preferences.temperatureUnit
   const selectedIndex = profiles.findIndex((profile) => profile.id === activeProfileId)
   const fallbackIndex = profiles.findIndex((profile) => profile.id === 'adaptive-v2')
   const initialIndex = Math.max(0, selectedIndex >= 0 ? selectedIndex : fallbackIndex)
@@ -56,19 +60,20 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, demo
 
   const editProfileSetting = (setting: EditableProfileSetting, valueHint?: (value: number) => string | undefined, fixedSuggestions?: readonly FixedValueSuggestion[]) => {
     const definition = VALUE_ADJUSTMENTS[setting]
+    const isTemperature = setting === 'temperature'
     return {
       title: definition.title,
-      min: definition.min,
-      max: definition.max,
-      step: definition.step,
+      min: isTemperature ? temperatureBoundToDisplay(definition.min, temperatureUnit) : definition.min,
+      max: isTemperature ? temperatureBoundToDisplay(definition.max, temperatureUnit) : definition.max,
+      step: isTemperature ? temperatureStepToDisplay(definition.step, temperatureUnit) : definition.step,
       mode: definition.mode,
       initialValue: 'defaultValue' in definition ? definition.defaultValue : undefined,
       suggestionKey: setting,
-      presets: definition.suggestions,
+      presets: isTemperature ? definition.suggestions.map((value) => temperatureBoundToDisplay(value, temperatureUnit)) : definition.suggestions,
       fixedSuggestions,
       valueHint,
       disabled: settingsDisabled,
-      onSave: (value: number) => onUpdateProfile(activeProfile.id, setting, value),
+      onSave: (value: number) => onUpdateProfile(activeProfile.id, setting, isTemperature ? temperatureFromDisplay(value, temperatureUnit) : value),
     }
   }
 
@@ -182,7 +187,7 @@ export function BrewingPanel({ profiles, activeProfileId, settingsDisabled, demo
     </div>
     <button className="manage-profiles" type="button" onClick={onManageProfiles}>See all profiles →</button>
     <div className="brew-metrics" aria-live="polite">
-      <Metric metric={{ label: 'Temp.', value: activeProfile.temperature, unit: '°' }} edit={editProfileSetting('temperature')} />
+      <Metric metric={{ label: 'Temp.', value: formatTemperatureValue(activeProfile.temperature, temperatureUnit), unit: temperatureUnitLabel(temperatureUnit) }} edit={editProfileSetting('temperature')} />
       <Metric metric={{ label: 'Grind size', value: activeProfile.grindSetting }} edit={editProfileSetting('grindSetting')} />
       <Metric metric={{ label: 'Dose', value: activeProfile.dose, unit: 'g' }} edit={editProfileSetting('dose')} />
       <Metric metric={{ label: 'Yield', value: activeProfile.targetYield, unit: Number.isFinite(Number(activeProfile.targetYield)) ? 'g' : undefined, subtext: ratio, subtextVariant: 'pill' }} reserveSubtext edit={editProfileSetting('targetYield', yieldValueHint, fixedYieldSuggestions)} />

@@ -6,8 +6,8 @@ import { isSuccessfulEspressoCompletion, shouldPlayCompletionCue } from '../src/
 const brewingData = readFileSync(new URL('../src/features/brew/useBrewingData.ts', import.meta.url), 'utf8')
 const completionSound = readFileSync(new URL('../src/audio/completionSound.ts', import.meta.url), 'utf8')
 
-test('loads the compact OGG completion cue', () => {
-  assert.match(completionSound, /brew-complete\.ogg/)
+test('loads the iOS-compatible MP3 completion cue', () => {
+  assert.match(completionSound, /brew-complete\.mp3/)
   assert.doesNotMatch(completionSound, /brew-complete\.wav/)
 })
 

@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { ValueAdjustmentProvider } from './components/ValueAdjustment/ValueAdjustmentProvider'
 import { ProfileBuilderScreen } from './features/profiles/ProfileBuilderScreen'
 import './styles/index.css'
+import './styles/cardSurfaces.css'
 
 export function Preview() {
   useEffect(() => {

@@ -8,8 +8,6 @@ import builderStageDelete from '../../assets/figma/builder-stage-delete.svg'
 import builderStageDrag from '../../assets/figma/builder-stage-drag.svg'
 import builderStageDuplicate from '../../assets/figma/builder-stage-duplicate.svg'
 import builderStageNumber from '../../assets/figma/builder-stage-number.svg'
-import builderStepMinus from '../../assets/figma/builder-step-minus.svg'
-import builderStepMinusMuted from '../../assets/figma/builder-step-minus-muted.svg'
 import builderStepPlus from '../../assets/figma/builder-step-plus.svg'
 import builderTransitionFast from '../../assets/figma/builder-transition-fast.svg'
 import builderTransitionFastActive from '../../assets/figma/builder-transition-fast-active.svg'
@@ -22,6 +20,7 @@ import skipNext from '../../assets/figma/skip-next.svg'
 import { useValueAdjustment } from '../../components/ValueAdjustment/ValueAdjustmentContext'
 import type { DecaidProfile, DecaidProfileRecord } from '../../api/decaid/types'
 import type { ProfileTargetPoint } from '../../domain/brewing'
+import { formatTemperatureValue, temperatureBoundToDisplay, temperatureFromDisplay, temperatureStepToDisplay, temperatureUnitLabel, type TemperatureUnit } from '../../domain/temperature'
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { ChartLegend } from '../brew/ChartLegend'
 import { ChartStageMarkers } from '../brew/ChartStageMarkers'
@@ -32,6 +31,7 @@ import { nextBuilderStepperValue } from './profileBuilderStepper'
 import type { BuilderStepperDirection } from './profileBuilderStepper'
 import { issueSummary, validateProfileDraft } from './profileBuilderValidation'
 import type { ProfileBuilderIssue } from './profileBuilderValidation'
+import { useBestpressoPreferences } from '../settings/bestpressoPreferences'
 
 const CHART_WIDTH = 1090
 const CHART_HEIGHT = 290
@@ -180,7 +180,7 @@ function Stepper({ label, value, unit, step, min = 0, max = 1000, disabled = fal
       onLostPointerCapture={(event) => endPress(event, -1, true)}
       onContextMenu={(event) => event.preventDefault()}
       aria-label={`Reduce ${label}; hold for whole units`}
-    ><img src={enabled ? builderStepMinus : builderStepMinusMuted} alt="" /></button>
+    ><span className="pb-stepper__glyph" aria-hidden="true">−</span></button>
     <span
       className={onOpen && !disabled ? 'pb-stepper__value is-adjustable' : 'pb-stepper__value'}
       role={onOpen && !disabled ? 'button' : undefined}
@@ -193,7 +193,7 @@ function Stepper({ label, value, unit, step, min = 0, max = 1000, disabled = fal
         onOpen()
       } : undefined}
       aria-label={onOpen && !disabled ? `Open ${label} fullscreen adjustment` : undefined}
-    >{formatValue(value)}{unit && <small>{unit}</small>}</span>
+    ><span className="pb-stepper__reading">{formatValue(value)}{unit && <small>{unit}</small>}</span></span>
     <button
       type="button"
       disabled={disabled}
@@ -204,7 +204,7 @@ function Stepper({ label, value, unit, step, min = 0, max = 1000, disabled = fal
       onLostPointerCapture={(event) => endPress(event, 1, true)}
       onContextMenu={(event) => event.preventDefault()}
       aria-label={`Increase ${label}; hold for whole units`}
-    ><img src={builderStepPlus} alt="" /></button>
+    ><span className="pb-stepper__glyph" aria-hidden="true">+</span></button>
   </div>
 }
 
@@ -305,12 +305,13 @@ function StageDragHandle({ onPointerDown, onPointerMove, onPointerUp }: {
   ><img src={builderStageDrag} alt="" /></button>
 }
 
-function StageEditorCard({ stage, index, active, isLastStage, limiterTolerances, onActivate, onChange, onDuplicate, onDelete, canDelete, dragging, issues, panelRequest, onDragStart, onDragMove, onDragEnd, cardRef }: {
+function StageEditorCard({ stage, index, active, isLastStage, limiterTolerances, temperatureUnit, onActivate, onChange, onDuplicate, onDelete, canDelete, dragging, issues, panelRequest, onDragStart, onDragMove, onDragEnd, cardRef }: {
   stage: BuilderStage
   index: number
   active: boolean
   isLastStage: boolean
   limiterTolerances: Record<BuilderExitType, number>
+  temperatureUnit: TemperatureUnit
   onActivate: () => void
   onChange: (patch: Partial<BuilderStage>) => void
   onDuplicate: () => void
@@ -388,11 +389,15 @@ function StageEditorCard({ stage, index, active, isLastStage, limiterTolerances,
   }
   const openTemperatureAdjustment = () => openAdjustment({
     label: 'Temperature',
-    value: stage.temperature,
-    unit: '°',
+    value: temperatureBoundToDisplay(stage.temperature, temperatureUnit),
+    unit: temperatureUnitLabel(temperatureUnit),
     ...VALUE_ADJUSTMENTS.builderTemperature,
+    min: temperatureBoundToDisplay(VALUE_ADJUSTMENTS.builderTemperature.min, temperatureUnit),
+    max: temperatureBoundToDisplay(VALUE_ADJUSTMENTS.builderTemperature.max, temperatureUnit),
+    step: temperatureStepToDisplay(VALUE_ADJUSTMENTS.builderTemperature.step, temperatureUnit),
+    presets: VALUE_ADJUSTMENTS.builderTemperature.suggestions.map((value) => temperatureBoundToDisplay(value, temperatureUnit)),
     suggestionKey: 'builderTemperature',
-    onSave: (temperature) => onChange({ temperature }),
+    onSave: (temperature) => onChange({ temperature: temperatureFromDisplay(temperature, temperatureUnit) }),
   })
   const openLimiterAdjustment = () => {
     const definition = stage.pump === 'pressure' ? VALUE_ADJUSTMENTS.builderFlow : VALUE_ADJUSTMENTS.builderPressure
@@ -452,7 +457,7 @@ function StageEditorCard({ stage, index, active, isLastStage, limiterTolerances,
     </header>
     <span className="pb-stage__summary-metrics">
       <span><small>{stage.pump === 'pressure' ? 'Pressure' : 'Flow'} Target</small><strong>{formatValue(stage.target)} <em>{targetUnit}</em></strong>{typeof limiterValue === 'number' && limiterValue > 0 && <i>Max {formatValue(limiterValue)} {limiterUnit}</i>}</span>
-      <span><small>{stage.sensor === 'water' ? 'Water' : 'Coffee'} temperature</small><strong>{formatValue(stage.temperature)}°</strong></span>
+      <span><small>{stage.sensor === 'water' ? 'Water' : 'Coffee'} temperature</small><strong>{formatTemperatureValue(stage.temperature, temperatureUnit)}<em className="temperature-unit">{temperatureUnitLabel(temperatureUnit)}</em></strong></span>
     </span>
     <span className="pb-stage__summary-exit"><small>Moves on when any is reached</small><strong>{exitSummary}</strong></span>
   </article>
@@ -477,7 +482,7 @@ function StageEditorCard({ stage, index, active, isLastStage, limiterTolerances,
           <SegmentControl value={stage.pump} onChange={setPump} />
           <Stepper label={`${stage.pump} target`} value={stage.target} unit={targetUnit} step={0.1} max={15.9} onOpen={openTargetAdjustment} onChange={setTarget} />
         </div>
-        <div className="pb-stage__temperature-control" data-builder-field="temperature" data-validation-severity={fieldSeverity('temperature')}><small>Temperature</small><Stepper label="Temperature" value={stage.temperature} unit="°" step={0.5} min={0} max={127.5} onOpen={openTemperatureAdjustment} onChange={(temperature) => onChange({ temperature: temperature ?? 0 })} /></div>
+        <div className="pb-stage__temperature-control" data-builder-field="temperature" data-validation-severity={fieldSeverity('temperature')}><small>Temperature</small><Stepper label="Temperature" value={temperatureBoundToDisplay(stage.temperature, temperatureUnit)} unit={temperatureUnitLabel(temperatureUnit)} step={temperatureStepToDisplay(0.5, temperatureUnit)} min={temperatureBoundToDisplay(0, temperatureUnit)} max={temperatureBoundToDisplay(127.5, temperatureUnit)} onOpen={openTemperatureAdjustment} onChange={(temperature) => onChange({ temperature: temperature === undefined ? 0 : temperatureFromDisplay(temperature, temperatureUnit) })} /></div>
         <div className="pb-stage__choice-control" data-builder-field="transition" data-validation-severity={fieldSeverity('transition')}><small>Transition</small><TransitionControl value={stage.transition} onChange={(transition) => onChange({ transition })} /></div>
         <div className="pb-stage__choice-control" data-builder-field="sensor" data-validation-severity={fieldSeverity('sensor')}><small>Measure from</small><SensorControl value={stage.sensor} onChange={(sensor) => onChange({ sensor })} /></div>
       </div>
@@ -536,6 +541,7 @@ interface StageDragSession {
 }
 
 export function ProfileBuilderScreen({ onClose, initialRecord, existingTitles = [], knownCategories = [], knownVersions = [], onSave, onSaved }: ProfileBuilderScreenProps) {
+  const { preferences } = useBestpressoPreferences()
   const openAdjustment = useValueAdjustment()
   const overwriteSource = initialRecord?.isDefault === false
   const [initialDraft] = useState(() => initialRecord?.profile?.steps?.length
@@ -1067,6 +1073,7 @@ export function ProfileBuilderScreen({ onClose, initialRecord, existingTitles = 
         active={index === activeStage}
         isLastStage={index === draft.stages.length - 1}
         limiterTolerances={draft.limiterTolerances}
+        temperatureUnit={preferences.temperatureUnit}
         dragging={stage.id === draggedStageId}
         issues={validation.issues.filter((issue) => issue.stageId === stage.id)}
         panelRequest={stagePanelRequest?.stageId === stage.id ? stagePanelRequest : undefined}

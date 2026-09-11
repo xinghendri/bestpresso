@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { playCompletionSound } from '../../audio/completionSound'
+import { updateSettings } from '../../api/decaid/client'
+import { hotWaterYieldLookAheadPatch } from '../settings/yieldLookAhead'
 import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isCleaningProfile, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotStage, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres } from '../../api/decaid/adapters'
 import { connectDevice, createProfile, DecaidApiError, getDecentAccountStatus, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getMachineSettings, getProfile, getProfiles, getSettings, getSharedSetting, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineProfile, setMachineState, setSharedSetting, tareScale, updateProfile, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
 import { profileTargetNeedsWorkflowSync, workflowPatchForSavedActiveProfile, workflowValuesForProfile } from '../../api/decaid/profileWorkflow'
@@ -21,7 +23,8 @@ import { DEMO_BREW_TICK_MS, demoBrewForProfile, demoBrewPointsAtElapsed, demoPul
 import { advanceShotTimeline, beginSkipTransition, isEspressoMonitoringSnapshot, observeSkipTransition, type SkipTransition } from './liveShotState'
 import { SLEEP_DISPLAY_BRIGHTNESS, shouldRunBackgroundScaleScan, sleepMachineWithConfiguredScalePolicy } from './sleepControl'
 import { utilityElapsedMs, utilityTimerStartedAt } from './utilityOperationTiming'
-import { readBestpressoPreferences } from '../settings/bestpressoPreferences'
+import { readBestpressoPreferences, useBestpressoPreferences } from '../settings/bestpressoPreferences'
+import { UNIFIED_SETTINGS_SAVED_EVENT, type UnifiedSettingsSnapshot } from '../settings/useUnifiedSettings'
 
 const currentWaterThresholds = () => {
   const preferences = readBestpressoPreferences()
@@ -133,6 +136,7 @@ const storeLastSelectedProfileIdLocally = (profileId: string) => {
 }
 
 export function useBrewingData() {
+  const { preferences } = useBestpressoPreferences()
   const [model, setModel] = useState<BrewingScreenModel>({ ...brewingFixture, profiles: fixtureProfiles.slice(0, 5), previousShot: null })
   const [allProfiles, setAllProfiles] = useState(fixtureProfiles)
   const [favoriteProfileSlots, setFavoriteProfileSlots] = useState<Array<string | null>>(fixtureProfiles.slice(0, 5).map((profile) => profile.id))
@@ -151,6 +155,24 @@ export function useBrewingData() {
   const [sleepPending, setSleepPending] = useState(false)
   const [sleepScreenActive, setSleepScreenActive] = useState(false)
   const [machineActionError, setMachineActionError] = useState<string | null>(null)
+  useEffect(() => {
+    if (connection !== 'connected' || scale.status !== 'connected') return
+    let cancelled = false
+    const enableWeightStopping = async () => {
+      try {
+        const current = await getSettings()
+        const patch = hotWaterYieldLookAheadPatch(current)
+        if (current.stopHotWaterAtWeight !== true) patch.stopHotWaterAtWeight = true
+        if (!cancelled && Object.keys(patch).length) {
+          await updateSettings(patch)
+        }
+      } catch {
+        if (!cancelled) setMachineActionError('Could not enable hot-water weight stopping. Reconnect the scale to retry.')
+      }
+    }
+    void enableWeightStopping()
+    return () => { cancelled = true }
+  }, [connection, scale.status, scale.id])
   const [settingFeedback, setSettingFeedback] = useState<SettingFeedback | null>(null)
   const [settingFeedbackVisible, setSettingFeedbackVisible] = useState(false)
   const [previousShotStatus, setPreviousShotStatus] = useState<PreviousShotStatus>('loading')
@@ -193,6 +215,20 @@ export function useBrewingData() {
 
   useEffect(() => { allProfilesRef.current = allProfiles }, [allProfiles])
   useEffect(() => { latestModel.current = model }, [model])
+  useEffect(() => {
+    const volume = latestTankVolume.current
+    if (volume === null) return
+    const tankState = waterTankLevelState(volume, machineNeedsWater.current, {
+      warningLevelMl: preferences.waterWarningLevelMl,
+      criticalLevelMl: preferences.waterCriticalLevelMl,
+    })
+    setModel((current) => ({
+      ...current,
+      utilities: current.utilities.map((utility) => utility.id === 'tank'
+        ? { ...utility, alert: tankState === 'needsWater', warning: tankState === 'warning' }
+        : utility),
+    }))
+  }, [preferences.waterWarningLevelMl, preferences.waterCriticalLevelMl])
   useEffect(() => () => {
     const interval = demoBrewSession.current?.interval
     if (interval != null) window.clearInterval(interval)
@@ -258,6 +294,17 @@ export function useBrewingData() {
     if (typeof duration === 'number' && Number.isFinite(duration)) latestFlushDuration.current = duration
     return workflow
   }
+
+  useEffect(() => {
+    const applySavedSettings = (event: Event) => {
+      const snapshot = (event as CustomEvent<UnifiedSettingsSnapshot>).detail
+      if (!snapshot?.workflow) return
+      rememberFlushDuration(snapshot.workflow)
+      setModel((current) => applyWorkflow(current, snapshot.workflow, profileRecords.current, favoriteAssignments.current, retainedAdHocProfileId.current))
+    }
+    window.addEventListener(UNIFIED_SETTINGS_SAVED_EVENT, applySavedSettings)
+    return () => window.removeEventListener(UNIFIED_SETTINGS_SAVED_EVENT, applySavedSettings)
+  }, [])
 
   const dimDisplay = async () => {
     if (displayDimmed.current) return

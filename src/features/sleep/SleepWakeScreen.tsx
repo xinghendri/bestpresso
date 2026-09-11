@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type TouchEvent as ReactTouchEvent } from 'react'
 import logo from '../../assets/figma/decent-logo.png'
 import { formatDeviceTime } from './deviceTime'
+import { useBestpressoPreferences } from '../settings/bestpressoPreferences'
 import { WAKE_HOLD_DURATION_MS, WakeHoldGesture, type WakeHoldUpdate } from './wakeHoldGesture'
 
 interface SleepWakeScreenProps {
@@ -14,6 +15,7 @@ interface PulsePoint {
 }
 
 export function SleepWakeScreen({ onWake }: SleepWakeScreenProps) {
+  const { preferences } = useBestpressoPreferences()
   const gesture = useRef(new WakeHoldGesture())
   const holdTimer = useRef<number | null>(null)
   const [pulse, setPulse] = useState<PulsePoint | null>(null)
@@ -107,7 +109,7 @@ export function SleepWakeScreen({ onWake }: SleepWakeScreenProps) {
   >
     <span className="sleep-screen__identity" aria-hidden="true">
       <img src={logo} alt="" />
-      <span className="sleep-screen__time">{formatDeviceTime(now)}</span>
+      <span className="sleep-screen__time">{formatDeviceTime(now, undefined, preferences.clockFormat)}</span>
     </span>
     <span className="sleep-screen__hint">Touch and hold to wake</span>
     {pulse && <span className="sleep-screen__pulse" style={{ left: pulse.x, top: pulse.y }} aria-hidden="true" />}

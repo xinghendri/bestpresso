@@ -38,7 +38,7 @@ export interface DecaidWorkflow {
   name?: string
   profile?: DecaidProfile
   context?: DecaidWorkflowContext
-  steamSettings?: { targetTemperature?: number; duration?: number; flow?: number }
+  steamSettings?: { targetTemperature?: number; duration?: number; flow?: number; stopAtTemperature?: number }
   hotWaterData?: { targetTemperature?: number; duration?: number; volume?: number; flow?: number }
   rinseData?: { targetTemperature?: number; duration?: number; flow?: number }
 }
@@ -60,9 +60,84 @@ export interface MachineSnapshot {
 export interface ScaleSnapshot { status?: 'connected' | 'disconnected'; timestamp?: string; weight?: number; weightFlow?: number; timerValue?: number | null }
 export interface DecaidDevice { id?: string; name?: string; state?: 'connected' | 'disconnected'; type?: 'machine' | 'scale' | 'sensor'; available?: boolean }
 export type ScalePowerMode = 'disabled' | 'displayOff' | 'disconnect'
-export interface DecaidSettings { preferredScaleId?: string | null; blockTareDuringShot?: boolean; scalePowerMode?: ScalePowerMode }
-export interface DecaidMachineSettings { flushTemp?: number; flushTimeout?: number; flushFlow?: number }
-export interface DisplayState { brightness?: number; requestedBrightness?: number; platformSupported?: { brightness?: boolean; wakeLock?: boolean } }
+export type ChargingMode = 'disabled' | 'longevity' | 'balanced' | 'highAvailability'
+export type GatewayMode = 'disabled' | 'full' | 'tracking'
+export type DecaidThemeMode = 'system' | 'light' | 'dark'
+export interface DecaidSettings {
+  gatewayMode?: GatewayMode
+  webUiPath?: string | null
+  logLevel?: string
+  weightFlowMultiplier?: number
+  volumeFlowMultiplier?: number
+  hotWaterFlowMultiplier?: number
+  scalePowerMode?: ScalePowerMode
+  blockOnNoScale?: boolean
+  blockTareDuringShot?: boolean
+  stopHotWaterAtWeight?: boolean
+  preferredMachineId?: string | null
+  preferredScaleId?: string | null
+  defaultSkinId?: string | null
+  automaticUpdateCheck?: boolean
+  chargingMode?: ChargingMode
+  nightModeEnabled?: boolean
+  nightModeSleepTime?: number
+  nightModeMorningTime?: number
+  lowBatteryBrightnessLimit?: boolean
+  keepAwake?: boolean
+  simulatedDevices?: ('machine' | 'scale' | 'sensor' | 'bengle')[]
+  themeMode?: DecaidThemeMode
+}
+export interface DecaidMachineSettings {
+  usb?: boolean
+  fan?: number
+  flushTemp?: number
+  flushTimeout?: number
+  flushFlow?: number
+  hotWaterFlow?: number
+  steamFlow?: number
+  tankTemp?: number
+  steamPurgeMode?: number
+}
+export interface DecaidAdvancedMachineSettings {
+  heaterPh1Flow?: number
+  heaterPh2Flow?: number
+  heaterIdleTemp?: number
+  heaterPh2Timeout?: number
+  heaterVoltage?: 120 | 230 | -1
+  refillKitSetting?: 0 | 1 | 2
+}
+export interface DisplayState {
+  wakeLockEnabled?: boolean
+  wakeLockOverride?: boolean
+  brightness?: number
+  requestedBrightness?: number
+  lowBatteryBrightnessActive?: boolean
+  platformSupported?: { brightness?: boolean; wakeLock?: boolean }
+}
+export interface WakeSchedule {
+  id?: string
+  hour?: number
+  minute?: number
+  time?: string
+  daysOfWeek?: number[]
+  enabled?: boolean
+  keepAwakeFor?: number | null
+}
+export interface PresenceSettings {
+  userPresenceEnabled?: boolean
+  sleepTimeoutMinutes?: number
+  schedules?: WakeSchedule[]
+  keepAwakeUntil?: string | null
+}
+export interface DecaidInfo {
+  version?: string
+  buildNumber?: string
+  fullVersion?: string
+  commitShort?: string
+  branch?: string
+  localIp?: string
+}
+export interface MachineCapabilities { capabilities?: string[]; [key: string]: unknown }
 export interface DecentAccountStatus { loggedIn: boolean; username?: string | null }
 export interface WaterLevels { currentLevel?: number; refillLevel?: number }
 export interface TimeToReadyFrame { status?: string; remainingTimeMs?: number; currentTemp?: number; targetTemp?: number }

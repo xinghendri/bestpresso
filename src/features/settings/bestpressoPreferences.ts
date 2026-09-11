@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import type { TemperatureUnit } from '../../domain/temperature'
+import type { ClockFormat } from '../sleep/deviceTime'
 
 export type ChartLineWeight = 'fine' | 'standard' | 'bold'
 
@@ -7,6 +9,8 @@ export interface BestpressoPreferences {
   waterWarningLevelMl: number
   waterCriticalLevelMl: number
   chartLineWeight: ChartLineWeight
+  temperatureUnit: TemperatureUnit
+  clockFormat: ClockFormat
 }
 
 export const BESTPRESSO_PREFERENCES_KEY = 'bestpresso.preferences.v1'
@@ -17,6 +21,8 @@ export const DEFAULT_BESTPRESSO_PREFERENCES: BestpressoPreferences = {
   waterWarningLevelMl: 426,
   waterCriticalLevelMl: 300,
   chartLineWeight: 'fine',
+  temperatureUnit: 'C',
+  clockFormat: 'device',
 }
 
 const finiteRange = (value: unknown, fallback: number) => {
@@ -31,11 +37,14 @@ export function normalizeBestpressoPreferences(value: unknown): BestpressoPrefer
   const chartLineWeight = candidate.chartLineWeight === 'standard' || candidate.chartLineWeight === 'bold'
     ? candidate.chartLineWeight
     : 'fine'
+  const temperatureUnit = candidate.temperatureUnit === 'F' ? 'F' : 'C'
   return {
     completionSoundEnabled: candidate.completionSoundEnabled !== false,
     waterWarningLevelMl: Math.min(2_000, warning),
     waterCriticalLevelMl: Math.min(1_999, critical),
     chartLineWeight,
+    temperatureUnit,
+    clockFormat: candidate.clockFormat === '12h' || candidate.clockFormat === '24h' ? candidate.clockFormat : 'device',
   }
 }
 

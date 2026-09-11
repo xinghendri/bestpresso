@@ -5,8 +5,9 @@ import scaleIcon from '../../assets/figma/scale.svg'
 import steamCompactConnector from '../../assets/figma/steam-compact-connector.svg'
 import steamIcon from '../../assets/figma/steam.svg'
 import { Metric } from '../../components/Metric/Metric'
-import { scaleWeightCanTare, WATER_TANK_CAPACITY_ML, waterTankLevelState } from '../../domain/brewing'
-import { readBestpressoPreferences } from '../settings/bestpressoPreferences'
+import { scaleWeightCanTare, WATER_TANK_CAPACITY_ML } from '../../domain/brewing'
+import { formatTemperatureValue, temperatureBoundToDisplay, temperatureFromDisplay, temperatureStepToDisplay, temperatureUnitLabel, type TemperatureUnit } from '../../domain/temperature'
+import { useBestpressoPreferences } from '../settings/bestpressoPreferences'
 import type { EditableMachineSetting, MachineUtility, ScaleConnection } from '../../domain/brewing'
 import { VALUE_ADJUSTMENTS } from '../../domain/valueAdjustments'
 import { scalePresentationForDevice } from './scaleArtwork'
@@ -31,7 +32,7 @@ interface MachineUtilityCardProps {
   onUpdateSetting?: (setting: EditableMachineSetting, value: number) => void
 }
 
-const editForMetric = (utility: MachineUtility, label: string, onSave?: (setting: EditableMachineSetting, value: number) => void, disabled?: boolean) => {
+const editForMetric = (utility: MachineUtility, label: string, temperatureUnit: TemperatureUnit, onSave?: (setting: EditableMachineSetting, value: number) => void, disabled?: boolean) => {
   if (!onSave) return undefined
   const setting: EditableMachineSetting | undefined = utility.id === 'water' && label === 'Volume'
     ? 'hotWaterVolume'
@@ -47,33 +48,31 @@ const editForMetric = (utility: MachineUtility, label: string, onSave?: (setting
   if (!setting) return undefined
 
   const definition = VALUE_ADJUSTMENTS[setting]
+  const isTemperature = setting === 'hotWaterTemperature' || setting === 'steamTemperature'
   return {
     title: definition.title,
-    min: definition.min,
-    max: definition.max,
-    step: definition.step,
+    min: isTemperature ? temperatureBoundToDisplay(definition.min, temperatureUnit) : definition.min,
+    max: isTemperature ? temperatureBoundToDisplay(definition.max, temperatureUnit) : definition.max,
+    step: isTemperature ? temperatureStepToDisplay(definition.step, temperatureUnit) : definition.step,
     mode: definition.mode,
     suggestionKey: setting,
-    presets: definition.suggestions,
+    presets: isTemperature ? definition.suggestions.map((value) => temperatureBoundToDisplay(value, temperatureUnit)) : definition.suggestions,
     disabled,
-    onSave: (value: number) => onSave(setting, value),
+    onSave: (value: number) => onSave(setting, isTemperature ? temperatureFromDisplay(value, temperatureUnit) : value),
   }
 }
 
 export function MachineUtilityCard({ utility, compact = false, scale, onExpand, onSearchScale, onTareScale, scaleTarePending = false, settingsDisabled, onUpdateSetting }: MachineUtilityCardProps) {
+  const { preferences } = useBestpressoPreferences()
+  const temperatureUnit = preferences.temperatureUnit
   if (utility.id === 'tank') {
     const metric = utility.metrics[0]
     const volume = Number(metric?.value.replaceAll(',', ''))
     const safeVolume = Number.isFinite(volume) ? Math.max(0, Math.min(WATER_TANK_CAPACITY_ML, volume)) : 0
     const fallbackLevel = safeVolume / WATER_TANK_CAPACITY_ML * 100
     const level = Math.max(0, Math.min(100, utility.levelPercent ?? fallbackLevel))
-    const waterPreferences = readBestpressoPreferences()
-    const tankState = waterTankLevelState(safeVolume, Boolean(utility.alert), {
-      warningLevelMl: waterPreferences.waterWarningLevelMl,
-      criticalLevelMl: waterPreferences.waterCriticalLevelMl,
-    })
-    const needsWater = tankState === 'needsWater'
-    const warnsWater = tankState === 'warning' || (!needsWater && Boolean(utility.warning))
+    const needsWater = Boolean(utility.alert)
+    const warnsWater = !needsWater && Boolean(utility.warning)
     const valueLabel = Number.isFinite(volume) ? `${metric.value} ${metric.unit ?? 'ml'}` : 'unknown level'
     const statusLabel = needsWater
       ? `Water reservoir needs water, ${valueLabel}`
@@ -99,6 +98,11 @@ export function MachineUtilityCard({ utility, compact = false, scale, onExpand, 
   const scaleWeight = Number(utility.metrics[0]?.value)
   const scaleCanTare = scaleConnected && scaleWeightCanTare(scaleWeight) && Boolean(onTareScale)
   const title = scaleConnected ? scalePresentation?.displayName ?? withoutGenericScaleSuffix(connectedScaleName) : utility.label
+  const metrics = utility.metrics.map((metric) => {
+    const isTemperature = (utility.id === 'water' && metric.label === 'Temperature')
+      || (utility.id === 'steam' && (metric.label === 'Current' || metric.label === 'Target'))
+    return isTemperature ? { ...metric, value: formatTemperatureValue(metric.value, temperatureUnit), unit: temperatureUnitLabel(temperatureUnit) } : metric
+  })
   const cardClassName = `utility-card utility-card--${utility.id}${isSteam && !steamHeatingEnabled ? ' utility-card--steam-off' : ''}${compact ? ' utility-card--compact' : ''}${scalePresentation?.imageSrc ? ' utility-card--scale-with-art' : ''}`
   const expandLabel = `Expand utility panels to view ${title}`
   const sectionIsExpandControl = compact && !isScale
@@ -114,12 +118,12 @@ export function MachineUtilityCard({ utility, compact = false, scale, onExpand, 
     {!compact && isSteam && <button className={`steam-heating-toggle${steamHeatingEnabled ? ' steam-heating-toggle--enabled' : ''}`} type="button" role="switch" aria-checked={steamHeatingEnabled} aria-label={steamHeatingEnabled ? 'Disable steam heating' : 'Enable steam heating'} title={steamHeatingEnabled ? 'Disable steam heating' : 'Enable steam heating'} disabled={settingsDisabled || !onUpdateSetting} onClick={() => onUpdateSetting?.('steamTemperature', steamTargetForToggle(!steamHeatingEnabled, steamTarget))}><span /></button>}
     {isScale && !scaleConnected
       ? <button className={compact ? 'scale-search scale-compact-summary' : 'scale-search'} type="button" onClick={onSearchScale} disabled={scale?.status === 'searching'}>{scale?.status === 'searching' ? 'Searching…' : 'Search'}</button>
-      : <div className="utility-card__metrics">{utility.metrics.map((metric) => scaleCanTare
+      : <div className="utility-card__metrics">{metrics.map((metric) => scaleCanTare
         ? <button className={`scale-tare-control${scaleTarePending ? ' scale-tare-control--pending' : ''}`} key={metric.label} type="button" aria-label={`Tare scale, current weight ${metric.value}${metric.unit ?? ''}`} title="Tare scale" disabled={scaleTarePending} onClick={onTareScale}>
           <Metric metric={metric} compact size="large" />
           <svg className="scale-tare-control__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5M4 18v-5h5M6.1 9a7 7 0 0 1 11.6-2.6L20 8.8M4 15.2l2.3 2.4A7 7 0 0 0 17.9 15" /></svg>
         </button>
-        : <Metric key={metric.label} metric={metric} compact size={isScale || !compact ? 'large' : 'small'} edit={compact ? undefined : editForMetric(utility, metric.label, onUpdateSetting, settingsDisabled)} />)}</div>}
+        : <Metric key={metric.label} metric={metric} compact size={isScale || !compact ? 'large' : 'small'} edit={compact ? undefined : editForMetric(utility, metric.label, temperatureUnit, onUpdateSetting, settingsDisabled)} />)}</div>}
     {compact && utility.id === 'steam' && <span className="utility-card__steam-connector" aria-hidden="true"><img src={steamCompactConnector} alt="" /></span>}
     {scalePresentation?.imageSrc && <span className="scale-device-art" aria-hidden="true"><img src={scalePresentation.imageSrc} alt="" /></span>}
   </section>

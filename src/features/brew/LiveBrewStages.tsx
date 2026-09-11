@@ -2,6 +2,8 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import type { MouseEvent, PointerEvent } from 'react'
 import skipNext from '../../assets/figma/skip-next.svg'
 import type { LiveShotPoint } from '../../domain/brewing'
+import { formatTemperatureValue, temperatureUnitLabel } from '../../domain/temperature'
+import { useBestpressoPreferences } from '../settings/bestpressoPreferences'
 import { DOUBLE_TAP_CONFIRMATION_WINDOW_MS, registerDoubleTap } from './doubleTapConfirmation'
 import { canStartStageMouseDrag, latestStageScrollLeft, STAGE_MOUSE_DRAG_THRESHOLD_PX, stageMouseDragScrollLeft } from './stageStripScroll'
 import { pressureChainSlotCount } from './stageCardSizing'
@@ -121,6 +123,7 @@ function PressureChain({ pressures, slotCount }: { pressures: number[]; slotCoun
 }
 
 export function LiveBrewStages({ points, elapsedMs, active = false, showYield = true, skipPending = false, selectedStageKey, onStageSelect, onSkipStage }: { points: LiveShotPoint[]; elapsedMs: number; active?: boolean; showYield?: boolean; skipPending?: boolean; selectedStageKey?: string; onStageSelect?: (stage: BrewStageSelection | null) => void; onSkipStage?: () => Promise<boolean> }) {
+  const { preferences } = useBestpressoPreferences()
   const stages = summarizeLiveBrewStages(points, elapsedMs)
   const stripRef = useRef<HTMLElement>(null)
   const trackRef = useRef<HTMLDivElement>(null)
@@ -286,7 +289,7 @@ export function LiveBrewStages({ points, elapsedMs, active = false, showYield = 
       <header><div className="live-brew-stage__heading"><b>{index + 1}</b><h2>{stage.name}</h2></div><div className="live-brew-stage__time"><time>{timedLabel(stage.endedAt - stage.startedAt)}</time>{wasSkipped && <span className="live-brew-stage__skipped" aria-label="Skipped phase"><img src={skipNext} alt="" /></span>}</div></header>
       <dl>
         {showYield && <div><dt>Yield</dt><dd><span className="live-brew-stage__yield-value">{reading(stage.yield)}<small>g</small></span></dd></div>}
-        <div><dt>Temperature range</dt><dd>{reading(stage.minimumTemperature, 0)}° – {reading(stage.maximumTemperature, 0)}°</dd></div>
+        <div><dt>Temperature range</dt><dd>{formatTemperatureValue(stage.minimumTemperature, preferences.temperatureUnit)} – {formatTemperatureValue(stage.maximumTemperature, preferences.temperatureUnit)}<small className="temperature-unit">{temperatureUnitLabel(preferences.temperatureUnit)}</small></dd></div>
         <div><dt>Pressure</dt><dd className="live-brew-stage__pressure-value" aria-label={pressureLabel}><PressureChain pressures={stage.pressureMovements} slotCount={stage.pressureSlotCount} /></dd></div>
       </dl>
     </article>})}
