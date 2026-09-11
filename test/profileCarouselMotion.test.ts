@@ -36,9 +36,11 @@ test('profile selection animates between taps while direct dragging tracks the p
   assert.match(styles, /\.profile-carousel--dragging \.profile-card--free \{ transition:none; \}/)
 })
 
-test('profile cards use the dashboard glass treatment while retaining the orbit', () => {
+test('profile cards omit backdrop blur and reserve glass highlights for the active card', () => {
   assert.match(styles, /\.profile-card \{ border:1px solid rgba\(255,255,255,\.075\); background-clip:padding-box; \}/)
-  assert.match(styles, /\.profile-card--left,\.profile-card--right \{[^}]*backdrop-filter:blur\(14px\) saturate\(116%\);/)
+  assert.doesNotMatch(styles, /\.profile-card[^{}]*\{[^}]*backdrop-filter:/)
+  assert.match(styles, /\.profile-card--left,\.profile-card--right \{ background:rgba\(29,35,33,\.9\); box-shadow:0 24px 42px rgba\(0,0,0,\.34\); \}/)
+  assert.match(styles, /\.profile-card--far-left,\.profile-card--far-right \{ border-color:rgba\(255,255,255,\.045\); background:rgba\(29,35,33,\.64\); box-shadow:none; \}/)
   assert.match(styles, /\.profile-card--active::before \{ inset:-52%; background:radial-gradient\(circle at 22% 78%[^}]*radial-gradient\(circle at 78% 22%/)
   assert.match(styles, /\.profile-card--active::after \{[^}]*linear-gradient\(145deg,rgba\(255,255,255,\.105\)/)
   assert.match(styles, /animation:profile-card-gradient-orbit 30s linear infinite/)
