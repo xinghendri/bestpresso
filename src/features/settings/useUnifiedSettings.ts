@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { hotWaterYieldLookAheadPatch } from './yieldLookAhead'
+import { displayBrightness } from './displayBrightness'
 import {
   connectDevice,
   createWakeSchedule,
@@ -18,7 +19,6 @@ import {
   getSettings,
   getWorkflow,
   scanForDevices,
-  setDisplayBrightness,
   updateAdvancedMachineSettings,
   updateMachineSettings,
   updatePresenceSettings,
@@ -156,10 +156,10 @@ export function useUnifiedSettings(enabled: boolean) {
       if (Object.keys(advanced).length) await updateAdvancedMachineSettings(advanced)
       if (Object.keys(workflow).length) await updateWorkflow(workflow)
       if (Object.keys(presence).length) await updatePresenceSettings(presence)
-      if (requestedBrightness !== undefined && requestedBrightness !== oldBrightness) await setDisplayBrightness(requestedBrightness)
+      if (requestedBrightness !== undefined && requestedBrightness !== oldBrightness) await displayBrightness.choose(requestedBrightness)
       await reload()
       window.dispatchEvent(new CustomEvent(UNIFIED_SETTINGS_SAVED_EVENT, { detail: draft }))
-      setMessage('Settings saved and verified with Decaid.')
+      setMessage('Settings sent to Decaid. Values refreshed from the machine.')
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Settings could not be saved.')
     } finally {

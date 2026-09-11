@@ -3,7 +3,8 @@ import { playCompletionSound } from '../../audio/completionSound'
 import { updateSettings } from '../../api/decaid/client'
 import { hotWaterYieldLookAheadPatch } from '../settings/yieldLookAhead'
 import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isCleaningProfile, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotStage, shotToDomain, STEAM_HEATER_READY_C, tankMillilitres } from '../../api/decaid/adapters'
-import { connectDevice, createProfile, DecaidApiError, getDecentAccountStatus, getDevices, getDisplayState, getFavoriteAssignments, getLatestShot, getMachineSettings, getProfile, getProfiles, getSettings, getSharedSetting, getShot, getShotHistory, getWorkflow, scanForDevices, setDisplayBrightness, setMachineProfile, setMachineState, setSharedSetting, tareScale, updateProfile, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
+import { connectDevice, createProfile, DecaidApiError, getDecentAccountStatus, getDevices, getFavoriteAssignments, getLatestShot, getMachineSettings, getProfile, getProfiles, getSettings, getSharedSetting, getShot, getShotHistory, getWorkflow, scanForDevices, setMachineProfile, setMachineState, setSharedSetting, tareScale, updateProfile, updateProfileMetadata, updateWorkflow } from '../../api/decaid/client'
+import { displayBrightness } from '../settings/displayBrightness'
 import { profileTargetNeedsWorkflowSync, workflowPatchForSavedActiveProfile, workflowValuesForProfile } from '../../api/decaid/profileWorkflow'
 import { createMachineReadinessTracker } from '../../api/decaid/readiness'
 import { subscribe } from '../../api/decaid/socket'
@@ -183,8 +184,6 @@ export function useBrewingData() {
   const wakeScreenDismissed = useRef(false)
   const previousReadiness = useRef<MachineReadiness | null>(null)
   const readinessTracker = useRef(createMachineReadinessTracker())
-  const displayDimmed = useRef(false)
-  const brightnessBeforeSleep = useRef<number | null>(null)
   const profileRecords = useRef<DecaidProfileRecord[]>([])
   const favoriteAssignments = useRef<FavoriteAssignments | null>(null)
   const feedbackTimeout = useRef<number | null>(null)
@@ -307,24 +306,19 @@ export function useBrewingData() {
   }, [])
 
   const dimDisplay = async () => {
-    if (displayDimmed.current) return
-    displayDimmed.current = true
-    try {
-      const display = await getDisplayState()
-      if (typeof display.requestedBrightness === 'number' && display.requestedBrightness > 0) brightnessBeforeSleep.current = display.requestedBrightness
-    } catch { /* brightness capture is optional */ }
-    try { await setDisplayBrightness(SLEEP_DISPLAY_BRIGHTNESS) }
-    catch { displayDimmed.current = false }
+    try { await displayBrightness.dim(SLEEP_DISPLAY_BRIGHTNESS) }
+    catch { /* Sleeping the machine remains the priority. */ }
   }
 
   const restoreDisplay = async () => {
-    const brightness = brightnessBeforeSleep.current ?? 100
-    try {
-      await setDisplayBrightness(brightness)
-      brightnessBeforeSleep.current = null
-    } catch { /* waking the machine remains the priority */ }
-    displayDimmed.current = false
+    try { await displayBrightness.restore() }
+    catch { /* Waking the machine remains the priority. */ }
   }
+
+  useEffect(() => {
+    if (connection !== 'connected') return
+    void displayBrightness.replay().catch(() => { /* Display support is optional. */ })
+  }, [connection])
 
   const showMachineActionError = (message: string | null) => {
     if (actionErrorTimeout.current !== null) window.clearTimeout(actionErrorTimeout.current)

@@ -1,7 +1,7 @@
 {
   "name": "bestpresso",
   "private": true,
-  "version": "0.1.26-patch001",
+  "version": "0.1.26-patch002",
   "type": "module",
   "scripts": {
     "dev": "vite",
