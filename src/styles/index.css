@@ -139,7 +139,10 @@ button.history-card { width:100%; text-align:left; transition:background .2s eas
 .live-pull-header__metrics.live-pull-header__metrics--live strong { color:var(--metric-value-color); }
 .live-pull-action { justify-self:end; min-width:92px; height:56px; padding:0 18px; border:2px solid; border-radius:72px; font-size:18px; line-height:1; font-weight:700; transition:background .2s ease,transform .18s ease,opacity .18s ease; }.live-pull-action:active:not(:disabled) { transform:scale(.96); }.live-pull-action:focus-visible { outline:2px solid currentColor; outline-offset:4px; }.live-pull-action:disabled { cursor:wait; opacity:.62; }.live-pull-action--stop { border-color:#de6161; color:#f49090; background:radial-gradient(circle at 84% 112%,rgba(222,97,97,.64),transparent 54%),rgba(89,84,80,.8); }.live-pull-action--stop:hover:not(:disabled) { background:radial-gradient(circle at 84% 112%,rgba(222,97,97,.82),transparent 54%),rgba(100,91,87,.9); }.live-pull-action--close { border-color:#777; color:#d0d0d0; background:rgba(70,70,70,.78); }.live-pull-action--close:hover { background:rgba(94,94,94,.9); }
 .live-pull-chart-panel { width:100%; max-width:100%; min-width:0; min-height:0; overflow:hidden; contain:layout paint; }
-.live-shot-chart { position:relative; width:100%; max-width:100%; height:100%; min-width:0; min-height:0; overflow:hidden; }
+.live-shot-chart { position:relative; display:flex; flex-direction:column; gap:8px; width:100%; max-width:100%; height:100%; min-width:0; min-height:0; overflow:hidden; }
+.live-shot-chart__plot { position:relative; flex:1 1 0; min-height:0; min-width:0; }
+/* Reserve real rows: percentage offsets collide with the legend on short tablets. */
+.live-shot-chart>.chart-legend { position:relative; inset:auto; flex:0 0 auto; justify-content:flex-end; flex-wrap:wrap; margin:7px 2.2% 0 4.2%; row-gap:8px; }
 .live-shot-chart svg { position:absolute; inset:0; width:100%; max-width:100%; height:100%; overflow:visible; touch-action:none; }
 .chart-legend { position:absolute; right:20px; top:7px; z-index:2; display:flex; align-items:flex-start; gap:17px; pointer-events:none; }
 .chart-legend--filterable { pointer-events:auto; }
@@ -775,6 +778,7 @@ body { min-width:0; min-height:0; background:#171717; }
 .live-shot-chart .chart-line--temperature{stroke-width:var(--chart-detail-temperature-width)}
 .pb-chart__line{stroke-width:var(--chart-builder-line-width)}
 .chart-legend__sample,.live-shot-chart .chart-legend__sample{height:var(--chart-legend-width)}
+.live-shot-chart>.chart-stage-markers { position:relative; inset:auto; flex:0 0 24px; height:24px; margin:0 2.2% 0 4.2%; }
 
 /* Unified settings */
 .settings-screen{width:min(1194px,100%);height:100vh;min-height:700px;display:grid;grid-template-columns:242px minmax(0,1fr);margin:0 auto;overflow:hidden;color:#f5f5f5;background:radial-gradient(circle at 17% 7%,rgba(55,83,68,.36),transparent 34%),radial-gradient(circle at 86% 96%,rgba(84,63,55,.34),transparent 42%),#111312}

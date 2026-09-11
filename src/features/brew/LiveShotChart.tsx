@@ -281,6 +281,7 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
   return <div className="live-shot-chart">
     <ChartLegend showWeight={showWeight} interactive={legendFilterEnabled} dimmedSeries={dimmedSeries} onToggleSeries={onToggleSeries} />
     <ChartStageMarkers stages={stageMarkers} highlightedKey={highlightedStage?.key} xForElapsedMs={xForElapsedMs} plotLeft={PLOT.left} plotRight={PLOT.right} />
+    <div className="live-shot-chart__plot">
     <svg ref={svgRef} viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`} role="img" aria-label={showWeight ? 'Pressure, flow, yield weight, and temperature chart. Touch and hold to inspect.' : 'Pressure, flow, and temperature chart. Touch and hold to inspect.'} preserveAspectRatio="none" onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerEnd} onPointerCancel={handlePointerEnd} onContextMenu={(event) => event.preventDefault()}>
       <defs>
         <clipPath id={`${gradientId}-plot`}><rect x={PLOT.left} y={PLOT.top - PLOT_TOP_STROKE_ALLOWANCE} width={PLOT.right - PLOT.left} height={PLOT.bottom - PLOT.top + PLOT_TOP_STROKE_ALLOWANCE + PLOT_BOTTOM_STROKE_ALLOWANCE} /></clipPath>
@@ -338,5 +339,6 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
       </dl>
     </aside>}
     {points.length === 0 && <p className="live-shot-chart__empty">Waiting for brewing telemetry…</p>}
+    </div>
   </div>
 }
