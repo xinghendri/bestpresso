@@ -282,6 +282,11 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
     <ChartLegend showWeight={showWeight} interactive={legendFilterEnabled} dimmedSeries={dimmedSeries} onToggleSeries={onToggleSeries} />
     <ChartStageMarkers stages={stageMarkers} highlightedKey={highlightedStage?.key} xForElapsedMs={xForElapsedMs} plotLeft={PLOT.left} plotRight={PLOT.right} />
     <div className="live-shot-chart__plot">
+    <div className="shot-chart-axes" aria-hidden="true">
+      {timeLabels.map((tick) => <span key={`time-label-${tick.offsetMs}`} className="shot-chart-axes__time" style={{ left: `${tick.x / VIEW_WIDTH * 100}%`, top: `${(PLOT.bottom + 25) / VIEW_HEIGHT * 100}%` }}>{tick.label}</span>)}
+      {horizontalGridLines.map((line) => <span key={`axis-${line.ratio}`} className="shot-chart-axes__value" style={{ left: `${(PLOT.left - 13) / VIEW_WIDTH * 100}%`, top: `${(PLOT.bottom - line.ratio * (PLOT.bottom - PLOT.top)) / VIEW_HEIGHT * 100}%` }}>{Math.round(12 * line.ratio)}</span>)}
+      <span className="shot-chart-axes__unit" style={{ left: `${(PLOT.left - 13) / VIEW_WIDTH * 100}%`, top: `${18 / VIEW_HEIGHT * 100}%` }}>bar / ml/s</span>
+    </div>
     <svg ref={svgRef} viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`} role="img" aria-label={showWeight ? 'Pressure, flow, yield weight, and temperature chart. Touch and hold to inspect.' : 'Pressure, flow, and temperature chart. Touch and hold to inspect.'} preserveAspectRatio="none" onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerEnd} onPointerCancel={handlePointerEnd} onContextMenu={(event) => event.preventDefault()}>
       <defs>
         <clipPath id={`${gradientId}-plot`}><rect x={PLOT.left} y={PLOT.top - PLOT_TOP_STROKE_ALLOWANCE} width={PLOT.right - PLOT.left} height={PLOT.bottom - PLOT.top + PLOT_TOP_STROKE_ALLOWANCE + PLOT_BOTTOM_STROKE_ALLOWANCE} /></clipPath>
@@ -290,11 +295,6 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
         <linearGradient id={`${gradientId}-temperature-area`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="var(--chart-temperature)" stopOpacity=".09" /><stop offset="1" stopColor="var(--chart-temperature)" stopOpacity="0" /></linearGradient>
       </defs>
       {horizontalGridLines.map((line) => <line key={`horizontal-${line.ratio}`} className="chart-grid chart-grid--horizontal" x1={line.x1} x2={line.x2} y1={line.y} y2={line.y} />)}
-      {timeLabels.map((tick) => <text key={`time-label-${tick.offsetMs}`} className="chart-axis-label" x={tick.x} y={PLOT.bottom + 25} textAnchor="middle">{tick.label}</text>)}
-      {horizontalGridLines.map((line) => <g key={`axis-${line.ratio}`}>
-        <text className="chart-axis-label" x={PLOT.left - 13} y={PLOT.bottom - line.ratio * (PLOT.bottom - PLOT.top) + 4} textAnchor="end">{Math.round(12 * line.ratio)}</text>
-      </g>)}
-      <text className="chart-axis-title" x={PLOT.left - 13} y="18">bar / ml/s</text>
       <g clipPath={`url(#${gradientId}-plot)`}>
         <g className="live-shot-chart__context-lines" opacity={layerOpacity.contextOpacity} aria-hidden="true">
           <path className={`chart-area chart-area--pressure${lineClass(chartSeriesForLine.pressure)}`} fill={`url(#${gradientId}-pressure-area)`} d={areaPath(displayPlottedPoints, 'pressure', xForElapsedMs, 0, 12)} />
