@@ -140,7 +140,13 @@ button.history-card { width:100%; text-align:left; transition:background .2s eas
 .live-pull-action { justify-self:end; min-width:92px; height:56px; padding:0 18px; border:2px solid; border-radius:72px; font-size:18px; line-height:1; font-weight:700; transition:background .2s ease,transform .18s ease,opacity .18s ease; }.live-pull-action:active:not(:disabled) { transform:scale(.96); }.live-pull-action:focus-visible { outline:2px solid currentColor; outline-offset:4px; }.live-pull-action:disabled { cursor:wait; opacity:.62; }.live-pull-action--stop { border-color:#de6161; color:#f49090; background:radial-gradient(circle at 84% 112%,rgba(222,97,97,.64),transparent 54%),rgba(89,84,80,.8); }.live-pull-action--stop:hover:not(:disabled) { background:radial-gradient(circle at 84% 112%,rgba(222,97,97,.82),transparent 54%),rgba(100,91,87,.9); }.live-pull-action--close { border-color:#777; color:#d0d0d0; background:rgba(70,70,70,.78); }.live-pull-action--close:hover { background:rgba(94,94,94,.9); }
 .live-pull-chart-panel { width:100%; max-width:100%; min-width:0; min-height:0; overflow:hidden; contain:layout paint; }
 .live-shot-chart { position:relative; display:flex; flex-direction:column; gap:8px; width:100%; max-width:100%; height:100%; min-width:0; min-height:0; overflow:hidden; }
-.live-shot-chart__plot { position:relative; flex:1 1 0; min-height:0; min-width:0; }
+.live-shot-chart__plot { position:relative; flex:1 1 0; min-height:0; min-width:0; container-type:size; }
+/* HTML text stays proportional while the SVG plot stretches to fill its bounds. */
+.shot-chart-axes { position:absolute; inset:0; pointer-events:none; color:#f5f5f5; font-size:clamp(9px,1.1cqw,11px); line-height:1; font-weight:400; font-variant-numeric:tabular-nums; }
+.shot-chart-axes>span { position:absolute; white-space:nowrap; }
+.shot-chart-axes__time { transform:translate(-50%,-50%); }
+.shot-chart-axes__value { transform:translate(-100%,-50%); }
+.shot-chart-axes__unit { transform:translateY(-50%); }
 /* Reserve real rows: percentage offsets collide with the legend on short tablets. */
 .live-shot-chart>.chart-legend { position:relative; inset:auto; flex:0 0 auto; justify-content:flex-end; flex-wrap:wrap; margin:7px 2.2% 0 4.2%; row-gap:8px; }
 .live-shot-chart svg { position:absolute; inset:0; width:100%; max-width:100%; height:100%; overflow:visible; touch-action:none; }
@@ -779,6 +785,23 @@ body { min-width:0; min-height:0; background:#171717; }
 .pb-chart__line{stroke-width:var(--chart-builder-line-width)}
 .chart-legend__sample,.live-shot-chart .chart-legend__sample{height:var(--chart-legend-width)}
 .live-shot-chart>.chart-stage-markers { position:relative; inset:auto; flex:0 0 24px; height:24px; margin:0 2.2% 0 4.2%; }
+
+/* A compact shared stage strip gives short tablets more room for the chart. */
+@media(max-height:700px){
+  .live-brew-screen,.history-browser-detail { grid-template-rows:96px minmax(0,1fr) 128px; }
+  .live-pull-header__metrics { height:60px; }
+  .live-pull-header__metrics>div { gap:6px; }
+  .live-pull-header__metrics>i { height:42px; }
+  .history-pull-title { gap:5px; }
+  .live-brew-stage { --metric-context-label-size:12px; --metric-context-value-size:21px; --metric-context-unit-size:14px; padding:12px 18px; border-radius:20px; }
+  .live-brew-stage header { min-height:24px; gap:16px; padding-bottom:8px; }
+  .live-brew-stage__heading { gap:8px; }
+  .live-brew-stage__heading>b { width:24px; height:24px; flex-basis:24px; }
+  .live-brew-stage h2,.live-brew-stage time { font-size:14px; line-height:18px; }
+  .live-brew-stage dl,.history-browser-detail .live-brew-stage dl { gap:24px; margin-top:9px; }
+  .live-brew-stage dt { line-height:15px; }
+  .live-brew-stage dd { margin-top:4px; line-height:25px; }
+}
 
 /* Unified settings */
 .settings-screen{width:min(1194px,100%);height:100vh;min-height:700px;display:grid;grid-template-columns:242px minmax(0,1fr);margin:0 auto;overflow:hidden;color:#f5f5f5;background:radial-gradient(circle at 17% 7%,rgba(55,83,68,.36),transparent 34%),radial-gradient(circle at 86% 96%,rgba(84,63,55,.34),transparent 42%),#111312}
