@@ -1,0 +1,73 @@
+/* Settings groups hug their contents; independent stacks avoid empty grid rows. */
+.settings-stack {display:flex;flex-direction:column;gap:18px;min-width:0}
+.settings-grid,.settings-overview {align-items:start}
+.settings-card--hero {min-height:0}
+.settings-card--hero>div {margin-top:20px;flex-wrap:wrap}
+.settings-card-link {margin-top:18px}
+.settings-form-list,.settings-list {border-top:0}
+.settings-form-list>.settings-control-row:last-child,
+.settings-form-list>.settings-number-row:last-child,
+.settings-list>.settings-row:last-child {border-bottom:0}
+.settings-capability-list>.settings-row:last-of-type {border-bottom:0}
+.settings-reset--all {align-self:flex-start;margin-top:18px;max-width:100%;white-space:normal;height:auto;min-height:40px}
+.settings-card>header {align-items:center}
+.settings-card>header>.settings-action-button {margin-top:0;flex-shrink:0}
+.settings-device>div {width:100%;justify-content:flex-start}
+.settings-device button {min-height:36px}
+.settings-routine-actions>button {min-height:76px}
+.settings-routine-actions>button em {flex-shrink:0}
+.settings-routine-actions>button strong {font-size:14px}
+.settings-routine-actions>button small {line-height:1.5}
+
+@media(min-width:1000px) {
+  .settings-routine-actions {grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:999px) {
+  /* Two lists become one: retain only the separator at their shared boundary. */
+  .settings-columns>.settings-form-list:not(:last-child)>:last-child {border-bottom:1px solid var(--card-outline)}
+}
+@media(max-width:700px) {
+  .settings-stack {gap:14px}
+  .settings-device>div {gap:8px}
+}
+
+/* Explicit light-mode states. Avoid reducing the opacity of entire controls. */
+[data-theme="light"] .settings-device,
+[data-theme="light"] .settings-schedule,
+[data-theme="light"] .settings-routine-actions>button {
+  background:#edf0eb;color:#34463a;border-color:#c4cdc3;
+}
+[data-theme="light"] .settings-device>span strong,
+[data-theme="light"] .settings-routine-actions>button strong {color:#34463a}
+[data-theme="light"] .settings-device>span small,
+[data-theme="light"] .settings-routine-actions>button small {color:#626e63}
+[data-theme="light"] .settings-device button,
+[data-theme="light"] .settings-routine-actions>button em,
+[data-theme="light"] .settings-action-button,
+[data-theme="light"] .settings-card--hero>div span.is-connected {
+  color:#205f3c;background:#d8e9dc;border:1px solid #adc6b2;
+}
+[data-theme="light"] .settings-device button.is-danger {
+  color:#913e39;background:#f3e1dd;border-color:#d8b8b0;
+}
+[data-theme="light"] .settings-device button:disabled,
+[data-theme="light"] .settings-action-button:disabled {
+  color:#747d73;background:#e3e7e0;border-color:#cdd4ca;opacity:1;
+}
+[data-theme="light"] .settings-routine-actions>button:disabled {opacity:1;background:#f0f2ed;border-style:dashed}
+[data-theme="light"] .settings-routine-actions>button:disabled :is(strong,small,em) {color:#747d73}
+[data-theme="light"] .settings-routine-actions>button:disabled em {background:#e3e7e0;border-color:#cdd4ca}
+[data-theme="light"] .settings-number-row>div.settings-number-control>button:not(.settings-number-value) {
+  color:#34463a;background:#e3e8e0;border-color:#bac6b7;
+}
+[data-theme="light"] .settings-number-row>div.settings-number-control>button:disabled {opacity:1;color:#7d867b;background:#eef0eb;border-color:#d2d9ce}
+[data-theme="light"] .settings-number-row>div.settings-number-control>button:not(.settings-number-value):active:not(:disabled) {background:#cbe3d1;color:#205f3c}
+[data-theme="light"] .settings-device button:hover:not(:disabled),
+[data-theme="light"] .settings-action-button:hover:not(:disabled) {filter:brightness(.96)}
+[data-theme="light"] .settings-routine-actions>button:hover:not(:disabled) {border-color:#6d9679;background:#e4ebe0}
+[data-theme="light"] .settings-card-link:hover {color:#174d30}
+[data-theme="light"] .settings-time-pair input,
+[data-theme="light"] .settings-schedule input {
+  color:#34463a;background:#edf0eb;border:1px solid #c4cdc3;color-scheme:light;
+}
+.settings-screen :is(button,a,select,input):focus-visible {outline:2px solid var(--chart-pressure,#53d68e);outline-offset:3px}

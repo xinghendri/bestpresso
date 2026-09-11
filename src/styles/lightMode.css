@@ -3,16 +3,19 @@
   color-scheme:light;
   --metric-label-color:#788078;
   --metric-value-color:#23382d;
-  --chart-pressure:#117449;
-  --chart-flow:#216c9b;
-  --chart-temperature:#ad3f48;
-  --chart-weight:#845331;
+  /* Brighter counterparts of the dark palette, shared by every chart surface. */
+  --chart-pressure:#209a74;
+  --chart-flow:#408cd0;
+  --chart-temperature:#d96167;
+  --chart-weight:#ba7940;
   --card-surface:linear-gradient(145deg,#ffffff,#f4f3ee);
   --card-outline:rgba(37,65,49,.14);
   --light-control:#edf0eb;
   --light-control-border:#c4cdc3;
   --light-selected:#cbe3d1;
   --light-accent:#246e47;
+  --light-home-control:#e4e7e1;
+  --light-home-control-hover:#d8ddd5;
   background:#f4f5ef;
   color:#37463d;
 }
@@ -32,18 +35,11 @@
 [data-theme="light"] :is(.metric__subtext--pill,.profile-category) {background:#e2e8df;color:#4e6255}
 [data-theme="light"] :is(.manage-profiles,.metric__edit-indicator,.settings-card-link) {color:#14784e}
 /* Pale active card with a visible glass edge and neutral grey layers behind. */
-[data-theme="light"] .profile-card {
-  --chart-pressure:#42c599;
-  --chart-flow:#4286c5;
-  --chart-temperature:#d65353;
-}
 [data-theme="light"] .profile-card h1 {color:inherit}
 [data-theme="light"] .profile-card--active {
   color:#343b37;
   background:linear-gradient(#f7faf7,#f7faf7) padding-box,conic-gradient(from var(--profile-border-angle),#c8d5cd 0 32%,#72a2b6 42%,#ffffff 49%,#629b80 56%,#c8d5cd 68% 100%) border-box;
   box-shadow:inset 0 1px 0 #fff,0 16px 30px rgba(42,63,48,.16);
-  --chart-pressure:#25865f;
-  --chart-flow:#347ca8;
 }
 [data-theme="light"] .profile-card--active::before {
   background:radial-gradient(circle at 22% 78%,rgba(93,184,132,.38) 0,rgba(129,201,156,.22) 24%,transparent 49%),radial-gradient(circle at 78% 22%,rgba(102,164,195,.34) 0,rgba(142,188,209,.2) 25%,transparent 50%),#f7faf7;
@@ -57,8 +53,6 @@
   color:#657169;
   border-color:#c4cbc6;
   box-shadow:0 12px 24px rgba(38,48,41,.1);
-  --chart-pressure:#16835d;
-  --chart-flow:#287aaf;
 }
 [data-theme="light"] :is(.profile-card--far-left,.profile-card--far-right) {
   background:rgba(174,181,175,.6);
@@ -95,6 +89,18 @@
 [data-theme="light"] .app-shell .utility-card--steam .metric:first-child .metric__reading--highlight {color:#855600}
 [data-theme="light"] .status-pill::after {background:#d6e8d7}
 [data-theme="light"] .status-pill {color:#236c44}
+[data-theme="light"] .status-pill--heating {color:#864531}
+[data-theme="light"] .status-pill--heating::before {
+  background:conic-gradient(#c8846d 0 58%,#f4d8c7 67%,#dfa58a 75%,#c8846d 84% 100%);
+}
+[data-theme="light"] .status-pill--heating::after {background:#f6e8de}
+[data-theme="light"] .status-pill--heating span {color:#864531;background:#ead0c3}
+[data-theme="light"] .status-pill--thirsty {color:#a43d38;background:#f5dfd9;border-color:#bb6055}
+[data-theme="light"] .status-pill--heating>img,
+[data-theme="light"] .status-pill--thirsty>img {filter:brightness(0) saturate(100%) invert(29%) sepia(39%) saturate(1702%) hue-rotate(326deg) brightness(93%) contrast(87%)}
+[data-theme="light"] :is(.status-pill--not-heating,.status-pill--notHeating,.status-pill--connecting,.status-pill--disconnected) {
+  color:#5b605b;background:var(--light-home-control);border-color:#b5beb3;
+}
 [data-theme="light"] .live-brew-screen {background:linear-gradient(125deg,#f8faf3,#f0ede6);color:#23382d}
 [data-theme="light"] .chart-legend__item {color:#4b6152}
 [data-theme="light"] .chart-stage-marker {color:#647264}
@@ -123,7 +129,7 @@
 [data-theme="light"] .live-brew-stage__heading b {background:#d7e8d6;color:#2c7046}
 [data-theme="light"] .settings-card header>small,
 [data-theme="light"] .settings-card>small {color:#37724e}
-[data-theme="light"] .settings-line-options path {stroke:#257847}
+[data-theme="light"] .settings-line-options path {stroke:var(--chart-pressure)}
 [data-theme="light"] .settings-status {background:#e0e9da;color:#4f6b53;border-color:#bfd1b9}
 [data-theme="light"] .settings-header-actions label {background:#e3e9dd;border-color:#c8d3c1}
 [data-theme="light"] .profile-builder-screen .pb-stage__conditions-panel button[aria-pressed="true"] {background:#c5dfc9;color:#19653e}
@@ -139,8 +145,7 @@
   color:#455549;
   border-color:#c7d1c6;
 }
-/* These exported SVGs include their button backgrounds, so recolor both together. */
-[data-theme="light"] .topbar nav>.control-button:not(.control-button--cleaning)>img,
+/* Profile actions still use the original exported button artwork. */
 [data-theme="light"] .profiles-icon-button>img {
   filter:invert(1) grayscale(1) brightness(1.1);
 }
@@ -164,6 +169,24 @@
 }
 [data-theme="light"] .utility-card--scale .scale-search.scale-compact-summary {color:#236b40;background:transparent;border-color:transparent}
 [data-theme="light"] .utility-card .metric__label {color:#788078}
+
+/* Header actions and the compact utility surfaces share one neutral treatment. */
+[data-theme="light"] .topbar nav>.control-button,
+[data-theme="light"] .app-shell .utility-layout-toggle,
+[data-theme="light"] .app-shell .utility-card--compact:is(.utility-card--water,.utility-card--steam) {
+  background:var(--light-home-control);color:#5b605b;box-shadow:none;
+}
+[data-theme="light"] .topbar nav>.control-button:hover:not(:disabled),
+[data-theme="light"] .app-shell .utility-layout-toggle:hover,
+[data-theme="light"] .app-shell .utility-card--compact:is(.utility-card--water,.utility-card--steam):hover {
+  background:var(--light-home-control-hover);
+}
+[data-theme="light"] .topbar nav>.control-button>img,
+[data-theme="light"] .app-shell .utility-layout-toggle>img,
+[data-theme="light"] .app-shell .utility-card>header>img,
+[data-theme="light"] .status-pill:not(.status-pill--thirsty):not(.status-pill--heating)>img {
+  filter:brightness(0) invert(.36);opacity:1;
+}
 
 /* Popup surfaces use the same light palette, including their nested panels. */
 [data-theme="light"] :is(.scale-picker-overlay,.cleaning-picker-overlay,.live-utility-overlay,.fullscreen-prompt-overlay,.decaid-update-overlay,.profiles-import-backdrop,.pb-discard-overlay) {
