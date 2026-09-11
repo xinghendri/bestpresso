@@ -22,7 +22,7 @@ import { rinseWorkflowPatchFromMachineSettings } from './flushSettings'
 import { isSuccessfulEspressoCompletion, shouldPlayCompletionCue } from './completionCue'
 import { DEMO_BREW_TICK_MS, demoBrewForProfile, demoBrewPointsAtElapsed, demoPullIsEnabled, isConnectedMockDe1, type DemoBrewDefinition } from './demoBrew'
 import { advanceShotTimeline, beginSkipTransition, isEspressoMonitoringSnapshot, observeSkipTransition, type SkipTransition } from './liveShotState'
-import { SLEEP_DISPLAY_BRIGHTNESS, shouldRunBackgroundScaleScan, sleepMachineWithConfiguredScalePolicy } from './sleepControl'
+import { shouldRunBackgroundScaleScan, sleepMachineWithConfiguredScalePolicy } from './sleepControl'
 import { utilityElapsedMs, utilityTimerStartedAt } from './utilityOperationTiming'
 import { readBestpressoPreferences, useBestpressoPreferences } from '../settings/bestpressoPreferences'
 import { UNIFIED_SETTINGS_SAVED_EVENT, type UnifiedSettingsSnapshot } from '../settings/useUnifiedSettings'
@@ -306,7 +306,7 @@ export function useBrewingData() {
   }, [])
 
   const dimDisplay = async () => {
-    try { await displayBrightness.dim(SLEEP_DISPLAY_BRIGHTNESS) }
+    try { await displayBrightness.dim(readBestpressoPreferences().screensaverBrightness) }
     catch { /* Sleeping the machine remains the priority. */ }
   }
 

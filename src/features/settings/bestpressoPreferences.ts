@@ -11,6 +11,7 @@ export interface BestpressoPreferences {
   chartLineWeight: ChartLineWeight
   temperatureUnit: TemperatureUnit
   clockFormat: ClockFormat
+  screensaverBrightness: number
 }
 
 export const BESTPRESSO_PREFERENCES_KEY = 'bestpresso.preferences.v1'
@@ -23,6 +24,7 @@ export const DEFAULT_BESTPRESSO_PREFERENCES: BestpressoPreferences = {
   chartLineWeight: 'fine',
   temperatureUnit: 'C',
   clockFormat: 'device',
+  screensaverBrightness: 7,
 }
 
 const finiteRange = (value: unknown, fallback: number) => {
@@ -40,6 +42,9 @@ export function normalizeBestpressoPreferences(value: unknown): BestpressoPrefer
   const temperatureUnit = candidate.temperatureUnit === 'F' ? 'F' : 'C'
   return {
     completionSoundEnabled: candidate.completionSoundEnabled !== false,
+    screensaverBrightness: typeof candidate.screensaverBrightness === 'number' && Number.isFinite(candidate.screensaverBrightness)
+      ? Math.round(Math.max(0, Math.min(100, candidate.screensaverBrightness)))
+      : DEFAULT_BESTPRESSO_PREFERENCES.screensaverBrightness,
     waterWarningLevelMl: Math.min(2_000, warning),
     waterCriticalLevelMl: Math.min(1_999, critical),
     chartLineWeight,
