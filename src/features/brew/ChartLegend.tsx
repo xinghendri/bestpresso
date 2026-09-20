@@ -20,7 +20,7 @@ const monitoringLegend = [
     { labelKey: 'common.metric.target', accessibleLabelKey: 'brew.chart.legend.targetPressure', className: 'chart-legend__sample--target-pressure' },
   ] },
   { series: 'temperature', labelKey: 'common.metric.temperature', items: [{ labelKey: 'common.metric.temperature', className: 'chart-legend__sample--temperature' }] },
-  { series: 'weight', labelKey: 'common.metric.weight', items: [{ labelKey: 'common.metric.weight', className: 'chart-legend__sample--weight' }] },
+  { series: 'weight', labelKey: 'brew.metric.yieldFlow', items: [{ labelKey: 'brew.metric.yieldFlow', className: 'chart-legend__sample--weight' }] },
 ] as const
 
 const profileLegend = [

@@ -102,6 +102,7 @@ export const shell = {
   "shell.liveOperation.hotWater": "出热水中",
   "shell.liveOperation.steaming": "出蒸汽中",
   "shell.liveOperation.flushing": "冲洗中",
+  "shell.liveOperation.targetTemperature": "目标温度",
   "shell.sleep.wakeAria": "用单指长按 1 秒唤醒机器",
   "shell.sleep.touchAndHold": "长按唤醒",
   "shell.updates.title": "有可用的 Decaid 更新",

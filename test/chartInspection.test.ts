@@ -41,11 +41,11 @@ test('keeps vertical graph guides hidden until a hold inspection', () => {
   assert.match(chartSource, /<dt>\{t\('brew\.metric\.pressure'\)\}<\/dt>/)
   assert.match(chartSource, /<dt>\{t\('common\.metric\.flow'\)\}<\/dt>/)
   assert.match(chartSource, /<dt>\{t\('common\.metric\.temperature'\)\}<\/dt>/)
-  assert.match(chartSource, /<dt>\{t\('brew\.metric\.yield'\)\}<\/dt>/)
+  assert.match(chartSource, /<dt>\{t\('brew\.metric\.yieldFlow'\)\}<\/dt>/)
   assert.equal(brewEn['brew.metric.pressure'], 'Pressure')
   assert.equal(commonEn['common.metric.flow'], 'Flow')
   assert.equal(commonEn['common.metric.temperature'], 'Temperature')
-  assert.equal(brewEn['brew.metric.yield'], 'Yield')
+  assert.equal(brewEn['brew.metric.yieldFlow'], 'Yield flow')
 })
 
 test('uses thinner detailed lines and subtle telemetry gradients', () => {

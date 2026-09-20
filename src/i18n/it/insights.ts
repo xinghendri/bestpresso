@@ -138,7 +138,7 @@ export const insights = {
   "insights.previousShot.chartAriaLabelWeight": "Cronologia delle estrazioni: {profile}",
   "insights.previousShot.chartAriaLabelGeneric": "Grafico di un’estrazione salvata",
   "insights.previousShot.loadError": "Impossibile caricare l’estrazione. Prova a selezionarla di nuovo.",
-  "insights.miniChart.ariaLabelWeight": "Grafico di pressione, portata e peso in tazza dell’estrazione precedente",
+  "insights.miniChart.ariaLabelWeight": "Grafico di pressione, portata e flusso in tazza dell’estrazione precedente",
   "insights.miniChart.ariaLabelCleaning": "Grafico di pressione e portata della pulizia precedente",
   "insights.status.unavailableRetrying": "Cronologia non disponibile · nuovo tentativo automatico",
   "insights.status.loading": "Caricamento della cronologia…",

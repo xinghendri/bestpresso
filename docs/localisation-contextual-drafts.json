@@ -9,6 +9,16 @@
   ],
   "heldForClarification": [],
   "entries": {
+    "brew.metric.yieldFlow": {
+      "english": "Yield flow",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Scale-reported beverage output rate in g/s, not cumulative yield."
+    },
+    "shell.liveOperation.targetTemperature": {
+      "english": "Target temperature",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Hot-water setpoint, not a measured outlet temperature."
+    },
     "shell.status.heating": {
       "english": "Heating",
       "languages": ["it"],
@@ -1882,7 +1892,7 @@
       ]
     },
     "brew.chart.live.ariaLabelWithWeight": {
-      "english": "Pressure, flow, yield weight, and temperature chart. Touch and hold to inspect.",
+      "english": "Pressure, flow, yield flow, and temperature chart. Touch and hold to inspect.",
       "languages": [
         "fr",
         "it",
@@ -3592,7 +3602,7 @@
       ]
     },
     "insights.miniChart.ariaLabelWeight": {
-      "english": "Previous shot pressure, flow, and yield weight graph",
+      "english": "Previous shot pressure, flow, and yield flow graph",
       "languages": [
         "fr",
         "it",

@@ -92,7 +92,7 @@ function MachineUtilityCardComponent({ utility, compact = false, scale, onExpand
   }
 
   const isScale = utility.id === 'scale'
-  const steamHeatingEnabled = utility.enabled !== false
+  const steamHeatingEnabled = utility.enabled === true
   const steamTarget = Number(utility.metrics.find((metric) => metric.id === 'target')?.value)
   const scaleConnected = isScale && scale?.status === 'connected'
   const connectedScaleName = scaleConnected ? scale.name || t('common.utility.scale') : undefined

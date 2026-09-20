@@ -104,6 +104,7 @@ export const shell = {
   "shell.liveOperation.hotWater": "Dispensando agua caliente",
   "shell.liveOperation.steaming": "Vaporizando",
   "shell.liveOperation.flushing": "Enjuagando",
+  "shell.liveOperation.targetTemperature": "Temperatura objetivo",
   "shell.sleep.wakeAria": "Mantén pulsado con un dedo durante 1 segundo para activar la máquina",
   "shell.sleep.touchAndHold": "Mantén pulsado para activar",
   "shell.updates.title": "Actualización de Decaid disponible",
@@ -134,4 +135,3 @@ export const shell = {
   "shell.profile.untitled": "Perfil sin título",
   "shell.profile.previousPull": "Extracción anterior"
 } satisfies Translation<EnglishCatalog>
-

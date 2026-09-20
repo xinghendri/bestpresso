@@ -12,6 +12,17 @@ const model = { profiles: [], utilities: [
 ] } as BrewingScreenModel
 const water = (value: BrewingScreenModel) => Object.fromEntries(value.utilities[0].metrics.map(m => [m.id, m.value]))
 
+test('unknown steam uses a disabled neutral control, not an on/off claim or animated loader', () => {
+  const source = readFileSync(new URL('../src/features/machine/DrinkUtilityCard.tsx', import.meta.url), 'utf8')
+  const css = readFileSync(new URL('../src/features/machine/drinkUtilityCards.css', import.meta.url), 'utf8')
+  assert.match(source, /const pending = steam && utility.enabled === undefined/)
+  assert.match(source, /aria-checked=\{pending \? undefined : enabled\}/)
+  assert.match(source, /disabled=\{pending \|\| disabled\}/)
+  assert.match(source, /const currentValid = !pending &&/)
+  assert.match(source, /const targetDisabled = pending \|\|/)
+  assert.match(css, /steam-pending \.drink-card__toggle>span \{[^}]*transform:translateX\(10px\);[^}]*transition:none/)
+})
+
 test('adds max duration to an older two-metric hot-water model from the workflow', () => {
   const updated = applyWorkflow(model, { hotWaterData: { duration: 35 } }, [])
   assert.deepEqual(water(updated), { volume: '50', temperature: '92', maxDuration: '35' })
@@ -80,7 +91,8 @@ test('narrow cards reflow controls without reducing label or temperature sizes',
   assert.match(css, /steam-settings \{min-height:0;display:grid;grid-template-columns:minmax\(0,1fr\)/)
   assert.match(css, /grid-template-rows:minmax\(0,1fr\) var\(--drink-metric-height\);gap:8px;padding:0 12px 2px/)
   assert.match(css, /steam-secondary \{min-width:0;height:var\(--drink-metric-height\);display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/)
-  assert.match(css, /steam-secondary>div\+div \{border-left:1px/)
+  assert.match(css, /steam-secondary>div\+div::before \{[^}]*top:12px;bottom:12px;width:1px;background:var\(--drink-separator\)/)
+  assert.doesNotMatch(css, /(?:water-settings|steam-secondary)>div\+div \{border-left:/)
   assert.match(narrow, /steam-secondary \.metric \{min-height:48px;gap:5px\}/)
   assert.doesNotMatch(narrow, /font-size|transform:scale/)
 })

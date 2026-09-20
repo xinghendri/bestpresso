@@ -13,7 +13,7 @@ test('Spanish covers all copy with traceable sources and only omits native date 
   const provenance = JSON.parse(readFileSync(new URL('../docs/localisation-spanish-provenance.json', import.meta.url), 'utf8'))
   assert.deepEqual(validateCatalog(en, catalog, 'es-ES'), [])
   assert.deepEqual(Object.keys(en).filter(key => !(key in catalog)), ['insights.period.dayMonth', 'insights.period.dayOnly'])
-  assert.equal(Object.keys(catalog).length, 1000)
+  assert.equal(Object.keys(catalog).length, Object.keys(en).length - 2)
   let seeded = 0
   for (const [key, value] of Object.entries(catalog)) {
     const entry = provenance.entries[key]

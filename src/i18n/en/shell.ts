@@ -120,6 +120,7 @@ export const shellEn = {
   'shell.liveOperation.hotWater': 'Dispensing hot water',
   'shell.liveOperation.steaming': 'Steaming',
   'shell.liveOperation.flushing': 'Flushing',
+  "shell.liveOperation.targetTemperature": "Target temperature",
 
   // SleepWakeScreen.tsx
   'shell.sleep.wakeAria': 'Hold with one finger for 1 second to wake machine',

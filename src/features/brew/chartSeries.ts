@@ -6,7 +6,8 @@ export const chartSeriesForLine = {
   pressure: 'pressure',
   targetPressure: 'pressure',
   temperature: 'temperature',
-  weight: 'weight',
+  // Keep the existing brown palette/filter identity; the telemetry is g/s.
+  weightFlow: 'weight',
 } as const satisfies Record<string, ChartSeries>
 
 export function toggleDimmedChartSeries(current: ChartSeries[], series: ChartSeries) {

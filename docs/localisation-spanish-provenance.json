@@ -8,6 +8,16 @@
     "insights.period.dayOnly"
   ],
   "entries": {
+    "brew.metric.yieldFlow": {
+      "english": "Yield flow",
+      "translation": "Flujo en taza",
+      "kind": "contextual"
+    },
+    "shell.liveOperation.targetTemperature": {
+      "english": "Target temperature",
+      "translation": "Temperatura objetivo",
+      "kind": "contextual"
+    },
     "common.error.historyUnavailable": {
       "english": "Decaid history is unavailable.",
       "translation": "El historial de Decaid no está disponible.",
@@ -1265,8 +1275,8 @@
       "kind": "contextual"
     },
     "brew.chart.live.ariaLabelWithWeight": {
-      "english": "Pressure, flow, yield weight, and temperature chart. Touch and hold to inspect.",
-      "translation": "Gráfico de presión, flujo, peso en taza y temperatura. Mantén pulsado para explorar.",
+      "english": "Pressure, flow, yield flow, and temperature chart. Touch and hold to inspect.",
+      "translation": "Gráfico de presión, flujo, flujo en taza y temperatura. Mantén pulsado para explorar.",
       "kind": "contextual"
     },
     "brew.chart.live.ariaLabelNoWeight": {
@@ -2307,8 +2317,8 @@
       "kind": "contextual"
     },
     "insights.miniChart.ariaLabelWeight": {
-      "english": "Previous shot pressure, flow, and yield weight graph",
-      "translation": "Gráfico de presión, flujo y peso en taza de la extracción anterior",
+      "english": "Previous shot pressure, flow, and yield flow graph",
+      "translation": "Gráfico de presión, flujo y flujo en taza de la extracción anterior",
       "kind": "contextual"
     },
     "insights.miniChart.ariaLabelCleaning": {

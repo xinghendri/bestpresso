@@ -1,10 +1,12 @@
 import type { LiveShotPoint } from '../../domain/brewing'
 
-const telemetryKeys = ['pressure', 'flow', 'temperature', 'weight'] as const
+const telemetryKeys = ['pressure', 'flow', 'temperature', 'weight', 'weightFlow'] as const
 
 const interpolatedValue = (before: LiveShotPoint, after: LiveShotPoint, key: typeof telemetryKeys[number], ratio: number) => {
   const beforeValue = before[key]
   const afterValue = after[key]
+  // Do not fill a missing yield-flow segment with a neighbouring reading.
+  if (key === 'weightFlow' && (!Number.isFinite(beforeValue) || !Number.isFinite(afterValue))) return undefined
   if (typeof beforeValue === 'number' && typeof afterValue === 'number') {
     return beforeValue + (afterValue - beforeValue) * ratio
   }

@@ -1,7 +1,27 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { brewingFixture } from '../src/fixtures/brewingFixture.ts'
-import { withDisplayedScaleWeight, withHomeMachineDisplay, withHomeTankDisplay, withScaleConnection } from '../src/features/brew/homeDisplayUpdates.ts'
+import { withDisplayedScaleWeight, withHomeMachineDisplay, withHomeTankDisplay, withScaleConnection, withUnknownSteamState } from '../src/features/brew/homeDisplayUpdates.ts'
+import { applyWorkflow } from '../src/api/decaid/adapters.ts'
+
+test('startup never assumes steam is on, even with telemetry arriving before workflow', () => {
+  const startup = withUnknownSteamState(brewingFixture)
+  const steam = (model: typeof startup) => model.utilities.find(u => u.id === 'steam')!
+  assert.equal(steam(startup).enabled, undefined)
+  assert.equal(steam(startup).metrics.find(m => m.id === 'current')?.value, '—')
+  assert.equal(steam(brewingFixture).enabled, true)
+  const telemetry = withHomeMachineDisplay(startup, 'ready', 160, 130, 'normal')
+  assert.equal(steam(telemetry).enabled, undefined)
+  for (const workflow of [{}, { steamSettings: { flow: 0.7 } }, { steamSettings: { targetTemperature: NaN } }]) {
+    assert.equal(steam(applyWorkflow(telemetry, workflow, [])).enabled, undefined)
+  }
+  const off = applyWorkflow(telemetry, { steamSettings: { targetTemperature: 0 } }, [])
+  assert.equal(steam(off).enabled, false)
+  assert.equal(steam(applyWorkflow(off, {}, [])).enabled, false)
+  const on = applyWorkflow(off, { steamSettings: { targetTemperature: 160 } }, [])
+  assert.equal(steam(on).enabled, true)
+  assert.equal(steam(applyWorkflow(on, {}, [])).enabled, true)
+})
 
 test('identical displayed weight preserves the model; a visible change updates only the scale', () => {
   const model = withDisplayedScaleWeight(brewingFixture, 10.01)

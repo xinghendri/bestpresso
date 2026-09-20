@@ -1,5 +1,14 @@
 import type { BrewingScreenModel, MachineReadiness, MachineUtility, ScaleConnection } from '../../domain/brewing.ts'
 
+/** Fixture values are not evidence of the machine's heater state at startup. */
+export function withUnknownSteamState(model: BrewingScreenModel): BrewingScreenModel {
+  return replaceUtility(model, 'steam', utility => ({
+    ...utility,
+    enabled: undefined,
+    metrics: utility.metrics.map(metric => metric.id === 'current' ? { ...metric, value: '—', highlight: false } : metric),
+  }))
+}
+
 export function withScaleConnection(current: ScaleConnection, next: ScaleConnection): ScaleConnection {
   return current.status === next.status && current.id === next.id && current.name === next.name ? current : next
 }

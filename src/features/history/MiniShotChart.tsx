@@ -11,7 +11,7 @@ const snapshotPath = (points: LiveShotPoint[], key: keyof LiveShotPoint, maximum
   let drawing = false
   for (const point of points) {
     const value = point[key]
-    if (typeof value !== 'number') {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
       drawing = false
       continue
     }
@@ -29,12 +29,10 @@ function MiniShotChartComponent({ shot }: { shot: PreviousShot }) {
   const points = useMemo(() => shot.points ?? [], [shot.points])
   const displayPoints = useMemo(() => smoothShotTelemetry(points), [points])
   const durationMs = Math.max(1, points.at(-1)?.elapsedMs ?? Number(shot.totalTime) * 1000)
-  const observedWeight = Math.max(0, ...points.map((point) => point.weight ?? 0))
-  const weightMax = Math.max(1, (shot.targetYield ?? observedWeight) * 1.12, observedWeight * 1.05)
   const showWeight = shot.beverageType?.toLowerCase() !== 'cleaning'
   const pressurePath = useMemo(() => snapshotPath(displayPoints, 'pressure', 12, durationMs), [displayPoints, durationMs])
   const flowPath = useMemo(() => snapshotPath(displayPoints, 'flow', 6, durationMs), [displayPoints, durationMs])
-  const weightPath = useMemo(() => snapshotPath(points, 'weight', weightMax, durationMs), [points, weightMax, durationMs])
+  const weightPath = useMemo(() => snapshotPath(points, 'weightFlow', 6, durationMs), [points, durationMs])
 
   return <div className="mini-chart">
     <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label={showWeight ? t('insights.miniChart.ariaLabelWeight') : t('insights.miniChart.ariaLabelCleaning')} preserveAspectRatio="none">

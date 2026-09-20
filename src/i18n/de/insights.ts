@@ -166,7 +166,7 @@ export const insightsDe = {
   'insights.previousShot.loadError': 'Dieser Bezug konnte nicht geladen werden. Bitte erneut auswählen.',
 
   // MiniShotChart
-  'insights.miniChart.ariaLabelWeight': 'Diagramm: Druck, Durchfluss und Menge des vorherigen Bezugs',
+  "insights.miniChart.ariaLabelWeight": "Diagramm: Druck, Durchfluss und Bezugsfluss des vorherigen Bezugs",
   'insights.miniChart.ariaLabelCleaning': 'Diagramm: Druck und Durchfluss der vorherigen Reinigung',
 
   // Background sync / chart status

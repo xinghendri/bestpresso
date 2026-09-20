@@ -138,7 +138,7 @@ export const insights = {
   "insights.previousShot.chartAriaLabelWeight": "Historial de extracciones: {profile}",
   "insights.previousShot.chartAriaLabelGeneric": "Gráfico del historial de extracciones",
   "insights.previousShot.loadError": "No se pudo cargar esa extracción. Prueba a seleccionarla de nuevo.",
-  "insights.miniChart.ariaLabelWeight": "Gráfico de presión, flujo y peso en taza de la extracción anterior",
+  "insights.miniChart.ariaLabelWeight": "Gráfico de presión, flujo y flujo en taza de la extracción anterior",
   "insights.miniChart.ariaLabelCleaning": "Gráfico de presión y flujo de la limpieza anterior",
   "insights.status.unavailableRetrying": "Historial no disponible · reintentando automáticamente",
   "insights.status.loading": "Cargando historial…",
@@ -149,4 +149,3 @@ export const insights = {
   "insights.chart.empty": "No se registró un gráfico para esta extracción",
   "insights.chart.loading": "Cargando gráfico…"
 } satisfies Translation<EnglishCatalog>
-

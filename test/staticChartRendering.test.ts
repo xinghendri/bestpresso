@@ -17,6 +17,6 @@ test('history thumbnails cache smoothing and static chart paths', () => {
   assert.match(historyChart, /useMemo\(\(\) => smoothShotTelemetry\(points\)/)
   assert.match(historyChart, /useMemo\(\(\) => snapshotPath\(displayPoints, 'pressure'/)
   assert.match(historyChart, /useMemo\(\(\) => snapshotPath\(displayPoints, 'flow'/)
-  assert.match(historyChart, /useMemo\(\(\) => snapshotPath\(points, 'weight'/)
+  assert.match(historyChart, /useMemo\(\(\) => snapshotPath\(points, 'weightFlow', 6/)
   assert.match(historyChart, /export const MiniShotChart = memo\(MiniShotChartComponent\)/)
 })

@@ -122,6 +122,7 @@ export const shellDe = {
   'shell.liveOperation.hotWater': 'Heißwasser läuft',
   'shell.liveOperation.steaming': 'Dampfen',
   'shell.liveOperation.flushing': 'Spült',
+  "shell.liveOperation.targetTemperature": "Zieltemperatur",
 
   // SleepWakeScreen.tsx
   'shell.sleep.wakeAria': 'Mit einem Finger 1 Sekunde halten, um die Maschine aufzuwecken',
