@@ -171,6 +171,8 @@ export const settings = {
   "settings.power.limitBrightness": "Limitar brillo con batería baja",
   "settings.power.screensaverBrightness": "Brillo del salvapantallas",
   "settings.power.screensaverBrightnessHint": "Se usa mientras la máquina reposa. Predeterminado: 7%.",
+  "settings.power.screenOffAfter": "Apagar pantalla tras",
+  "settings.power.screenOffAfterHint": "Segundos de reposo antes de que la pantalla se ponga en negro. 0 mantiene el salvapantallas encendido.",
   "settings.power.battery.eyebrow": "Batería",
   "settings.power.battery.title": "Carga",
   "settings.power.chargingMode": "Modo de carga",

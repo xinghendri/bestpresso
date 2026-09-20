@@ -15,6 +15,7 @@ export interface BestpressoPreferences {
   temperatureUnit: TemperatureUnit
   clockFormat: ClockFormat
   screensaverBrightness: number
+  screensaverScreenOffDelaySeconds: number
   language: LanguagePreference
 }
 
@@ -31,6 +32,7 @@ export const DEFAULT_BESTPRESSO_PREFERENCES: BestpressoPreferences = {
   temperatureUnit: 'C',
   clockFormat: 'device',
   screensaverBrightness: 7,
+  screensaverScreenOffDelaySeconds: 0,
   language: 'auto',
 }
 
@@ -55,6 +57,9 @@ export function normalizeBestpressoPreferences(value: unknown): BestpressoPrefer
     screensaverBrightness: typeof candidate.screensaverBrightness === 'number' && Number.isFinite(candidate.screensaverBrightness)
       ? Math.round(Math.max(0, Math.min(100, candidate.screensaverBrightness)))
       : DEFAULT_BESTPRESSO_PREFERENCES.screensaverBrightness,
+    screensaverScreenOffDelaySeconds: typeof candidate.screensaverScreenOffDelaySeconds === 'number' && Number.isFinite(candidate.screensaverScreenOffDelaySeconds)
+      ? Math.round(Math.max(0, Math.min(3_600, candidate.screensaverScreenOffDelaySeconds)))
+      : DEFAULT_BESTPRESSO_PREFERENCES.screensaverScreenOffDelaySeconds,
     waterWarningLevelMl: Math.min(2_000, warning),
     waterCriticalLevelMl: Math.min(1_999, critical),
     chartLineWeight,

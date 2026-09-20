@@ -19,7 +19,7 @@ test('hot water keeps four controls in two balanced columns', () => {
 test('power controls remain present once, grouped in independent screen and sleep stacks', () => {
   const power = screen.split('const power =')[1].split('const experience =')[0]
   assert.equal((power.match(/className="settings-stack"/g) || []).length, 2)
-  for (const key of ['settings.power.brightness', 'settings.power.screensaverBrightness', 'settings.power.keepScreenAwake', 'settings.power.presenceDetection', 'settings.power.sleepAfter', 'settings.power.chargingMode', 'settings.power.overnightSchedule']) {
+  for (const key of ['settings.power.brightness', 'settings.power.screensaverBrightness', 'settings.power.screenOffAfter', 'settings.power.keepScreenAwake', 'settings.power.presenceDetection', 'settings.power.sleepAfter', 'settings.power.chargingMode', 'settings.power.overnightSchedule']) {
     assert.equal(power.split(`label={t('${key}')}`).length - 1, 1, key)
   }
   assert.match(power, /title=\{t\('settings\.power\.schedule\.title'\)\}/)

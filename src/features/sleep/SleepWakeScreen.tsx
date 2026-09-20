@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, ty
 import logo from '../../assets/figma/decent-logo.png'
 import { t } from '../../i18n/index.ts'
 import { formatDeviceTime } from './deviceTime'
-import { useBestpressoPreferences } from '../settings/bestpressoPreferences'
+import { readBestpressoPreferences, useBestpressoPreferences } from '../settings/bestpressoPreferences'
+import { displayBrightness } from '../settings/displayBrightness'
 import { WAKE_HOLD_DURATION_MS, WakeHoldGesture, type WakeHoldUpdate } from './wakeHoldGesture'
 
 interface SleepWakeScreenProps {
@@ -15,12 +16,18 @@ interface PulsePoint {
   y: number
 }
 
+// The timed screen-off target: as dark as the tablet gets without an OS blank.
+const SCREEN_OFF_BRIGHTNESS = 0
+
 export function SleepWakeScreen({ onWake }: SleepWakeScreenProps) {
   const { preferences } = useBestpressoPreferences()
   const gesture = useRef(new WakeHoldGesture())
   const holdTimer = useRef<number | null>(null)
   const [pulse, setPulse] = useState<PulsePoint | null>(null)
   const [now, setNow] = useState(() => new Date())
+  const [blackedOut, setBlackedOut] = useState(false)
+  const clockTimer = useRef<number | null>(null)
+  const screenOffTimer = useRef<number | null>(null)
 
   const cancelHold = () => {
     if (holdTimer.current !== null) window.clearTimeout(holdTimer.current)
@@ -48,9 +55,26 @@ export function SleepWakeScreen({ onWake }: SleepWakeScreenProps) {
   }
 
   useEffect(() => {
-    const clockTimer = window.setInterval(() => setNow(new Date()), 30_000)
+    clockTimer.current = window.setInterval(() => setNow(new Date()), 30_000)
+    // Read at activation, not reactively: a mid-sleep settings change applies
+    // on the next sleep cycle, and a fixed window keeps a stray touch from
+    // extending the configured blackout delay.
+    const delaySeconds = readBestpressoPreferences().screensaverScreenOffDelaySeconds
+    if (delaySeconds > 0) {
+      screenOffTimer.current = window.setTimeout(() => {
+        screenOffTimer.current = null
+        setBlackedOut(true)
+        // Best effort: a refused write leaves the saver dimmed but visible.
+        displayBrightness.deepen(SCREEN_OFF_BRIGHTNESS).catch(() => {})
+        if (clockTimer.current !== null) {
+          window.clearInterval(clockTimer.current)
+          clockTimer.current = null
+        }
+      }, delaySeconds * 1_000)
+    }
     return () => {
-      window.clearInterval(clockTimer)
+      if (clockTimer.current !== null) window.clearInterval(clockTimer.current)
+      if (screenOffTimer.current !== null) window.clearTimeout(screenOffTimer.current)
       if (holdTimer.current !== null) window.clearTimeout(holdTimer.current)
     }
   }, [])
@@ -129,12 +153,13 @@ export function SleepWakeScreen({ onWake }: SleepWakeScreenProps) {
     onTouchMove={handleTouchMove}
     onTouchEnd={handleTouchEnd}
     onTouchCancel={handleTouchEnd}
+    data-blacked-out={blackedOut ? 'true' : undefined}
   >
-    <span className="sleep-screen__identity" aria-hidden="true">
+    {!blackedOut && <span className="sleep-screen__identity" aria-hidden="true">
       <img src={logo} alt="" />
       <span className="sleep-screen__time">{formatDeviceTime(now, undefined, preferences.clockFormat)}</span>
-    </span>
-    <span className="sleep-screen__hint">{t('shell.sleep.touchAndHold')}</span>
+    </span>}
+    {!blackedOut && <span className="sleep-screen__hint">{t('shell.sleep.touchAndHold')}</span>}
     {pulse && <span className="sleep-screen__pulse" style={{ left: pulse.x, top: pulse.y }} aria-hidden="true" />}
   </button>
 }

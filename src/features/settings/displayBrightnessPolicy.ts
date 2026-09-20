@@ -41,6 +41,13 @@ export function createDisplayBrightnessPolicy(api: DisplayBrightnessDependencies
       await api.write(value)
       dimmed = true
     }),
+    // The timed screen-off darkens an active saver session one step further.
+    // Without a dim session the saver is gone or the wake already restored, and a
+    // late blackout must not fight the restore queued behind it.
+    deepen: (value: number) => enqueue(async () => {
+      if (!dimmed) return
+      await api.write(value)
+    }),
     restore: () => enqueue(async () => {
       // A disconnect/wake callback is not itself permission to reset brightness.
       if (!dimmed) return
