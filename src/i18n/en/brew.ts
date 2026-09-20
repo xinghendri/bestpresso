@@ -10,6 +10,7 @@ export const brewEn = {
   // Shared metric labels not already covered by common.metric.*
   'brew.metric.pressure': 'Pressure',
   'brew.metric.yield': 'Yield',
+  "brew.metric.yieldFlow": "Yield flow",
   'brew.metric.flowRate': 'Flow rate',
   'brew.metric.temperatureRange': 'Temperature range',
   'brew.metric.grindSize': 'Grind size',
@@ -67,7 +68,7 @@ export const brewEn = {
   'brew.liveScreen.runningAriaLabel': 'Running {name}',
 
   // LiveShotChart.tsx
-  'brew.chart.live.ariaLabelWithWeight': 'Pressure, flow, yield weight, and temperature chart. Touch and hold to inspect.',
+  "brew.chart.live.ariaLabelWithWeight": "Pressure, flow, yield flow, and temperature chart. Touch and hold to inspect.",
   'brew.chart.live.ariaLabelNoWeight': 'Pressure, flow, and temperature chart. Touch and hold to inspect.',
   'brew.chart.live.waitingForTelemetry': 'Waiting for brewing telemetry…',
 

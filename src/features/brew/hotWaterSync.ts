@@ -13,6 +13,13 @@ const fields = [
 ] as const
 const valid = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0
 
+/** A setpoint, never a measured outlet/mix temperature. Prefer machine readback. */
+export function hotWaterTargetTemperature(readback: Water, workflow: DecaidWorkflow): number | undefined {
+  if (valid(readback.targetTemperature)) return readback.targetTemperature
+  const target = workflow.hotWaterData?.targetTemperature
+  return valid(target) ? target : undefined
+}
+
 export function hotWaterFromShotSettings(frame: HotWaterShotSettings): Water {
   const water: Water = {}
   if (valid(frame.targetHotWaterVolume)) water.volume = frame.targetHotWaterVolume

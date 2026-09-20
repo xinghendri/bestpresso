@@ -164,7 +164,7 @@ export const insightsEn = {
   'insights.previousShot.loadError': 'That pull couldn’t be loaded. Try selecting it again.',
 
   // MiniShotChart
-  'insights.miniChart.ariaLabelWeight': 'Previous shot pressure, flow, and yield weight graph',
+  "insights.miniChart.ariaLabelWeight": "Previous shot pressure, flow, and yield flow graph",
   'insights.miniChart.ariaLabelCleaning': 'Previous cleaning pressure and flow graph',
 
   // Background sync / chart status

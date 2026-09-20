@@ -30,10 +30,10 @@ interface HistoryChartView {
   showWeight: boolean
 }
 
-function AnimatedHistoryShotChart({ view, targetYield }: { view: HistoryChartView; targetYield: number }) {
+function AnimatedHistoryShotChart({ view }: { view: HistoryChartView }) {
   const [dimmedSeries, setDimmedSeries] = useState<ChartSeries[]>([])
 
-  return <LiveShotChart points={view.points} contextPoints={view.contextPoints} elapsedMs={view.elapsedMs} fitDuration={view.fitDuration} startMs={view.startMs} targetYield={targetYield} showWeight={view.showWeight} legendFilterEnabled dimmedSeries={dimmedSeries} onToggleSeries={(series) => setDimmedSeries((current) => toggleDimmedChartSeries(current, series))} />
+  return <LiveShotChart points={view.points} contextPoints={view.contextPoints} elapsedMs={view.elapsedMs} fitDuration={view.fitDuration} startMs={view.startMs} showWeight={view.showWeight} legendFilterEnabled dimmedSeries={dimmedSeries} onToggleSeries={(series) => setDimmedSeries((current) => toggleDimmedChartSeries(current, series))} />
 }
 
 const pullTime = (timestamp: string | undefined, clockFormat: ClockFormat) => {
@@ -92,7 +92,7 @@ export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, o
   const points = activeShot?.points ?? []
   const reasons = activeShot ? reconcileStageReasons(activeShot).stageReasons : undefined
   const elapsedMs = points.at(-1)?.elapsedMs ?? (Number(activeShot?.totalTime) || 0) * 1000
-  const targetYield = activeShot?.targetYield ?? (Number(activeShot?.totalYield) || 36)
+
   const focusedView = stageFocusedChartView(points, elapsedMs, selectedStage)
   const chartView: HistoryChartView = {
     points: focusedView.points,
@@ -133,7 +133,7 @@ export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, o
       </header>
 
       <section className={`live-pull-chart-panel history-pull-chart${loadingId ? ' history-pull-chart--loading' : ''}`} aria-label={activeShot ? t('insights.previousShot.chartAriaLabelWeight', { profile: displayedShotName(activeShot) }) : t('insights.previousShot.chartAriaLabelGeneric')}>
-        {activeShot && <AnimatedHistoryShotChart view={chartView} targetYield={targetYield} />}
+        {activeShot && <AnimatedHistoryShotChart view={chartView} />}
         {loadError && <p className="history-pull-error">{t('insights.previousShot.loadError')}</p>}
       </section>
       <LiveBrewStages reasons={reasons} points={points} elapsedMs={elapsedMs} showYield={!isCleaning} selectedStageKey={selectedStage?.key} onStageSelect={(stage) => setStageSelection(stage ? { shotId: activeId, stage } : null)} />

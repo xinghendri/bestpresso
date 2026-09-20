@@ -45,7 +45,7 @@ export function LiveUtilityOperationOverlay({ operation }: { operation: LiveUtil
         {hotWaterMeasurement
           ? <Reading label={utilityMetricLabel(hotWaterMeasurement.label === 'Weight' ? 'weight' : 'volume')} align="center">{hotWaterMeasurement.value === undefined ? '—' : decimal(hotWaterMeasurement.value)} <em>/</em> {hotWaterMeasurement.target ?? '—'}<small>{hotWaterMeasurement.unit}</small></Reading>
           : <Reading label={t('common.metric.flow')} align="center">{decimal(operation.flow)}<small>ml/s</small></Reading>}
-        <Reading label={t('common.metric.temperature')} align="end">{formatTemperatureValue(operation.temperature, preferences.temperatureUnit)}<small className="temperature-unit">{temperatureUnitLabel(preferences.temperatureUnit)}</small></Reading>
+        <Reading label={t(operation.kind === 'hotWater' ? 'shell.liveOperation.targetTemperature' : 'common.metric.temperature')} align="end">{formatTemperatureValue(operation.kind === 'hotWater' ? operation.targetTemperature : operation.temperature, preferences.temperatureUnit)}<small className="temperature-unit">{temperatureUnitLabel(preferences.temperatureUnit)}</small></Reading>
       </div>
     </section>
   </div>

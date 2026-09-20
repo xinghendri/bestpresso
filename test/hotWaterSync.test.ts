@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createHotWaterSync, hotWaterFromShotSettings } from '../src/features/brew/hotWaterSync.ts'
+import { createHotWaterSync, hotWaterFromShotSettings, hotWaterTargetTemperature } from '../src/features/brew/hotWaterSync.ts'
 import type { DecaidWorkflowPatch } from '../src/api/decaid/types.ts'
 
 function fixture() {
@@ -17,6 +17,14 @@ function fixture() {
 }
 const idle = () => true
 const old = { hotWaterData: { volume: 20, targetTemperature: 60 } }
+
+test('display target prefers machine readback, falls back to workflow, and never invents a temperature', () => {
+  assert.equal(hotWaterTargetTemperature({ targetTemperature: 80 }, old), 80)
+  assert.equal(hotWaterTargetTemperature({}, old), 60)
+  assert.equal(hotWaterTargetTemperature({}, {}), undefined)
+  assert.equal(hotWaterTargetTemperature({ targetTemperature: NaN }, old), 60)
+  assert.equal(hotWaterTargetTemperature({}, { hotWaterData: { targetTemperature: Infinity } }), undefined)
+})
 
 test('saves shared intent before workflow for both edited targets, preserving safety settings', async () => {
   const f = fixture()

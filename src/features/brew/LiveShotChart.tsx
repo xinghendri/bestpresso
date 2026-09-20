@@ -19,7 +19,6 @@ import { removeOverlappingFocusedTimeTicks, shouldShowTimelineLabel } from './ch
 interface LiveShotChartProps {
   points: LiveShotPoint[]
   elapsedMs: number
-  targetYield: number
   startMs?: number
   fitDuration?: boolean
   contextPoints?: LiveShotPoint[]
@@ -57,7 +56,7 @@ const linePath = (points: LiveShotPoint[], key: keyof LiveShotPoint, xForElapsed
   let drawing = false
   for (const point of points) {
     const value = point[key]
-    if (typeof value !== 'number') {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
       drawing = false
       continue
     }
@@ -97,7 +96,7 @@ const areaPath = (points: LiveShotPoint[], key: keyof LiveShotPoint, xForElapsed
 }
 
 const yForValue = (value: number | undefined, minimum: number, maximum: number) => {
-  if (typeof value !== 'number') return null
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null
   const ratio = Math.max(0, Math.min(1, (value - minimum) / (maximum - minimum)))
   return PLOT.bottom - ratio * (PLOT.bottom - PLOT.top)
 }
@@ -109,7 +108,7 @@ const inspectionTimeLabel = (elapsedMs: number) => {
   return `${String(minutes).padStart(2, '0')}:${seconds.toFixed(1).padStart(4, '0')}`
 }
 
-const reading = (value: number | undefined, digits: number) => typeof value === 'number' ? formatDecimal(value, digits) : '—'
+const reading = (value: number | undefined, digits: number) => typeof value === 'number' && Number.isFinite(value) ? formatDecimal(value, digits) : '—'
 
 const useAnimatedChartFocus = (target: ChartFocusTransform) => {
   const currentRef = useRef(target)
@@ -140,7 +139,7 @@ const useAnimatedChartFocus = (target: ChartFocusTransform) => {
   return current
 }
 
-export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fitDuration = false, contextPoints, showWeight = true, legendFilterEnabled = false, dimmedSeries = [], onToggleSeries }: LiveShotChartProps) {
+export function LiveShotChart({ points, elapsedMs, startMs = 0, fitDuration = false, contextPoints, showWeight = true, legendFilterEnabled = false, dimmedSeries = [], onToggleSeries }: LiveShotChartProps) {
   const { preferences } = useBestpressoPreferences()
   const gradientId = useId().replaceAll(':', '')
   const svgRef = useRef<SVGSVGElement>(null)
@@ -159,8 +158,6 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
   const displayPlottedPoints = smoothShotTelemetry(plottedPoints)
   const smoothedByElapsedMs = new Map(displayPlottedPoints.map((point) => [point.elapsedMs, point]))
   const displayFocusPoints = focusPoints.map((point) => smoothedByElapsedMs.get(point.elapsedMs) ?? point)
-  const observedWeight = Math.max(0, ...plottedPoints.map((point) => point.weight ?? 0))
-  const weightMax = Math.max(50, targetYield * 1.2, observedWeight * 1.12)
   const plotWidth = PLOT.right - PLOT.left
   const focusEndMs = startMs + durationMs
   const contextStartMs = plottedPoints[0]?.elapsedMs ?? startMs
@@ -273,12 +270,12 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
 
   const smoothedInspection = inspectionElapsedMs === null ? null : inspectShotTelemetry(displayPlottedPoints, inspectionElapsedMs)
   const rawInspection = inspectionElapsedMs === null ? null : inspectShotTelemetry(plottedPoints, inspectionElapsedMs)
-  const inspection = smoothedInspection && rawInspection ? { ...smoothedInspection, weight: rawInspection.weight } : smoothedInspection ?? rawInspection
+  const inspection = smoothedInspection && rawInspection ? { ...smoothedInspection, weightFlow: rawInspection.weightFlow } : smoothedInspection ?? rawInspection
   const inspectionX = inspection ? xForElapsedMs(inspection.elapsedMs) : null
   const inspectionPressureY = yForValue(inspection?.pressure, 0, 12)
   const inspectionFlowY = yForValue(inspection?.flow, 0, 12)
   const inspectionTemperatureY = yForValue(inspection?.temperature, 70, 100)
-  const inspectionWeightY = yForValue(inspection?.weight, 0, weightMax)
+  const inspectionWeightY = yForValue(inspection?.weightFlow, 0, 12)
 
   return <div className="live-shot-chart">
     <ChartLegend showWeight={showWeight} interactive={legendFilterEnabled} dimmedSeries={dimmedSeries} onToggleSeries={onToggleSeries} />
@@ -287,7 +284,7 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
     <div className="shot-chart-axes" aria-hidden="true">
       {timeLabels.map((tick) => <span key={`time-label-${tick.offsetMs}`} className="shot-chart-axes__time" style={{ left: `${tick.x / VIEW_WIDTH * 100}%`, top: `${(PLOT.bottom + 25) / VIEW_HEIGHT * 100}%` }}>{tick.label}</span>)}
       {horizontalGridLines.map((line) => <span key={`axis-${line.ratio}`} className="shot-chart-axes__value" style={{ left: `${(PLOT.left - 13) / VIEW_WIDTH * 100}%`, top: `${(PLOT.bottom - line.ratio * (PLOT.bottom - PLOT.top)) / VIEW_HEIGHT * 100}%` }}>{Math.round(12 * line.ratio)}</span>)}
-      <span className="shot-chart-axes__unit" style={{ left: `${(PLOT.left - 13) / VIEW_WIDTH * 100}%`, top: `${18 / VIEW_HEIGHT * 100}%` }}>bar / ml/s</span>
+      <span className="shot-chart-axes__unit" style={{ left: `${(PLOT.left - 13) / VIEW_WIDTH * 100}%`, top: `${18 / VIEW_HEIGHT * 100}%` }}>{showWeight ? 'bar / ml/s / g/s' : 'bar / ml/s'}</span>
     </div>
     <svg ref={svgRef} viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`} role="img" aria-label={showWeight ? t('brew.chart.live.ariaLabelWithWeight') : t('brew.chart.live.ariaLabelNoWeight')} preserveAspectRatio="none" onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerEnd} onPointerCancel={handlePointerEnd} onContextMenu={(event) => event.preventDefault()}>
       <defs>
@@ -307,7 +304,7 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
           <path className={`chart-line chart-line--temperature${lineClass(chartSeriesForLine.temperature)}`} d={linePath(displayPlottedPoints, 'temperature', xForElapsedMs, 70, 100)} />
           <path className={`chart-line chart-line--pressure${lineClass(chartSeriesForLine.pressure)}`} d={linePath(displayPlottedPoints, 'pressure', xForElapsedMs, 0, 12)} />
           <path className={`chart-line chart-line--flow${lineClass(chartSeriesForLine.flow)}`} d={linePath(displayPlottedPoints, 'flow', xForElapsedMs, 0, 12)} />
-          {showWeight && <path className={`chart-line chart-line--weight${lineClass(chartSeriesForLine.weight)}`} d={linePath(plottedPoints, 'weight', xForElapsedMs, 0, weightMax)} />}
+          {showWeight && <path className={`chart-line chart-line--weight${lineClass(chartSeriesForLine.weightFlow)}`} d={linePath(plottedPoints, 'weightFlow', xForElapsedMs, 0, 12)} />}
         </g>
         {focusPoints.length > 0 && <g className="live-shot-chart__focus-lines" opacity={layerOpacity.focusOpacity}>
           <path className={`chart-area chart-area--pressure${lineClass(chartSeriesForLine.pressure)}`} fill={`url(#${gradientId}-pressure-area)`} d={areaPath(displayFocusPoints, 'pressure', xForElapsedMs, 0, 12)} />
@@ -318,7 +315,7 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
           <path className={`chart-line chart-line--temperature${lineClass(chartSeriesForLine.temperature)}`} d={linePath(displayFocusPoints, 'temperature', xForElapsedMs, 70, 100)} />
           <path className={`chart-line chart-line--pressure${lineClass(chartSeriesForLine.pressure)}`} d={linePath(displayFocusPoints, 'pressure', xForElapsedMs, 0, 12)} />
           <path className={`chart-line chart-line--flow${lineClass(chartSeriesForLine.flow)}`} d={linePath(displayFocusPoints, 'flow', xForElapsedMs, 0, 12)} />
-          {showWeight && <path className={`chart-line chart-line--weight${lineClass(chartSeriesForLine.weight)}`} d={linePath(focusPoints, 'weight', xForElapsedMs, 0, weightMax)} />}
+          {showWeight && <path className={`chart-line chart-line--weight${lineClass(chartSeriesForLine.weightFlow)}`} d={linePath(focusPoints, 'weightFlow', xForElapsedMs, 0, 12)} />}
         </g>}
         {inspection && inspectionX !== null && <g className="chart-inspection-cursor" aria-hidden="true">
           <line x1={inspectionX} x2={inspectionX} y1={PLOT.top} y2={PLOT.bottom} />
@@ -337,7 +334,7 @@ export function LiveShotChart({ points, elapsedMs, targetYield, startMs = 0, fit
         <div className="chart-reading--pressure"><dt>{t('brew.metric.pressure')}</dt><dd>{reading(inspection.pressure, 1)}<small>bar</small></dd></div>
         <div className="chart-reading--flow"><dt>{t('common.metric.flow')}</dt><dd>{reading(inspection.flow, 1)}<small>ml/s</small></dd></div>
         <div className="chart-reading--temperature"><dt>{t('common.metric.temperature')}</dt><dd>{formatTemperatureValue(inspection.temperature, preferences.temperatureUnit, 1)}<small className="temperature-unit">{temperatureUnitLabel(preferences.temperatureUnit)}</small></dd></div>
-        {showWeight && <div className="chart-reading--weight"><dt>{t('brew.metric.yield')}</dt><dd>{reading(inspection.weight, 1)}<small>g</small></dd></div>}
+        {showWeight && <div className="chart-reading--weight"><dt>{t('brew.metric.yieldFlow')}</dt><dd>{reading(inspection.weightFlow, 1)}<small>g/s</small></dd></div>}
       </dl>
     </aside>}
     {points.length === 0 && <p className="live-shot-chart__empty">{t('brew.chart.live.waitingForTelemetry')}</p>}

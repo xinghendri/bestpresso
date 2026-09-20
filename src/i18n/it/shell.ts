@@ -104,6 +104,7 @@ export const shell = {
   "shell.liveOperation.hotWater": "Erogazione di acqua calda",
   "shell.liveOperation.steaming": "Erogazione del vapore",
   "shell.liveOperation.flushing": "Risciacquo in corso",
+  "shell.liveOperation.targetTemperature": "Temperatura obiettivo",
   "shell.sleep.wakeAria": "Tieni premuto con un dito per 1 secondo per riattivare la macchina",
   "shell.sleep.touchAndHold": "Tieni premuto per riattivare",
   "shell.updates.title": "Aggiornamento Decaid disponibile",

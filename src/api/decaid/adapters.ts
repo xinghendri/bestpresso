@@ -156,7 +156,7 @@ export function applyWorkflow(model: BrewingScreenModel, workflow: DecaidWorkflo
     }
     if (utility.id === 'steam') {
       const targetTemperature = finiteNumber(workflow.steamSettings?.targetTemperature)
-      const enabled = targetTemperature === undefined ? utility.enabled ?? true : isSteamHeatingEnabled(targetTemperature)
+      const enabled = targetTemperature === undefined ? utility.enabled : isSteamHeatingEnabled(targetTemperature)
       return {
         ...utility,
         enabled,

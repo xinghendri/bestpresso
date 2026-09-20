@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { withDisplayedScaleWeight, withHomeMachineDisplay, withHomeTankDisplay, withScaleConnection } from './homeDisplayUpdates'
+import { withDisplayedScaleWeight, withHomeMachineDisplay, withHomeTankDisplay, withScaleConnection, withUnknownSteamState } from './homeDisplayUpdates'
 import { cloneJsonData, createId } from '../../utils/browserCompatibility'
 import { t } from '../../i18n/index.ts'
 import { playCompletionSound } from '../../audio/completionSound'
@@ -9,6 +9,7 @@ import { assertProfileDeletionAllowed, canDeleteProfile, deleteVerifiedUserProfi
 import { hotWaterWeightStoppingPatch } from '../settings/yieldLookAhead'
 import { hotWaterSettings } from './hotWaterSettings'
 import type { HotWaterShotSettings } from './hotWaterSync'
+import { hotWaterTargetTemperature } from './hotWaterSync'
 import { activeProfileForWorkflow, applyWorkflow, carouselProfiles, favoriteProfileSlots as resolveFavoriteProfileSlots, isCleaningProfile, profileRecordsToDomain, profilesWithParsedTitles, retainedAdHocProfileAtBrewStart, shotStage, shotToDomain as rawShotToDomain, STEAM_HEATER_READY_C, tankMillilitres } from '../../api/decaid/adapters'
 import { getDecaidEndpoints } from '../../api/decaid/config'
 import { reconcileStageReasons, type StageAdvanceEvidence } from './stageMoveOn'
@@ -172,7 +173,7 @@ const storeLastSelectedProfileIdLocally = (profileId: string) => {
 
 export function useBrewingData() {
   const { preferences } = useBestpressoPreferences()
-  const [model, setModel] = useState<BrewingScreenModel>({ ...brewingFixture, profiles: fixtureProfiles.slice(0, 5), previousShot: null })
+  const [model, setModel] = useState<BrewingScreenModel>(() => withUnknownSteamState({ ...brewingFixture, profiles: fixtureProfiles.slice(0, 5), previousShot: null }))
   const [allProfiles, setAllProfiles] = useState(fixtureProfiles)
   const [favoriteProfileSlots, setFavoriteProfileSlots] = useState<Array<string | null>>(fixtureProfiles.slice(0, 5).map((profile) => profile.id))
   const [heatingSeconds, setHeatingSeconds] = useState<number | null>(null)
@@ -835,7 +836,8 @@ export function useBrewingData() {
           kind: operationKind,
           elapsedMs: utilityElapsedMs(session.startedAt, now),
           flow: Math.max(0, snapshot.flow ?? 0),
-          temperature: operationKind === 'steam' ? snapshot.steamTemperature : snapshot.mixTemperature ?? snapshot.groupTemperature,
+          temperature: operationKind === 'steam' ? snapshot.steamTemperature : operationKind === 'flush' ? snapshot.mixTemperature ?? snapshot.groupTemperature : undefined,
+          targetTemperature: operationKind === 'hotWater' ? hotWaterTargetTemperature(hotWaterSettings.readback(), hotWaterWorkflow) : undefined,
           volumeMl: session.volumeMl,
           scaleConnected: operationKind === 'hotWater' && connectedScale.current,
           weightGrams: operationKind === 'hotWater' ? session.weightGrams : undefined,

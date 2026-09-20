@@ -138,7 +138,7 @@ export const insights = {
   "insights.previousShot.chartAriaLabelWeight": "Historique des extractions : {profile}",
   "insights.previousShot.chartAriaLabelGeneric": "Graphique d’une extraction enregistrée",
   "insights.previousShot.loadError": "Impossible de charger cette extraction. Sélectionnez-la à nouveau.",
-  "insights.miniChart.ariaLabelWeight": "Graphique de pression, débit et masse en tasse de l’extraction précédente",
+  "insights.miniChart.ariaLabelWeight": "Graphique de pression, débit et débit en tasse de l’extraction précédente",
   "insights.miniChart.ariaLabelCleaning": "Graphique de pression et débit du nettoyage précédent",
   "insights.status.unavailableRetrying": "Historique indisponible · nouvelle tentative automatique",
   "insights.status.loading": "Chargement de l’historique…",

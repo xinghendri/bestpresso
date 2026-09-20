@@ -12,6 +12,7 @@ export const brew = {
   "brew.stage.condition.sensor": "{type} {symbol}{value} {unit}",
   "brew.metric.pressure": "Presión",
   "brew.metric.yield": "Peso en taza",
+  "brew.metric.yieldFlow": "Flujo en taza",
   "brew.metric.flowRate": "Flujo",
   "brew.metric.temperatureRange": "Rango de temperatura",
   "brew.metric.grindSize": "Molienda",
@@ -55,7 +56,7 @@ export const brew = {
   "brew.liveScreen.closeAriaLabel": "Cerrar extracción finalizada",
   "brew.liveScreen.close": "Cerrar",
   "brew.liveScreen.runningAriaLabel": "Ejecutando {name}",
-  "brew.chart.live.ariaLabelWithWeight": "Gráfico de presión, flujo, peso en taza y temperatura. Mantén pulsado para explorar.",
+  "brew.chart.live.ariaLabelWithWeight": "Gráfico de presión, flujo, flujo en taza y temperatura. Mantén pulsado para explorar.",
   "brew.chart.live.ariaLabelNoWeight": "Gráfico de presión, flujo y temperatura. Mantén pulsado para explorar.",
   "brew.chart.live.waitingForTelemetry": "Esperando telemetría de la extracción…",
   "brew.chart.target.ariaLabelDetail": "Presión, flujo y temperatura previstos para {name}",
@@ -130,4 +131,3 @@ export const brew = {
   "brew.data.feedback.profileSelectFailed": "No se pudo seleccionar {name}.",
   "brew.data.feedback.scaleConnectFailed": "No se pudo conectar con {name}."
 } satisfies Translation<EnglishCatalog>
-

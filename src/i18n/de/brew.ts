@@ -12,6 +12,7 @@ export const brewDe = {
   // Shared metric labels not already covered by common.metric.*
   'brew.metric.pressure': 'Druck',
   'brew.metric.yield': 'Menge',
+  "brew.metric.yieldFlow": "Bezugsfluss",
   'brew.metric.flowRate': 'Durchflussrate',
   'brew.metric.temperatureRange': 'Temperaturbereich',
   'brew.metric.grindSize': 'Mahlgrad',
@@ -69,7 +70,7 @@ export const brewDe = {
   'brew.liveScreen.runningAriaLabel': '{name} läuft',
 
   // LiveShotChart.tsx
-  'brew.chart.live.ariaLabelWithWeight': 'Diagramm für Druck, Durchfluss, Menge und Temperatur. Zum Prüfen berühren und halten.',
+  "brew.chart.live.ariaLabelWithWeight": "Diagramm für Druck, Durchfluss, Bezugsfluss und Temperatur. Zum Prüfen berühren und halten.",
   'brew.chart.live.ariaLabelNoWeight': 'Diagramm für Druck, Durchfluss und Temperatur. Zum Prüfen berühren und halten.',
   'brew.chart.live.waitingForTelemetry': 'Warte auf Brühdaten …',
 

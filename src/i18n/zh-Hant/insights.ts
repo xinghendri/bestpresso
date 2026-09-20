@@ -132,7 +132,7 @@ export const insights = {
   "insights.previousShot.chartAriaLabelWeight": "萃取紀錄：{profile}",
   "insights.previousShot.chartAriaLabelGeneric": "歷史萃取曲線",
   "insights.previousShot.loadError": "無法載入此萃取紀錄，請重新選取。",
-  "insights.miniChart.ariaLabelWeight": "上次萃取的壓力、流量與出杯液重曲線",
+  "insights.miniChart.ariaLabelWeight": "上次萃取的壓力、流量與出杯流速曲線",
   "insights.miniChart.ariaLabelCleaning": "上次清潔的壓力與流量曲線",
   "insights.status.unavailableRetrying": "無法取得紀錄 · 將自動重試",
   "insights.status.loading": "載入紀錄中…",

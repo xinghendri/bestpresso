@@ -14,7 +14,9 @@ test('status pills hug their localized content without fixed breakpoint widths o
   const utilityStyles = readFileSync(new URL('../src/features/machine/drinkUtilityCards.css', import.meta.url), 'utf8')
   assert.match(styles, /\.status-pill \{[^}]*width:max-content;[^}]*flex:0 0 auto;/)
   assert.match(styles, /\.status-pill img \{[^}]*flex-shrink:0/)
-  assert.match(styles, /\.status-pill \{[^}]*padding:0 12px 0 24px;/)
+  assert.match(styles, /\.status-pill \{[^}]*padding:0 24px;/)
+  assert.match(styles, /\.status-pill--not-heating \{[^}]*padding:0 24px 0 21px;/)
+  assert.match(styles, /\.status-pill--heating \{[^}]*padding:0 24px 0 21px;/)
   assert.match(styles, /\.status-pill\{height:46px;padding-left:16px\}/)
   assert.match(styles, /\.status-pill\{height:48px;padding-left:18px\}/)
   assert.doesNotMatch(styles, /\.status-pill\s*\{[^}]*padding-inline:/)
@@ -38,7 +40,7 @@ test('steam duration is visible and editable on the card and in Settings', () =>
 })
 
 test('marks disabled steam heating so its temperature is no longer shown as a warning', () => {
-  assert.match(drinkCard, /steam && !enabled \? ' utility-card--steam-off'/)
+  assert.match(drinkCard, /steam && utility.enabled === false \? ' utility-card--steam-off'/)
   assert.match(styles, /\.utility-card--steam\.utility-card--steam-off \.metric:first-child \.metric__reading \{ color:#707070; \}/)
 })
 

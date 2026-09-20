@@ -31,9 +31,14 @@
 .drink-card__toggle[aria-checked=false]>span {transform:none;background:#aaa39b}
 .drink-card__toggle:disabled {cursor:not-allowed;opacity:.5}
 .drink-card__toggle:focus-visible {outline:2px solid #53d68e;outline-offset:3px}
+/* Unknown is neither on nor off. A static centered thumb avoids a startup flash
+   and adds no animation work while settings are loading. */
+.utility-card--steam-pending .drink-card__toggle {background:var(--drink-track)}
+.utility-card--steam-pending .drink-card__toggle>span {transform:translateX(10px);background:var(--metric-label-color);transition:none}
 .drink-card__water-settings {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));height:var(--drink-metric-height);align-self:start;margin:0 12px;min-height:0}
 .drink-card__water-settings>div {display:grid;align-content:center;min-width:0;height:100%;padding:0 4px}
-.drink-card__water-settings>div+div {border-left:1px solid var(--drink-separator)}
+.drink-card__water-settings>div+div,.drink-card__steam-secondary>div+div {position:relative}
+.drink-card__water-settings>div+div::before,.drink-card__steam-secondary>div+div::before {content:"";position:absolute;left:0;top:12px;bottom:12px;width:1px;background:var(--drink-separator);pointer-events:none}
 .app-shell .drink-card__expanded .metric {position:static;width:100%;min-height:48px;align-items:center;justify-content:center;gap:5px;padding:0;text-align:center}
 .app-shell .drink-card__expanded .metric__label {position:static;font-size:12px;font-weight:400;gap:4px;letter-spacing:0;color:var(--metric-label-color)}
 .app-shell .drink-card__expanded .metric>.metric__reading {font-size:20px;font-weight:300;line-height:24px;letter-spacing:-.45px;color:var(--metric-value-color)}
@@ -68,7 +73,6 @@
 .app-shell .drink-card__target.metric__reading {align-self:end;font-size:16px;font-weight:300;line-height:20px;letter-spacing:-.3px;color:var(--metric-value-color);transform:translate(-12px,-4px)}
 .drink-card__steam-secondary {min-width:0;height:var(--drink-metric-height);display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-top:1px solid var(--drink-separator)}
 .drink-card__steam-secondary>div {display:grid;align-items:center;min-width:0}
-.drink-card__steam-secondary>div+div {border-left:1px solid var(--drink-separator)}
 .drink-card .temperature-digits {position:relative;display:inline-grid;font-variant-numeric:tabular-nums}
 .drink-card .temperature-digits>span {grid-area:1/1}
 .drink-card .temperature-digits__out {position:absolute;inset:0;opacity:0;animation:drink-temperature-out .14s linear both;pointer-events:none}
@@ -83,6 +87,8 @@
 [data-theme="light"] .drink-card__toggle>span {background:#27794c}
 [data-theme="light"] .drink-card__toggle[aria-checked=false] {background:#c4cbc2}
 [data-theme="light"] .drink-card__toggle[aria-checked=false]>span {background:#f7f8f4}
+[data-theme="light"] .utility-card--steam-pending .drink-card__toggle {background:var(--drink-track)}
+[data-theme="light"] .utility-card--steam-pending .drink-card__toggle>span {background:var(--metric-label-color)}
 @media(max-height:650px) and (min-width:761px) {
   .app-shell .drink-card .drink-card__compact.utility-card--water .utility-card__metrics {inset:50px 0 8px;row-gap:4px}
   .app-shell .drink-card .drink-card__compact.utility-card--water header {top:18px}
@@ -106,12 +112,12 @@
   .app-shell .utility-card--scale .scale-search {bottom:12px}
   .app-shell .ins-home-entry {min-height:0}
   .app-shell .ins-entry-card {container-type:inline-size}
-  .app-shell .ins-entry-content {padding:20px 16px 10px;gap:6px}
-  .app-shell .ins-entry-week {min-height:22px;max-height:78px}
+  .app-shell .ins-entry-content {padding:20px 12px 16px;gap:6px}
+  .app-shell .ins-entry-week {min-height:22px;max-height:66px}
   .app-shell .ins-entry-day {gap:5px}
   .app-shell .ins-entry-summary {gap:10px}
-  .app-shell .ins-entry-shot-chart {min-height:34px;padding-top:8px}
-  .app-shell .ins-entry-shot-caption {padding:6px 16px 8px;gap:3px}
+  .app-shell .ins-entry-shot-chart {min-height:22px;padding-top:8px}
+  .app-shell .ins-entry-shot-caption {padding:6px 12px 16px;gap:3px}
   .app-shell .ins-entry-shot-caption>strong {font-size:14px;line-height:18px}
   .app-shell .ins-entry-shot-caption>time {font-size:12px;line-height:16px}
   .app-shell .ins-entry-recipe {top:8px;right:8px;padding:5px 10px}

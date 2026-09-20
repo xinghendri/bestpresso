@@ -154,6 +154,7 @@ export interface LiveUtilityOperation {
   elapsedMs: number
   flow: number
   temperature?: number
+  targetTemperature?: number
   volumeMl: number
   scaleConnected?: boolean
   weightGrams?: number
