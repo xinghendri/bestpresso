@@ -17,3 +17,11 @@ Thanks to the Decent Espresso / Streamline.js translation contributors for reusa
 - Enforced Bestpresso's tare protection during active shots when enabled.
 
 Install `bestpresso-v0.1.32-patch001.zip` in Decaid.
+
+## Patch 002 — Yield consistency and spacing
+
+- The completed final stage now matches total yield, including captured drips, in live view and history. Cached history uses its saved total; earlier stages, recorded chart samples and exit reasons remain unchanged.
+- Hot-water, steam and flush modals remain visible for 500 ms after stopping, with content-sized metric panels and balanced padding.
+- Insight and last-shot captions have matching side and bottom padding. The last-shot graph has 4px of bottom clearance to avoid clipping its lowest line.
+
+Install `bestpresso-v0.1.32-patch002.zip` in Decaid.

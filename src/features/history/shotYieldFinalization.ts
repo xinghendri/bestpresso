@@ -1,4 +1,4 @@
-import type { LiveShotPoint } from '../../domain/brewing.ts'
+import type { LiveBrewState, LiveShotPoint } from '../../domain/brewing.ts'
 
 export const FINAL_YIELD_SETTLE_FLOW = 0.4
 export const FINAL_YIELD_SETTLE_SAMPLES = 10
@@ -34,6 +34,11 @@ export function observePostShotWeight(state: YieldFinalizationState, weight: num
 export function reconciledShotYield(persistedYield: string, settledWeight?: number) {
   if (settledWeight === undefined || !Number.isFinite(settledWeight) || settledWeight <= 0) return persistedYield
   return settledWeight.toFixed(1)
+}
+
+export function withSettledLiveYield(current: LiveBrewState, startedAt: number, weight: number): LiveBrewState {
+  if (current.active || current.startedAt !== startedAt || current.kind === 'cleaning' || !Number.isFinite(weight) || weight < 0) return current
+  return current.scaleWeight === weight ? current : { ...current, scaleWeight: weight }
 }
 
 export function reconciledShotPoints(persistedPoints: LiveShotPoint[] | undefined, livePoints: LiveShotPoint[]) {

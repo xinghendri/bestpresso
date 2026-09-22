@@ -27,7 +27,7 @@ import type { AvailableScale, BrewProfile, BrewingScreenModel, DataConnection, E
 import { brewingFixture, demoLiveBrewFixture } from '../../fixtures/brewingFixture'
 import { scaleFixtureForKey } from '../../fixtures/scaleFixtures'
 import { cleaningRestorePatch, isCleaningSequenceRun, prepareCleaningProfileForEspressoStart, profileForCleaningShortcut } from '../cleaning/cleaningSequence'
-import { observePostShotWeight, reconciledShotPoints, reconciledShotYield, type YieldFinalizationState } from '../history/shotYieldFinalization'
+import { observePostShotWeight, reconciledShotPoints, reconciledShotYield, withSettledLiveYield, type YieldFinalizationState } from '../history/shotYieldFinalization'
 import { LAST_SELECTED_PROFILE_LOCAL_KEY, LAST_SELECTED_PROFILE_SHARED_KEY, normalizeRememberedProfileId, resolveRememberedProfileId } from '../profiles/profileSelectionPersistence'
 import { profileAuthorForAccount } from '../profiles/profileAuthor'
 import { assertMatchingProfileReadback, assertVerifiedProfileRecord, ProfileSaveVerificationError } from '../profiles/profileSaveVerification'
@@ -39,7 +39,7 @@ import { createStopObservation, requestMachineStop } from './stopRequest'
 import { createBackgroundScaleSearch } from './backgroundScaleSearch'
 import { observeTareShotState, requestGuardedScaleTare, scaleTareBlocked, type ScaleTareState } from './scaleTareSafety'
 import { sleepMachineWithConfiguredScalePolicy } from './sleepControl'
-import { utilityElapsedMs, utilityTimerStartedAt } from './utilityOperationTiming'
+import { createUtilityDismissal, utilityElapsedMs, utilityTimerStartedAt } from './utilityOperationTiming'
 import { readBestpressoPreferences, useBestpressoPreferences } from '../settings/bestpressoPreferences'
 import { UNIFIED_SETTINGS_SAVED_EVENT, type UnifiedSettingsSnapshot } from '../settings/useUnifiedSettings'
 
@@ -462,6 +462,11 @@ export function useBrewingData() {
     let pendingScaleRenderWeight: { display: number; operational: number } | null = null
     let scaleRenderFrame: number | null = null
     const settledYieldBySession = new Map<number, number>()
+    const utilityDismissal = createUtilityDismissal(
+      (callback, delay) => window.setTimeout(callback, delay),
+      timer => window.clearTimeout(timer),
+      () => { if (!disposed) setUtilityOperation(null) },
+    )
 
     const scheduleScaleWeightRender = (displayWeight: number, operationalWeight: number) => {
       pendingScaleRenderWeight = { display: displayWeight, operational: operationalWeight }
@@ -567,8 +572,9 @@ export function useBrewingData() {
       }, 800 * (attempt + 1))
     }
 
-    const updateLocalShotYield = (localShotId: string, weight: number) => {
+    const updateLocalShotYield = (localShotId: string, startedAt: number, weight: number) => {
       const totalYield = weight.toFixed(1)
+      setLiveBrew((current) => withSettledLiveYield(current, startedAt, weight))
       setModel((current) => current.previousShot?.id === localShotId
         ? { ...current, previousShot: { ...current.previousShot, totalYield } }
         : current)
@@ -807,6 +813,7 @@ export function useBrewingData() {
       machineNeedsWater.current = machineState === 'needswater'
       const operationKind = operationKindForSnapshot(snapshot)
       if (operationKind) {
+        utilityDismissal.cancel()
         const now = snapshotTime(snapshot.timestamp)
         let session = utilityOperationSession.current
         if (!session || session.kind !== operationKind) {
@@ -850,7 +857,7 @@ export function useBrewingData() {
           if (finalWeight !== undefined) setDisplayedScaleWeight(finalWeight)
         }
         utilityOperationSession.current = null
-        setUtilityOperation(null)
+        utilityDismissal.finish()
       }
       const skipObservation = observeSkipTransition(snapshot, brewSkipTransition.current, Date.now(), liveShotSession.current !== null)
       brewSkipTransition.current = skipObservation.transition
@@ -858,6 +865,8 @@ export function useBrewingData() {
       const isEspressoMonitoring = isEspressoMonitoringSnapshot(snapshot, isEspressoExtraction)
       const isCleaning = isCleaningSequenceRun(machineStateForSnapshot(snapshot), isEspressoMonitoring, pendingCleaningSequence.current !== null)
       if (isEspressoMonitoring || isCleaning) {
+        utilityDismissal.cancel()
+        setUtilityOperation(null)
         const now = snapshotTime(snapshot.timestamp)
         const currentModel = latestModel.current
         const cleaningSequence = pendingCleaningSequence.current
@@ -945,6 +954,7 @@ export function useBrewingData() {
         brewSkipTransition.current = null
         completeLiveShot(true)
         utilityOperationSession.current = null
+        utilityDismissal.cancel()
         setUtilityOperation(null)
       } else if (machineConnectionRef.current === 'fixture') {
         updateMachineConnection('connecting')
@@ -976,7 +986,7 @@ export function useBrewingData() {
         const result = observePostShotWeight(pendingYieldFinalization.state, snapshot.weight, snapshot.weightFlow)
         pendingYieldFinalization.state = result.state
         pendingYieldFinalization.displayWeight = result.displayWeight
-        updateLocalShotYield(pendingYieldFinalization.localShotId, result.displayWeight)
+        updateLocalShotYield(pendingYieldFinalization.localShotId, pendingYieldFinalization.session.startedAt, result.displayWeight)
         if (result.finished) finishPendingYield()
       }
       if (snapshot.status === 'connected') {
@@ -1063,6 +1073,7 @@ export function useBrewingData() {
 
     return () => {
       disposed = true
+      utilityDismissal.cancel()
       pendingStopRequest.current = null
       backgroundScaleSearch.dispose()
       document.removeEventListener('visibilitychange', resumeScaleSearch)
