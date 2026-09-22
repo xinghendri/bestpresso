@@ -33,3 +33,9 @@ Install `bestpresso-v0.1.32-patch002.zip` in Decaid.
 - Added the GPLv3 license declaration to the README.
 
 Install `bestpresso-v0.1.32-patch003.zip` in Decaid.
+
+## Patch 004 — History chart height
+
+- Increased the home-screen history chart height by 4px, preserving its top alignment, edge-to-edge layout and caption padding.
+
+Install `bestpresso-v0.1.32-patch004.zip` in Decaid.

@@ -158,8 +158,8 @@
 .ins-entry-metric>small { color:var(--ins-muted); font-size:13px; line-height:18px; }
 .ins-entry-unit { color:var(--ins-muted); font-size:12px; }
 .ins-entry-latest-content { width:100%; height:100%; display:flex; flex-direction:column; align-items:stretch; }
-.ins-entry-shot-chart { --ins-shot-chart-trim:22px; position:relative; flex:1; min-height:0; padding:0; overflow:hidden; pointer-events:none; }
-/* Remove the old vertical insets, keep the plot 6px shorter, and crop both sides. */
+.ins-entry-shot-chart { --ins-shot-chart-trim:18px; position:relative; flex:1; min-height:0; padding:0; overflow:hidden; pointer-events:none; }
+/* Keep bottom clearance while top-aligning the plot and cropping both sides. */
 .ins-entry-shot-chart .mini-chart { position:absolute; top:0; left:-4px; width:calc(100% + 8px); height:max(0px,calc(100% - var(--ins-shot-chart-trim))); }
 .ins-entry-shot-chart .mini-chart__weight { display:none; }
 .ins-entry-shot-chart .mini-chart .chart-line { stroke-width:var(--chart-thumbnail-line-width,1.75px); vector-effect:non-scaling-stroke; }
