@@ -11,6 +11,7 @@ import { pressureChainSlotCount } from './stageCardSizing'
 import { stageReasonKey, type StageReasonAnalysis } from './stageMoveOn'
 import { displayedStageName } from '../../i18n/dataLabels.ts'
 import { stageReasonParts } from './stageReasonLabels'
+import { displayedStageYield } from './stageYield'
 
 interface StageSummary {
   key: string
@@ -126,7 +127,7 @@ function PressureChain({ pressures, slotCount }: { pressures: number[]; slotCoun
   </span>
 }
 
-export function LiveBrewStages({ points, elapsedMs, reasons, active = false, showYield = true, skipPending = false, selectedStageKey, onStageSelect, onSkipStage }: { points: LiveShotPoint[]; elapsedMs: number; reasons?: StageReasonAnalysis; active?: boolean; showYield?: boolean; skipPending?: boolean; selectedStageKey?: string; onStageSelect?: (stage: BrewStageSelection | null) => void; onSkipStage?: () => Promise<boolean> }) {
+export function LiveBrewStages({ points, elapsedMs, reasons, active = false, finalYield, showYield = true, skipPending = false, selectedStageKey, onStageSelect, onSkipStage }: { points: LiveShotPoint[]; elapsedMs: number; reasons?: StageReasonAnalysis; active?: boolean; finalYield?: number | string; showYield?: boolean; skipPending?: boolean; selectedStageKey?: string; onStageSelect?: (stage: BrewStageSelection | null) => void; onSkipStage?: () => Promise<boolean> }) {
   const { preferences } = useBestpressoPreferences()
   const stages = summarizeLiveBrewStages(points, elapsedMs)
   const stripRef = useRef<HTMLElement>(null)
@@ -302,7 +303,7 @@ export function LiveBrewStages({ points, elapsedMs, reasons, active = false, sho
       </p>}
       </header>
       <dl>
-        {showYield && <div><dt>{t('brew.metric.yield')}</dt><dd><span className="live-brew-stage__yield-value">{reading(stage.yield)}<small>g</small></span></dd></div>}
+        {showYield && <div><dt>{t('brew.metric.yield')}</dt><dd><span className="live-brew-stage__yield-value">{reading(displayedStageYield(stage.yield, !active && index === stages.length - 1, finalYield))}<small>g</small></span></dd></div>}
         <div><dt>{t('brew.metric.temperatureRange')}</dt><dd>{formatTemperatureValue(stage.minimumTemperature, preferences.temperatureUnit)} – {formatTemperatureValue(stage.maximumTemperature, preferences.temperatureUnit)}<small className="temperature-unit">{temperatureUnitLabel(preferences.temperatureUnit)}</small></dd></div>
         <div><dt>{t('brew.metric.pressure')}</dt><dd className="live-brew-stage__pressure-value" aria-label={pressureLabel}><PressureChain pressures={stage.pressureMovements} slotCount={stage.pressureSlotCount} /></dd></div>
       </dl>

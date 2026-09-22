@@ -136,7 +136,7 @@ export function PreviousShotScreen({ shots, initialShot, status, onSelectShot, o
         {activeShot && <AnimatedHistoryShotChart view={chartView} />}
         {loadError && <p className="history-pull-error">{t('insights.previousShot.loadError')}</p>}
       </section>
-      <LiveBrewStages reasons={reasons} points={points} elapsedMs={elapsedMs} showYield={!isCleaning} selectedStageKey={selectedStage?.key} onStageSelect={(stage) => setStageSelection(stage ? { shotId: activeId, stage } : null)} />
+      <LiveBrewStages reasons={reasons} points={points} elapsedMs={elapsedMs} finalYield={activeShot?.totalYield} showYield={!isCleaning} selectedStageKey={selectedStage?.key} onStageSelect={(stage) => setStageSelection(stage ? { shotId: activeId, stage } : null)} />
     </section>
   </main>
 }

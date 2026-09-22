@@ -20,3 +20,28 @@ export function utilityTimerStartedAt(kind: UtilityOperationKind, currentStarted
 export function utilityElapsedMs(startedAt: number | undefined, now: number) {
   return startedAt === undefined ? 0 : Math.max(0, now - startedAt)
 }
+
+export const UTILITY_DISMISS_DELAY_MS = 500
+
+/** A display-only grace period; a newer operation must never be dismissed by it. */
+export function createUtilityDismissal<T>(schedule: (callback: () => void, delay: number) => T, clear: (timer: T) => void, dismiss: () => void) {
+  let pending: { timer: T } | undefined
+  let generation = 0
+  const cancel = () => {
+    generation += 1
+    if (pending) clear(pending.timer)
+    pending = undefined
+  }
+  return {
+    cancel,
+    finish: () => {
+      if (pending) return
+      const expected = ++generation
+      pending = { timer: schedule(() => {
+        if (generation !== expected) return
+        pending = undefined
+        dismiss()
+      }, UTILITY_DISMISS_DELAY_MS) }
+    },
+  }
+}
