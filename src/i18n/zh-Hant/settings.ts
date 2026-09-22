@@ -174,6 +174,8 @@ export const settings = {
   "settings.power.limitBrightness": "低電量時限制亮度",
   "settings.power.screensaverBrightness": "螢幕保護程式亮度",
   "settings.power.screensaverBrightnessHint": "機器休眠時使用，預設為 7%。",
+  "settings.power.screenOffAfter": "螢幕關閉等待",
+  "settings.power.screenOffAfterHint": "機器休眠多少秒後螢幕變黑。0 表示保持螢幕保護程式常亮。",
   "settings.power.battery.eyebrow": "電池",
   "settings.power.battery.title": "充電",
   "settings.power.chargingMode": "充電模式",

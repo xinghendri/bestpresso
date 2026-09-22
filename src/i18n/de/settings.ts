@@ -170,6 +170,8 @@ export const settingsDe = {
   'settings.power.limitBrightness': 'Helligkeit bei niedrigem Akkustand begrenzen',
   'settings.power.screensaverBrightness': 'Helligkeit des Bildschirmschoners',
   'settings.power.screensaverBrightnessHint': 'Wird verwendet, während die Maschine schläft. Standard: 7 %.',
+  'settings.power.screenOffAfter': 'Bildschirm ausschalten nach',
+  'settings.power.screenOffAfterHint': 'Sekunden Schlaf, bevor der Bildschirm schwarz wird. 0 lässt den Bildschirmschoner eingeschaltet.',
   'settings.power.battery.eyebrow': 'Akku',
   'settings.power.battery.title': 'Laden',
   'settings.power.chargingMode': 'Lademodus',

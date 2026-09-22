@@ -4759,6 +4759,16 @@
       "translation": "Se usa mientras la máquina reposa. Predeterminado: 7%.",
       "kind": "contextual"
     },
+    "settings.power.screenOffAfter": {
+      "english": "Screen off after",
+      "translation": "Apagar pantalla tras",
+      "kind": "contextual"
+    },
+    "settings.power.screenOffAfterHint": {
+      "english": "Seconds of sleep before the screen goes black. 0 keeps the screensaver lit.",
+      "translation": "Segundos de reposo antes de que la pantalla se ponga en negro. 0 mantiene el salvapantallas encendido.",
+      "kind": "contextual"
+    },
     "settings.power.battery.eyebrow": {
       "english": "Battery",
       "translation": "Batería",

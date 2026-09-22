@@ -7,6 +7,29 @@ test('requires a one-second hold duration', () => {
   assert.equal(WAKE_HOLD_DURATION_MS, 1_000)
 })
 
+test('a short release can reveal the clock but a completed hold cannot', () => {
+  const gesture = new WakeHoldGesture()
+  gesture.pointerDown(1, 100, 120)
+  assert.equal(gesture.pointerEnd(1, true).kind, 'tap')
+  assert.equal(gesture.complete(1), false)
+  gesture.pointerDown(2, 100, 120)
+  assert.equal(gesture.complete(2), true)
+  assert.equal(gesture.pointerEnd(2, true).kind, 'none')
+})
+
+test('cancel, swipe and multiple fingers do not become clock-reveal taps', () => {
+  const gesture = new WakeHoldGesture()
+  gesture.pointerDown(1, 0, 0)
+  assert.equal(gesture.pointerEnd(1, false).kind, 'cancel')
+  gesture.pointerDown(2, 0, 0)
+  gesture.pointerMove(2, 30, 0)
+  assert.equal(gesture.pointerEnd(2, true).kind, 'none')
+  gesture.pointerDown(3, 0, 0)
+  gesture.pointerDown(4, 0, 0)
+  assert.equal(gesture.pointerEnd(3, true).kind, 'none')
+  assert.equal(gesture.pointerEnd(4, true).kind, 'none')
+})
+
 test('accepts one stationary pointer that remains down', () => {
   const gesture = new WakeHoldGesture()
   assert.equal(gesture.pointerDown(1, 100, 120).kind, 'start')

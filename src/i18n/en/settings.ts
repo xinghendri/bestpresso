@@ -167,6 +167,8 @@ export const settingsEn = {
   'settings.power.limitBrightness': 'Limit brightness on low battery',
   'settings.power.screensaverBrightness': 'Screensaver brightness',
   'settings.power.screensaverBrightnessHint': 'Used while the machine sleeps. Default: 7%.',
+  'settings.power.screenOffAfter': 'Screen off after',
+  'settings.power.screenOffAfterHint': 'Seconds of sleep before the screen goes black. 0 keeps the screensaver lit.',
   'settings.power.battery.eyebrow': 'Battery',
   'settings.power.battery.title': 'Charging',
   'settings.power.chargingMode': 'Charging mode',
