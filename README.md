@@ -50,3 +50,9 @@ Machine and profile values with a green chevron beside their label are editable 
 The status pill first confirms Decaid availability and then the machine device's own connected state from `/devices`; stale temperature frames never outrank either connection gate. Only a connected machine can show thermal status. Explicit `booting`, `heating`, `preheating`, and `preparingForShot` signals mean Heating, while the thermal tracker also recognizes a 0.3 °C rise from either mix or group temperature as active warm-up. Espresso, flush, hot water, and steam hold the preceding thermal status. A machine that was Ready remains Ready after an operation while its lagging temperature is no more than 8 °C below target; a larger deficit returns it to Heating. `Not heating — Check power button` is limited to an explicit no-AC signal or a temperature below 70 °C that shows no measurable rise for 10 seconds. Tank removal preserves the prior thermal state while separately showing the water alert. The `time-to-ready.reaplugin` contributes only the seconds estimate after the connected and thermal gates agree that the machine is heating.
 
 The header Sleep control sends `sleeping`, replaces the skin with a full black wake surface, and asks Decaid to set the tablet brightness to `0`. Tapping anywhere on that surface dismisses it immediately, sends `idle`, and restores the brightness that was active before sleeping (or returns to OS-managed brightness when no prior value is available). The Settings control opens Decaid's bundled settings interface and supplies `backName=Bestpresso` so its Back control returns to the skin. Other machine commands remain disabled.
+
+## License
+
+Bestpresso is licensed under the [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.html) (GPLv3).
+
+Third-party dependencies and assets remain subject to their respective licenses.

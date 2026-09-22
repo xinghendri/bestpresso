@@ -25,3 +25,11 @@ Install `bestpresso-v0.1.32-patch001.zip` in Decaid.
 - Insight and last-shot captions have matching side and bottom padding. The last-shot graph has 4px of bottom clearance to avoid clipping its lowest line.
 
 Install `bestpresso-v0.1.32-patch002.zip` in Decaid.
+
+## Patch 003 — Home-card layout
+
+- The home-screen history chart is now edge-to-edge, clipped at both sides, top-aligned and 6px shorter.
+- Added 4px more horizontal padding to insight and history captions.
+- Added the GPLv3 license declaration to the README.
+
+Install `bestpresso-v0.1.32-patch003.zip` in Decaid.

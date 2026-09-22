@@ -112,12 +112,12 @@
   .app-shell .utility-card--scale .scale-search {bottom:12px}
   .app-shell .ins-home-entry {min-height:0}
   .app-shell .ins-entry-card {container-type:inline-size}
-  .app-shell .ins-entry-content {padding:20px 16px 16px;gap:6px}
+  .app-shell .ins-entry-content {padding:20px 20px 16px;gap:6px}
   .app-shell .ins-entry-week {min-height:22px;max-height:66px}
   .app-shell .ins-entry-day {gap:5px}
   .app-shell .ins-entry-summary {gap:10px}
-  .app-shell .ins-entry-shot-chart {min-height:22px;padding-top:8px}
-  .app-shell .ins-entry-shot-caption {padding:6px 16px 16px;gap:3px}
+  .app-shell .ins-entry-shot-chart {--ins-shot-chart-trim:18px;min-height:22px}
+  .app-shell .ins-entry-shot-caption {padding:6px 20px 16px;gap:3px}
   .app-shell .ins-entry-shot-caption>strong {font-size:14px;line-height:18px}
   .app-shell .ins-entry-shot-caption>time {font-size:12px;line-height:16px}
   .app-shell .ins-entry-recipe {top:8px;right:8px;padding:5px 10px}
@@ -146,7 +146,7 @@
   .app-shell .ins-entry-metric {align-items:flex-start}
   .app-shell .ins-entry-metric:last-child {align-items:flex-end}
   .app-shell .ins-entry-metric>small {font-size:12px;line-height:16px}
-  .app-shell .ins-entry-content {padding-inline:16px}
+  .app-shell .ins-entry-content {padding-inline:20px}
 }
 @container (max-width:340px) {
   .app-shell .drink-card__expanded .metric__label {line-height:18px}
