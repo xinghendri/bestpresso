@@ -1,7 +1,7 @@
 {
   "name": "bestpresso",
   "private": true,
-  "version": "0.1.32-patch003",
+  "version": "0.1.32-patch004",
   "type": "module",
   "scripts": {
     "i18n:check": "node --experimental-strip-types scripts/i18n.ts check && node --experimental-strip-types scripts/i18n-audit.ts",
