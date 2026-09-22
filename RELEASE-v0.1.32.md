@@ -39,3 +39,13 @@ Install `bestpresso-v0.1.32-patch003.zip` in Decaid.
 - Increased the home-screen history chart height by 4px, preserving its top alignment, edge-to-edge layout and caption padding.
 
 Install `bestpresso-v0.1.32-patch004.zip` in Decaid.
+
+## Patch 005 — Optional sleep-screen blackout
+
+- Added Screen off after in Power settings. The clock can go black after a configurable delay; disabled by default. This dims the display to zero rather than powering off the panel.
+- Tap the black screen to bring back the clock without waking the machine. Hold for one second on either screen to wake the machine and restore normal brightness.
+- Restoring the clock restarts the blackout timer. Clock updates and hint animations stop while blacked out.
+
+Thanks to the PR93 contributor for the initial implementation.
+
+Install `bestpresso-v0.1.32-patch005.zip` in Decaid.
