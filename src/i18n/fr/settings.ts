@@ -174,6 +174,8 @@ export const settings = {
   "settings.power.limitBrightness": "Limiter la luminosité si la batterie est faible",
   "settings.power.screensaverBrightness": "Luminosité en veille",
   "settings.power.screensaverBrightnessHint": "Utilisée pendant la veille. Par défaut : 7%.",
+  "settings.power.screenOffAfter": "Extinction de l’écran après",
+  "settings.power.screenOffAfterHint": "Secondes de veille avant que l’écran devienne noir. 0 laisse l’écran de veille allumé.",
   "settings.power.battery.eyebrow": "Batterie",
   "settings.power.battery.title": "Recharge",
   "settings.power.chargingMode": "Mode de charge",

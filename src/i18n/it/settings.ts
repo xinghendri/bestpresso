@@ -174,6 +174,8 @@ export const settings = {
   "settings.power.limitBrightness": "Limita la luminosità con batteria scarica",
   "settings.power.screensaverBrightness": "Luminosità del salvaschermo",
   "settings.power.screensaverBrightnessHint": "Usata quando la macchina è in standby. Predefinita: 7%.",
+  "settings.power.screenOffAfter": "Spegni schermo dopo",
+  "settings.power.screenOffAfterHint": "Secondi di standby prima che lo schermo diventi nero. 0 lascia il salvaschermo acceso.",
   "settings.power.battery.eyebrow": "Batteria",
   "settings.power.battery.title": "Ricarica",
   "settings.power.chargingMode": "Modalità ricarica",

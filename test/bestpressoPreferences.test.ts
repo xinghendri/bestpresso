@@ -18,6 +18,17 @@ test('screensaver brightness defaults to 7 but preserves user choices across the
   assert.match(source, /displayBrightness.dim\(readBestpressoPreferences\(\).screensaverBrightness\)/)
 })
 
+test('screensaver screen-off delay defaults to disabled, clamps to the hour and rounds', () => {
+  assert.equal(normalizeBestpressoPreferences({}).screensaverScreenOffDelaySeconds, 0)
+  for (const value of [15, 300, 3_600]) {
+    assert.equal(normalizeBestpressoPreferences({ screensaverScreenOffDelaySeconds: value }).screensaverScreenOffDelaySeconds, value)
+  }
+  assert.equal(normalizeBestpressoPreferences({ screensaverScreenOffDelaySeconds: NaN }).screensaverScreenOffDelaySeconds, 0)
+  assert.equal(normalizeBestpressoPreferences({ screensaverScreenOffDelaySeconds: 9_000 }).screensaverScreenOffDelaySeconds, 3_600)
+  assert.equal(normalizeBestpressoPreferences({ screensaverScreenOffDelaySeconds: -5 }).screensaverScreenOffDelaySeconds, 0)
+  assert.equal(normalizeBestpressoPreferences({ screensaverScreenOffDelaySeconds: 90.6 }).screensaverScreenOffDelaySeconds, 91)
+})
+
 test('water warning preferences remain ordered and within the reservoir control range', () => {
   assert.deepEqual(normalizeBestpressoPreferences({ waterCriticalLevelMl: 500, waterWarningLevelMl: 100 }), {
     theme: 'dark',
@@ -29,6 +40,7 @@ test('water warning preferences remain ordered and within the reservoir control 
     temperatureUnit: 'C',
     clockFormat: 'device',
     screensaverBrightness: 7,
+    screensaverScreenOffDelaySeconds: 0,
     language: 'auto',
   })
   const maximum = normalizeBestpressoPreferences({ waterCriticalLevelMl: 9_000, waterWarningLevelMl: 9_000 })

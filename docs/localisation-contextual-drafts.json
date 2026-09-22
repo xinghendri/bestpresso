@@ -7030,6 +7030,24 @@
         "zh-Hans"
       ]
     },
+    "settings.power.screenOffAfter": {
+      "english": "Screen off after",
+      "languages": [
+        "fr",
+        "it",
+        "zh-Hant",
+        "zh-Hans"
+      ]
+    },
+    "settings.power.screenOffAfterHint": {
+      "english": "Seconds of sleep before the screen goes black. 0 keeps the screensaver lit.",
+      "languages": [
+        "fr",
+        "it",
+        "zh-Hant",
+        "zh-Hans"
+      ]
+    },
     "settings.power.battery.eyebrow": {
       "english": "Battery",
       "languages": [

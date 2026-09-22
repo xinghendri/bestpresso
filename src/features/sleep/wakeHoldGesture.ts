@@ -4,6 +4,7 @@ export const WAKE_HOLD_MOVEMENT_TOLERANCE_PX = 20
 export type WakeHoldUpdate =
   | { kind: 'start'; pointerId: number; x: number; y: number }
   | { kind: 'cancel' }
+  | { kind: 'tap' }
   | { kind: 'none' }
 
 interface WakeHoldCandidate {
@@ -51,12 +52,12 @@ export class WakeHoldGesture {
     return { kind: 'cancel' }
   }
 
-  pointerEnd(pointerId: number): WakeHoldUpdate {
+  pointerEnd(pointerId: number, allowTap = false): WakeHoldUpdate {
     this.activePointers.delete(pointerId)
     const endedCandidate = this.candidate?.pointerId === pointerId
     if (endedCandidate) this.candidate = null
     if (this.activePointers.size === 0) this.blocked = false
-    return endedCandidate ? { kind: 'cancel' } : { kind: 'none' }
+    return endedCandidate ? { kind: allowTap ? 'tap' : 'cancel' } : { kind: 'none' }
   }
 
   complete(pointerId: number) {
