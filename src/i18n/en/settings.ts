@@ -311,4 +311,8 @@ export const settingsEn = {
   'settings.message.scheduleRemoved': 'Wake schedule removed.',
   'settings.brightness.outOfRange': 'Brightness must be between 0 and 100.',
   'settings.brightness.persistFailed': 'Brightness applied to Decaid, but this browser could not remember it for the next launch.',
+  // Milk Assist
+  'settings.prepare.milkAssist': 'Milk Assist',
+  'settings.prepare.milkAssistHint': 'Show the steam time suggestion from the weighed milk. Stored on this device; calibrate from the steam card.',
+
 } as const

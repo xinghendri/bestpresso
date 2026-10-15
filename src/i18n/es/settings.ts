@@ -318,6 +318,10 @@ export const settings = {
   "settings.message.scheduleUpdated": "Horario de activación actualizado.",
   "settings.message.scheduleRemoved": "Horario de activación eliminado.",
   "settings.brightness.outOfRange": "El brillo debe estar entre 0 y 100.",
-  "settings.brightness.persistFailed": "Se aplicó el brillo en Decaid, pero este navegador no pudo guardarlo para el próximo inicio."
+  "settings.brightness.persistFailed": "Se aplicó el brillo en Decaid, pero este navegador no pudo guardarlo para el próximo inicio.",
+  // Milk Assist
+  'settings.prepare.milkAssist': 'Milk Assist',
+  'settings.prepare.milkAssistHint': 'Muestra la sugerencia de tiempo de vapor según la leche pesada. Se guarda en este dispositivo; calibra desde la tarjeta de vapor.',
+
 } satisfies Translation<EnglishCatalog>
 

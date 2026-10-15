@@ -1367,7 +1367,7 @@ export function useBrewingData() {
   const updateMachineSetting = async (setting: EditableMachineSetting, value: number) => {
     if (connection !== 'connected') {
       showSettingFeedback({ status: 'error', message: t('brew.data.error.connectBeforeMachineSettings') })
-      return
+      return false
     }
     const settings = {
       hotWaterVolume: { label: t('brew.data.label.hotWaterYield'), patch: { hotWaterData: { volume: value } }, sharedKey: 'last-hot-water-volume' },
@@ -1385,8 +1385,10 @@ export function useBrewingData() {
       setModel((current) => applyWorkflow(current, workflow, profileRecords.current, favoriteAssignments.current, retainedAdHocProfileId.current))
       if (!isHotWater && 'sharedKey' in update) await setSharedSetting(update.sharedKey, value)
       showSettingFeedback({ status: 'saved', message: t('brew.data.feedback.settingSaved', { name: update.label }) })
+      return true
     } catch {
       showSettingFeedback({ status: 'error', message: t('brew.data.feedback.saveFailed', { name: update.label }) })
+      return false
     }
   }
 

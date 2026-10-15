@@ -314,4 +314,8 @@ export const settingsDe = {
   'settings.message.scheduleRemoved': 'Aufwachzeitplan entfernt.',
   'settings.brightness.outOfRange': 'Die Helligkeit muss zwischen 0 und 100 liegen.',
   'settings.brightness.persistFailed': 'Helligkeit an Decaid übermittelt, aber der Browser konnte sie nicht für den nächsten Start speichern.',
+  // Milk Assist
+  'settings.prepare.milkAssist': 'Milk Assist',
+  'settings.prepare.milkAssistHint': 'Zeigt den Dampfzeit-Vorschlag aus der gewogenen Milch. Auf diesem Gerät gespeichert; Kalibrierung über die Dampfkarte.',
+
 } satisfies Translation<typeof settingsEn>

@@ -318,5 +318,9 @@ export const settings = {
   "settings.message.scheduleUpdated": "Horaire de réveil mis à jour.",
   "settings.message.scheduleRemoved": "Horaire de réveil supprimé.",
   "settings.brightness.outOfRange": "La luminosité doit être comprise entre 0 et 100.",
-  "settings.brightness.persistFailed": "Luminosité appliquée à Decaid, mais ce navigateur n’a pas pu la mémoriser pour le prochain lancement."
+  "settings.brightness.persistFailed": "Luminosité appliquée à Decaid, mais ce navigateur n’a pas pu la mémoriser pour le prochain lancement.",
+  // Milk Assist
+  'settings.prepare.milkAssist': 'Milk Assist',
+  'settings.prepare.milkAssistHint': 'Affiche la suggestion de temps de vapeur selon le lait pesé. Enregistré sur cet appareil ; calibration depuis la carte vapeur.',
+
 } satisfies Translation<EnglishCatalog>

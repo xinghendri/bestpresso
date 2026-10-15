@@ -318,5 +318,9 @@ export const settings = {
   "settings.message.scheduleUpdated": "Programma di riattivazione aggiornato.",
   "settings.message.scheduleRemoved": "Programma di riattivazione rimosso.",
   "settings.brightness.outOfRange": "La luminosità deve essere tra 0 e 100.",
-  "settings.brightness.persistFailed": "Luminosità applicata a Decaid, ma questo browser non ha potuto memorizzarla per il prossimo avvio."
+  "settings.brightness.persistFailed": "Luminosità applicata a Decaid, ma questo browser non ha potuto memorizzarla per il prossimo avvio.",
+  // Milk Assist
+  'settings.prepare.milkAssist': 'Milk Assist',
+  'settings.prepare.milkAssistHint': 'Mostra il suggerimento del tempo di vapore dal latte pesato. Salvato su questo dispositivo; calibra dalla scheda vapore.',
+
 } satisfies Translation<EnglishCatalog>

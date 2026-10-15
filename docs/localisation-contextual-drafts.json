@@ -8403,6 +8403,161 @@
         "zh-Hans"
       ],
       "note": "Terminology consistency revision of the source seed."
+    },
+    "shell.milkAssist.steamTime": {
+      "english": "Steam time",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Milk Assist metric label replacing Max duration on the steam card."
+    },
+    "shell.milkAssist.steamTimeGrams": {
+      "english": "Steam time · {grams} g",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Metric label with the live weighed milk amount."
+    },
+    "shell.milkAssist.setAria": {
+      "english": "Set steam time to {seconds} seconds for {grams} g of milk",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Aria label for tapping the suggested steam time."
+    },
+    "shell.milkAssist.calibrateAria": {
+      "english": "Milk Assist calibration",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Aria label for the calibration entry tap."
+    },
+    "shell.milkAssist.jugWeight": {
+      "english": "Jug weight",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Milk Assist dialog row label."
+    },
+    "shell.milkAssist.calibration": {
+      "english": "Calibration",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Milk Assist dialog row label."
+    },
+    "shell.milkAssist.pair": {
+      "english": "{grams} g · {seconds} s",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Calibration pair display, grams and seconds."
+    },
+    "shell.milkAssist.rate": {
+      "english": "Rate",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Milk Assist dialog row label."
+    },
+    "shell.milkAssist.ratePer150": {
+      "english": "≈ {seconds} s per 150 ml",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Derived calibration rate for display."
+    },
+    "shell.milkAssist.adjustTime": {
+      "english": "Adjust time",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Dialog action opening the manual steam time ruler."
+    },
+    "shell.milkAssist.recalibrate": {
+      "english": "Recalibrate",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Dialog action opening the calibration wizard."
+    },
+    "shell.milkAssist.wizardStep": {
+      "english": "Calibrate · Step {step} of 3",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Wizard progress heading."
+    },
+    "shell.milkAssist.jugTitle": {
+      "english": "Weigh the empty jug",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Wizard step one title."
+    },
+    "shell.milkAssist.jugInstruction": {
+      "english": "Place the empty milk jug on the scale.",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Wizard step one instruction."
+    },
+    "shell.milkAssist.useSaved": {
+      "english": "Use saved {grams} g",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Secondary action adopting the stored jug weight."
+    },
+    "shell.milkAssist.milkTitle": {
+      "english": "Add the milk",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Wizard step two title."
+    },
+    "shell.milkAssist.milkInstruction": {
+      "english": "Pour the milk you normally steam and put the jug back on the scale.",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Wizard step two instruction."
+    },
+    "shell.milkAssist.capture": {
+      "english": "Capture {grams} g",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Capture button with the stable reading."
+    },
+    "shell.milkAssist.stable": {
+      "english": "Stable",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Stability chip state."
+    },
+    "shell.milkAssist.settling": {
+      "english": "Settling…",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Stability chip state while the reading varies."
+    },
+    "shell.milkAssist.steamTitle": {
+      "english": "Steam your milk",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Wizard step three title."
+    },
+    "shell.milkAssist.steamInstruction": {
+      "english": "Press the steam button on the machine. Stop it when the milk reaches your temperature.",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Wizard step three instruction."
+    },
+    "shell.milkAssist.steamWaiting": {
+      "english": "Waiting for steam to start…",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Step three status before steam starts."
+    },
+    "shell.milkAssist.captured": {
+      "english": "Captured",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Step three heading after the run ends."
+    },
+    "shell.milkAssist.tryAgain": {
+      "english": "Try again",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Step three retry action."
+    },
+    "shell.milkAssist.saveCalibration": {
+      "english": "Save calibration",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Step three confirm action."
+    },
+    "shell.milkAssist.tooShort": {
+      "english": "Steam ran shorter than 5 s. Try again.",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Error for runs under five seconds."
+    },
+    "shell.milkAssist.reachedMax": {
+      "english": "Reached the 120 s maximum. Try again.",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Error when the run hits the safety net."
+    },
+    "shell.milkAssist.scaleLost": {
+      "english": "Scale disconnected. Reconnect it to continue.",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Error when the scale disconnects mid wizard."
+    },
+    "settings.prepare.milkAssist": {
+      "english": "Milk Assist",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Settings toggle label for the feature."
+    },
+    "settings.prepare.milkAssistHint": {
+      "english": "Show the steam time suggestion from the weighed milk. Stored on this device; calibrate from the steam card.",
+      "languages": ["fr", "it", "zh-Hant", "zh-Hans"],
+      "note": "Settings toggle hint."
     }
   }
 }

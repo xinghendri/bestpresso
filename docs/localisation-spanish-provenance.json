@@ -5561,6 +5561,161 @@
       "english": "Brightness applied to Decaid, but this browser could not remember it for the next launch.",
       "translation": "Se aplicó el brillo en Decaid, pero este navegador no pudo guardarlo para el próximo inicio.",
       "kind": "contextual"
+    },
+    "shell.milkAssist.steamTime": {
+      "kind": "contextual",
+      "english": "Steam time",
+      "translation": "Tiempo de vapor"
+    },
+    "shell.milkAssist.steamTimeGrams": {
+      "kind": "contextual",
+      "english": "Steam time · {grams} g",
+      "translation": "Tiempo de vapor · {grams} g"
+    },
+    "shell.milkAssist.setAria": {
+      "kind": "contextual",
+      "english": "Set steam time to {seconds} seconds for {grams} g of milk",
+      "translation": "Fijar el tiempo de vapor en {seconds} segundos para {grams} g de leche"
+    },
+    "shell.milkAssist.calibrateAria": {
+      "kind": "contextual",
+      "english": "Milk Assist calibration",
+      "translation": "Calibración de Milk Assist"
+    },
+    "shell.milkAssist.jugWeight": {
+      "kind": "contextual",
+      "english": "Jug weight",
+      "translation": "Peso de la jarra"
+    },
+    "shell.milkAssist.calibration": {
+      "kind": "contextual",
+      "english": "Calibration",
+      "translation": "Calibración"
+    },
+    "shell.milkAssist.pair": {
+      "kind": "contextual",
+      "english": "{grams} g · {seconds} s",
+      "translation": "{grams} g · {seconds} s"
+    },
+    "shell.milkAssist.rate": {
+      "kind": "contextual",
+      "english": "Rate",
+      "translation": "Proporción"
+    },
+    "shell.milkAssist.ratePer150": {
+      "kind": "contextual",
+      "english": "≈ {seconds} s per 150 ml",
+      "translation": "≈ {seconds} s por 150 ml"
+    },
+    "shell.milkAssist.adjustTime": {
+      "kind": "contextual",
+      "english": "Adjust time",
+      "translation": "Ajustar tiempo"
+    },
+    "shell.milkAssist.recalibrate": {
+      "kind": "contextual",
+      "english": "Recalibrate",
+      "translation": "Recalibrar"
+    },
+    "shell.milkAssist.wizardStep": {
+      "kind": "contextual",
+      "english": "Calibrate · Step {step} of 3",
+      "translation": "Calibrar · Paso {step} de 3"
+    },
+    "shell.milkAssist.jugTitle": {
+      "kind": "contextual",
+      "english": "Weigh the empty jug",
+      "translation": "Pesa la jarra vacía"
+    },
+    "shell.milkAssist.jugInstruction": {
+      "kind": "contextual",
+      "english": "Place the empty milk jug on the scale.",
+      "translation": "Coloca la jarra de leche vacía sobre la báscula."
+    },
+    "shell.milkAssist.useSaved": {
+      "kind": "contextual",
+      "english": "Use saved {grams} g",
+      "translation": "Usar {grams} g guardados"
+    },
+    "shell.milkAssist.milkTitle": {
+      "kind": "contextual",
+      "english": "Add the milk",
+      "translation": "Añade la leche"
+    },
+    "shell.milkAssist.milkInstruction": {
+      "kind": "contextual",
+      "english": "Pour the milk you normally steam and put the jug back on the scale.",
+      "translation": "Vierte la leche habitual y vuelve a poner la jarra en la báscula."
+    },
+    "shell.milkAssist.capture": {
+      "kind": "contextual",
+      "english": "Capture {grams} g",
+      "translation": "Capturar {grams} g"
+    },
+    "shell.milkAssist.stable": {
+      "kind": "contextual",
+      "english": "Stable",
+      "translation": "Estable"
+    },
+    "shell.milkAssist.settling": {
+      "kind": "contextual",
+      "english": "Settling…",
+      "translation": "Estabilizando…"
+    },
+    "shell.milkAssist.steamTitle": {
+      "kind": "contextual",
+      "english": "Steam your milk",
+      "translation": "Vaporiza la leche"
+    },
+    "shell.milkAssist.steamInstruction": {
+      "kind": "contextual",
+      "english": "Press the steam button on the machine. Stop it when the milk reaches your temperature.",
+      "translation": "Pulsa el botón de vapor de la máquina. Detenlo cuando la leche alcance tu temperatura."
+    },
+    "shell.milkAssist.steamWaiting": {
+      "kind": "contextual",
+      "english": "Waiting for steam to start…",
+      "translation": "Esperando a que empiece el vapor…"
+    },
+    "shell.milkAssist.captured": {
+      "kind": "contextual",
+      "english": "Captured",
+      "translation": "Capturado"
+    },
+    "shell.milkAssist.tryAgain": {
+      "kind": "contextual",
+      "english": "Try again",
+      "translation": "Reintentar"
+    },
+    "shell.milkAssist.saveCalibration": {
+      "kind": "contextual",
+      "english": "Save calibration",
+      "translation": "Guardar calibración"
+    },
+    "shell.milkAssist.tooShort": {
+      "kind": "contextual",
+      "english": "Steam ran shorter than 5 s. Try again.",
+      "translation": "El vapor duró menos de 5 s. Reintenta."
+    },
+    "shell.milkAssist.reachedMax": {
+      "kind": "contextual",
+      "english": "Reached the 120 s maximum. Try again.",
+      "translation": "Se alcanzó el máximo de 120 s. Reintenta."
+    },
+    "shell.milkAssist.scaleLost": {
+      "kind": "contextual",
+      "english": "Scale disconnected. Reconnect it to continue.",
+      "translation": "Báscula desconectada. Reconéctala para continuar."
+    },
+    "settings.prepare.milkAssist": {
+      "kind": "contextual",
+      "english": "Milk Assist",
+      "translation": "Milk Assist"
+    },
+    "settings.prepare.milkAssistHint": {
+      "kind": "contextual",
+      "english": "Show the steam time suggestion from the weighed milk. Stored on this device; calibrate from the steam card.",
+      "translation": "Muestra la sugerencia de tiempo de vapor según la leche pesada. Se guarda en este dispositivo; calibra desde la tarjeta de vapor."
     }
   }
 }

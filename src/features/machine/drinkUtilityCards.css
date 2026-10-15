@@ -161,3 +161,43 @@
 @media(prefers-reduced-motion:reduce) {
   .app-shell .utility-card.drink-card,.drink-card *,.drink-card *::before,.drink-card *::after {transition:none!important;animation:none!important}
 }
+/* Milk Assist: the steam-time sync icon, the dialog, and the wizard shell. */
+.milk-metric:focus-visible {outline:2px solid #53d68e;outline-offset:-2px;border-radius:12px}
+.milk-metric__sync {width:18px;height:18px;flex:none;margin-left:8px;align-self:center;fill:none;stroke:#8d8d8d;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:stroke .18s ease,transform .18s ease}
+.milk-metric:hover:not(:disabled) .milk-metric__sync {stroke:#53d68e;transform:rotate(-18deg)}
+.milk-metric:active:not(:disabled) {transform:scale(.98)}
+.milk-dialog-backdrop {position:fixed;inset:0;z-index:8500;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55)}
+.milk-dialog {width:min(420px,92vw);padding:24px 28px;border-radius:24px;background:linear-gradient(145deg,rgba(77,66,66,.97),rgba(54,47,47,.97));outline:1px solid rgba(255,255,255,.09)}
+.milk-dialog h2 {margin:0 0 14px;color:#ef8686;font-size:16px;font-weight:600}
+.milk-dialog__row {display:flex;justify-content:space-between;align-items:baseline;padding:12px 0;border-top:1px solid rgba(255,255,255,.1)}
+.milk-dialog__row span {color:#a9a29a;font-size:14px}
+.milk-dialog__row strong {color:#f5f5f5;font-size:19px;font-weight:300;font-variant-numeric:tabular-nums}
+.milk-dialog__row strong small {margin-left:2px;font-size:13px;color:#bdb6ae}
+.milk-dialog__actions {display:flex;gap:10px;margin-top:16px}
+.milk-dialog__actions button {flex:1;height:50px;border:1px solid #747474;border-radius:25px;color:#c6c6c6;background:rgba(70,70,70,.55);font-size:14px;font-weight:600;white-space:nowrap;padding-inline:10px}
+.milk-dialog__actions .milk-dialog__primary {border:2px solid #3dc078;color:#53d68e;background:rgba(61,192,120,.14);font-weight:650}
+.milk-dialog__actions button:focus-visible {outline:2px solid #d0d0d0;outline-offset:3px}
+.milk-wizard {position:fixed;inset:0;z-index:9000;display:grid;grid-template-rows:auto minmax(0,1fr) 60px;padding:24px;background:radial-gradient(circle at 16% 16%,#060707 0,#141414 22%,transparent 50%),linear-gradient(124deg,#181818 36%,#4d4038 100%);color:#d0d0d0}
+.milk-wizard__head {display:flex;align-items:center;justify-content:space-between}
+.milk-wizard__step {color:#a9a29a;font-size:13px;font-weight:650;letter-spacing:.12em;text-transform:uppercase}
+.milk-wizard__cancel {min-width:104px;height:54px;padding:0 20px;border:1px solid #747474;border-radius:27px;color:#c6c6c6;background:rgba(70,70,70,.55);font-size:16px;font-weight:600}
+.milk-wizard__body {align-self:center;justify-self:center;text-align:center;width:min(680px,92vw);display:flex;flex-direction:column;align-items:center;gap:14px}
+.milk-wizard__body h2 {margin:0;color:#e96d6d;font-size:17px;font-weight:600}
+.milk-wizard__body>p {margin:0;color:#c7c2bc;font-size:18px}
+.milk-wizard__value {display:flex;align-items:flex-start;justify-content:center;color:#f0ece7;font-size:clamp(56px,10vh,88px);font-weight:200;letter-spacing:-3px;line-height:1;font-variant-numeric:tabular-nums}
+.milk-wizard__value--active {color:#ef8686}
+.milk-wizard__value--active em {margin:0 10px;font-style:normal;font-weight:200;color:#8f8a84}
+.milk-wizard__value--editable {gap:10px;padding:0;border:0;background:none;cursor:pointer}
+.milk-wizard__value--editable .metric__edit-indicator {align-self:center;width:26px;height:26px;flex:0 0 26px;font-size:22px}
+.milk-wizard__value small {margin-left:6px;font-size:.4em;font-weight:300;color:#b9b3ac}
+.milk-wizard__stability {display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 16px;border-radius:16px;border:1px solid rgba(255,255,255,.18);color:#c7c2bc;background:rgba(25,25,25,.7);font-size:13px;font-weight:600}
+.milk-wizard__stability.is-stable {border-color:rgba(61,192,120,.38);color:#66dfa0}
+.milk-wizard__body>.milk-wizard__error {margin:0;color:#f2a0a0;font-size:14px;font-weight:600}
+.milk-wizard__actions {display:flex;gap:12px}
+.milk-wizard__secondary {min-width:120px;height:54px;padding:0 18px;border:1px solid #747474;border-radius:27px;color:#c6c6c6;background:rgba(70,70,70,.55);font-size:15px;font-weight:600;white-space:nowrap}
+.milk-wizard__primary {min-width:220px;height:56px;border:2px solid #3dc078;border-radius:28px;color:#53d68e;background:rgba(61,192,120,.14);font-size:16px;font-weight:650;white-space:nowrap}
+.milk-wizard__primary:disabled {opacity:.38;cursor:not-allowed}
+.milk-wizard__primary:focus-visible,.milk-wizard__secondary:focus-visible,.milk-wizard__cancel:focus-visible {outline:2px solid #d0d0d0;outline-offset:3px}
+.milk-wizard__dots {display:flex;gap:8px;justify-content:center;align-self:end}
+.milk-wizard__dots i {width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.22)}
+.milk-wizard__dots i.is-on {background:#ef8686}

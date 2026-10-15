@@ -316,5 +316,9 @@ export const settings = {
   "settings.message.scheduleUpdated": "唤醒计划已更新。",
   "settings.message.scheduleRemoved": "唤醒计划已移除。",
   "settings.brightness.outOfRange": "亮度必须介于 0 与 100 之间。",
-  "settings.brightness.persistFailed": "亮度已应用到 Decaid，但此浏览器无法记住设置以供下次启动使用。"
+  "settings.brightness.persistFailed": "亮度已应用到 Decaid，但此浏览器无法记住设置以供下次启动使用。",
+  // Milk Assist
+  'settings.prepare.milkAssist': 'Milk Assist',
+  'settings.prepare.milkAssistHint': '根据称量的牛奶显示蒸汽时间建议。仅保存在本设备；请在蒸汽卡片上校准。',
+
 } satisfies Translation<EnglishCatalog>
